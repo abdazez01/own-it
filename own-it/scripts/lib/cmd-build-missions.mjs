@@ -157,8 +157,10 @@ export async function run(args, ctx) {
     if (x.blank) mission.blank = true;
     mission.answer = core.encode(x.answer);
     const cardIds = x.blank ? x.answer.cards.map((c) => c.id) : x.cards.map((c) => c.id);
+    // Token floor for this mission: what Claude wrote (recipe entry) plus what the helper emitted.
+    const est = estimate(JSON.stringify(m), JSON.stringify(mission));
     built.push({ mission, meta: { zone: m.zone, rung: m.rung, board: m.board, cardIds,
-      refresh: Boolean(m.refresh), threatIds: x.threatIds || [] } });
+      refresh: Boolean(m.refresh), threatIds: x.threatIds || [], est } });
   });
 
   // All validation done; write.

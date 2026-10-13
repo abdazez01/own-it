@@ -203,7 +203,9 @@ export async function run(args, ctx) {
   const badges = badgesFor(progress).filter((b) => !had.has(b));
   progress.badges.push(...badges);
 
-  const est = f.tokens ?? estimate(m.answerText, m.meta ? JSON.stringify(m.meta) : '', typeof args.flags?.text === 'string' ? args.flags.text : '');
+  // Helper floor: build-missions' per-mission estimate plus what apply reads. --tokens is the real count.
+  const floor = Number.isFinite(m.meta?.est) && m.meta.est >= 0 ? m.meta.est : 0;
+  const est = f.tokens ?? floor + estimate(m.answerText, m.meta ? JSON.stringify(m.meta) : '', typeof args.flags?.text === 'string' ? args.flags.text : '');
   progress.tokens.push({ t: ctx.now().toISOString(), kind: 'mission', id, session: m.session, est });
   progress.applied.push(id);
   saveProgress(ctx.root, progress);

@@ -174,3 +174,13 @@ test('emitted cards omit actor, are shuffled deterministically, boss answer card
   assert.notDeepEqual(orders[0], flat);
   assert.deepEqual(orders[0], orders[1]);
 });
+
+test('session meta stores a per-mission token floor (recipe mission + emitted mission)', async () => {
+  const root = await setup();
+  open(root, 'map');
+  const rm = { zone: 'trips', rung: 'map', board: 'component', brief: 'Map it', cards: ['c0', 'c1', 'c4'] };
+  await build({ _: [recipe(root, [rm])], flags: {} }, ctx(root));
+  const m = loadMissions(root).missions[0];
+  const session = JSON.parse(readFileSync(join(root, '.own-it', 'session.json'), 'utf8'));
+  assert.equal(session.missions[m.id].est, Math.ceil((JSON.stringify(rm).length + JSON.stringify(m).length) / 4));
+});

@@ -93,6 +93,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
 .ledger dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; margin: 0; }
 .ledger dt { color: var(--muted); }
 .ledger dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.ledger p.how { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
 .mode-tag { font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 6px; }
 
 /* ---------- board screen ---------- */
@@ -413,12 +414,13 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     var last = lastSessionTokens(tokens);
     var perZone = {};
     tokens.forEach(function (t) { if (t && t.kind === 'extraction') perZone[t.zone] = (perZone[t.zone] || 0) + (+t.est || 0); });
-    var rows = [el('dt', null, 'Last session'), el('dd', { text: last ? '≈ ' + num(last.est) + ' tokens, ' + last.count + (last.count === 1 ? ' mission' : ' missions') : 'none yet' })];
+    var rows = [el('dt', null, 'Last session'), el('dd', { text: last ? '≈ ' + num(last.est) + ' tokens (helper floor), ' + last.count + (last.count === 1 ? ' mission' : ' missions') : 'none yet' })];
     Object.keys(perZone).forEach(function (z) {
       var name = PROG.zones && PROG.zones[z] && PROG.zones[z].name || z;
-      rows.push(el('dt', null, 'Reading ' + name), el('dd', { text: '≈ ' + num(perZone[z]) + ' tokens' }));
+      rows.push(el('dt', null, 'Reading ' + name), el('dd', { text: '≈ ' + num(perZone[z]) + ' tokens (helper floor)' }));
     });
-    return el('section', { class: 'ledger', 'aria-labelledby': 'ledger-h' }, el('h2', { id: 'ledger-h', text: 'Token log' }), el('dl', null, rows));
+    return el('section', { class: 'ledger', 'aria-labelledby': 'ledger-h' }, el('h2', { id: 'ledger-h', text: 'Token log' }), el('dl', null, rows),
+      el('p', { class: 'how', text: 'Real cost is about 5-10x: reference reads, chat and debriefs are not counted.' }));
   }
 
   // ---------- board state ----------

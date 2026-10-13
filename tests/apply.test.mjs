@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run as init } from '../own-it/scripts/lib/cmd-init.mjs';
 import { run as apply } from '../own-it/scripts/lib/cmd-apply.mjs';
 import { loadModel, saveModel } from '../own-it/scripts/lib/model.mjs';
 import { loadProgress, saveProgress } from '../own-it/scripts/lib/progress.mjs';
 import { writeJson, readJson } from '../own-it/scripts/lib/json.mjs';
+import { estimate } from '../own-it/scripts/lib/tokens.mjs';
 import { tmpProject, ctx } from './helpers.mjs';
 
 const I = (o) => ({ conf: 'high', ref: 'api/t.ts:1', ...o });
@@ -275,4 +276,17 @@ test('boss solids count q1..q5 only', async () => {
   mission(root, 'trips-boss-1', { zone: 'trips', rung: 'boss', board: 'component', cardIds: ['c0', 'c1'] }, { got: 3, of: 3, text: { c0: 'pin' } });
   const out = await apply({ _: ['trips-boss-1'], flags: { text: '{"c0":"solid","q1":"solid","q2":"solid"}' } }, ctx(root));
   assert.deepEqual(out.cleared, []);
+});
+
+test('logged estimate adds the mission floor from build-missions; --tokens replaces it', async () => {
+  const root = await setup();
+  setRungs(root, { trace: 'open' });
+  mission(root, 'trips-trace-1', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0'], est: 1000 }, { got: 1, of: 1 });
+  await apply({ _: ['trips-trace-1'], flags: {} }, ctx(root));
+  const meta = readJson(join(root, '.own-it', 'session.json')).missions['trips-trace-1'];
+  const answerText = readFileSync(join(root, '.own-it', 'answers', 'trips-trace-1.json'), 'utf8');
+  assert.equal(loadProgress(root).tokens.at(-1).est, 1000 + estimate(answerText, JSON.stringify(meta), ''));
+  mission(root, 'trips-trace-2', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0'], est: 1000 }, { got: 1, of: 1 });
+  await apply({ _: ['trips-trace-2'], flags: { tokens: '10,5' } }, ctx(root));
+  assert.equal(loadProgress(root).tokens.at(-1).est, 15);
 });
