@@ -15,6 +15,12 @@ export async function run(args, ctx) {
   const errs = check(spec, ZONES);
   if (errs.length) throw new Error(`invalid zones file: ${errs.slice(0, 5).join('; ')}`);
 
+  const seen = new Set();
+  for (const z of spec.zones) {
+    if (seen.has(z.id)) throw new Error(`invalid zones file: duplicate zone id "${z.id}"`);
+    seen.add(z.id);
+  }
+
   const gitTracked = Boolean(args.flags['git-tracked']);
   const created = !existsSync(ownItPath(ctx.root, 'progress.json'));
   mkdirSync(ownItPath(ctx.root), { recursive: true });
@@ -37,8 +43,8 @@ export async function run(args, ctx) {
     const prevM = Object.hasOwn(oldModelZones, z.id) ? oldModelZones[z.id] : null;
     const prevP = Object.hasOwn(oldProgressZones, z.id) ? oldProgressZones[z.id] : null;
     model.zones[z.id] = prevM
-      ? { ...prevM, name: z.name, paths: z.paths }
-      : { name: z.name, paths: z.paths, items: [] };
+      ? { files: {}, items: [], ...prevM, name: z.name, paths: z.paths }
+      : { name: z.name, paths: z.paths, files: {}, items: [] };
     progress.zones[z.id] = prevP
       ? { ...prevP, name: z.name }
       : defaultZoneProgress(z.name);

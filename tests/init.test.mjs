@@ -22,6 +22,7 @@ test('init creates .own-it with self-ignoring .gitignore, model, progress, progr
   assert.equal(loadProgress(root).zones.trips.rungs.words, 'open');
   assert.equal(loadProgress(root).zones.trips.rungs.map, 'locked');
   assert.deepEqual(loadModel(root).zones.trips.paths, ['api']);
+  assert.deepEqual(loadModel(root).zones.trips.files, {});
   assert.match(readFileSync(join(root, '.own-it', 'progress.js'), 'utf8'), /^window\.OWNIT_PROGRESS = /);
 });
 
@@ -67,4 +68,10 @@ test('init treats prototype-key ids as ordinary zone ids', async () => {
   assert.deepEqual(out.zones, ['constructor']);
   assert.equal(loadProgress(root).zones.constructor.rungs.words, 'open');
   assert.deepEqual(loadModel(root).zones.constructor.items, []);
+});
+
+test('init rejects duplicate zone ids', async () => {
+  const root = tmpProject({});
+  const zf = zonesFile(root, [{ id: 'a', name: 'A', paths: ['x'] }, { id: 'a', name: 'B', paths: ['y'] }]);
+  await assert.rejects(init({ _: [], flags: { zones: zf } }, ctx(root)), /invalid zones file: duplicate zone id "a"/);
 });
