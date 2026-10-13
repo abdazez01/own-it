@@ -35,7 +35,7 @@ function detectFrameworks(root, files, frameworks) {
 }
 
 const compile = (pats) => pats.map((p) => ({ ...p, rx: new RegExp(p.re, 'g') }));
-const applies = (p, ext) => !p.ext || p.ext.includes(ext);
+const applies = (p, ext) => !p.ext || p.ext.includes(ext.toLowerCase());
 
 function buildLabel(p, m) {
   return p.label.replace(/\$([1-9])/g, (_, i) => {
@@ -103,7 +103,8 @@ export async function run(args, ctx) {
   const patterns = readJson(join(SKILL_DIR, 'assets', 'patterns.json'));
   const zoneId = args.flags.strings;
   if (zoneId !== undefined) {
-    const zone = loadModel(root).zones[zoneId];
+    const zones = loadModel(root).zones;
+    const zone = Object.hasOwn(zones, zoneId) ? zones[zoneId] : undefined;
     if (!zone) throw new Error(`unknown zone "${zoneId}"; run init --zones first`);
     return { zone: zoneId, terms: scanStrings(root, zoneFiles(root, zone), patterns.strings) };
   }

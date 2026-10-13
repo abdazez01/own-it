@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { run as scan } from '../own-it/scripts/lib/cmd-scan.mjs';
-import { saveModel, zoneFiles } from '../own-it/scripts/lib/model.mjs';
+import { saveModel, zoneFiles, matchesPath } from '../own-it/scripts/lib/model.mjs';
 import { tmpProject, ctx } from './helpers.mjs';
 
 const files = {
@@ -67,4 +67,22 @@ test('scan --strings lists zone terms with refs, capped', async () => {
 test('scan --strings on unknown zone errors', async () => {
   const root = tmpProject(files, { git: false });
   await assert.rejects(scan({ _: [], flags: { strings: 'nope' } }, ctx(root)), /unknown zone "nope"/);
+});
+
+test('matchesPath takes the extension dot from the basename only', () => {
+  assert.equal(matchesPath('Makefile', 'Makefil'), false);
+  assert.equal(matchesPath('v1.2/foo', 'v1'), false);
+  assert.equal(matchesPath('api/trips.ts', 'api/trips'), true);
+  assert.equal(matchesPath('api/trips/x.ts', 'api/trips'), true);
+});
+
+test('scan --strings rejects inherited property names as zones', async () => {
+  const root = tmpProject(files, { git: false });
+  await assert.rejects(scan({ _: [], flags: { strings: 'constructor' } }, ctx(root)), /unknown zone "constructor"/);
+});
+
+test('scan matches pattern extensions case-insensitively', async () => {
+  const root = tmpProject({ 'package.json': JSON.stringify({ dependencies: { 'react-router-dom': '6' } }), 'app/A.TSX': '<Route path="/up" element={<A/>} />' }, { git: false });
+  const out = await scan({ _: [], flags: {} }, ctx(root));
+  assert.ok(out.candidates.some((c) => c.label === 'screen /up'), JSON.stringify(out.candidates));
 });

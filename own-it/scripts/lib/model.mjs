@@ -8,7 +8,9 @@ export const saveModel = (root, m) => writeJson(ownItPath(root, 'model.json'), m
 export function matchesPath(file, prefix) {
   const p = prefix.replace(/\/+$/, '');
   if (file === p || file.startsWith(p + '/')) return true;
-  const base = file.slice(0, file.lastIndexOf('.'));
+  const slash = file.lastIndexOf('/');
+  const dot = file.lastIndexOf('.');
+  const base = dot > slash ? file.slice(0, dot) : file;
   return base === p;
 }
 export const zoneFiles = (root, zone) => listFiles(root).filter((f) => zone.paths.some((p) => matchesPath(f, p)));
