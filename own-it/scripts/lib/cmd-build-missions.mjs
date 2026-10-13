@@ -1,0 +1,150 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { check, RECIPE } from './validate.mjs';
+import { loadModel } from './model.mjs';
+import { loadProgress, saveProgress, defaultZoneProgress } from './progress.mjs';
+import core from './core.mjs';
+import { writeJson, writeJsVar } from './json.mjs';
+import { ownItPath, toPosix } from './paths.mjs';
+import { estimate } from './tokens.mjs';
+
+const CARD_KINDS = ['surface', 'component', 'actor'];
+const BOARD_OF = { map: 'component', trace: 'swimlanes', break: 'component', boss: 'component' };
+const BOSS_MAX = 15;
+
+const cardOf = (it) => {
+  const c = { id: it.id, label: it.label ?? it.id, ref: it.ref, conf: it.conf };
+  if (it.actor) c.actor = it.actor;
+  return c;
+};
+
+function gate(m, pz) {
+  if (m.refresh) {
+    if (!pz.fogged) throw new Error(`zone "${m.zone}" is not fogged`);
+    return;
+  }
+  const state = Object.hasOwn(pz.rungs, m.rung) ? pz.rungs[m.rung] : 'locked';
+  if (state === 'open' || state === 'cleared') return;
+  let msg = `rung "${m.rung}" is locked in zone "${m.zone}"`;
+  if (m.rung === 'trace' && pz.rungs.map !== 'cleared') msg += `; map needs surfaces ${m.__uncovered.join(',')}`;
+  throw new Error(msg);
+}
+
+function expand(m, i, items, byId) {
+  const at = `missions[${i}]`;
+  const edgesWithin = (ids) => {
+    const s = new Set(ids);
+    return items.filter((x) => x.k === 'edge' && s.has(x.from) && s.has(x.to)).map((x) => ({ id: x.id, from: x.from, to: x.to }));
+  };
+  const pick = (ids) => {
+    const missing = ids.filter((id) => !byId.has(id));
+    if (missing.length) throw new Error(`unknown ids in ${at}: ${missing.join(', ')}`);
+    return ids.map((id) => byId.get(id));
+  };
+  const pickCards = (ids) => {
+    if (!ids || ids.length < 2 || ids.length > 12) throw new Error(`${at} needs 2-12 cards`);
+    if (new Set(ids).size !== ids.length) throw new Error(`duplicate cards in ${at}`);
+    const its = pick(ids);
+    const bad = its.filter((x) => !CARD_KINDS.includes(x.k));
+    if (bad.length) throw new Error(`${at} cards must be surface, component or actor: ${bad.map((x) => x.id).join(', ')}`);
+    return its;
+  };
+
+  if (m.rung === 'map') {
+    const its = pickCards(m.cards);
+    return { cards: its.map(cardOf), answer: { edges: edgesWithin(its.map((x) => x.id)) } };
+  }
+
+  if (m.rung === 'trace') {
+    if (!m.flow) throw new Error(`${at} needs a flow`);
+    const [flow] = pick([m.flow]);
+    if (flow.k !== 'flow') throw new Error(`${at}: "${m.flow}" is not a flow`);
+    const steps = flow.steps || [];
+    const ids = [...new Set(steps.flat())];
+    const its = pick(ids);
+    if (its.length < 2 || its.length > 12) throw new Error(`${at} flow needs 2-12 cards`);
+    const noActor = its.filter((x) => !x.actor).map((x) => x.id);
+    if (noActor.length) throw new Error(`${at} flow cards without actor: ${noActor.join(', ')}`);
+    const lanes = [...new Set(steps.flat().map((id) => byId.get(id).actor))];
+    return { cards: its.map(cardOf), lanes,
+      answer: { steps, lanes: Object.fromEntries(its.map((x) => [x.id, x.actor])) } };
+  }
+
+  if (m.rung === 'break') {
+    const its = pickCards(m.cards);
+    const th = m.threats || [];
+    if (th.length < 1 || th.length > 4) throw new Error(`${at} needs 1-4 threats`);
+    const tits = pick(th);
+    const cardIds = new Set(its.map((x) => x.id));
+    for (const t of tits) {
+      if (t.k !== 'failure') throw new Error(`${at}: "${t.id}" is not a failure`);
+      if (!cardIds.has(t.card)) throw new Error(`threat "${t.id}" card "${t.card}" not in ${at} cards`);
+    }
+    return { cards: its.map(cardOf), tokens: tits.map((t) => ({ id: t.id, label: t.threat })), threatIds: th,
+      answer: { edges: edgesWithin([...cardIds]), threats: tits.map((t) => ({ id: t.id, card: t.card })) } };
+  }
+
+  // boss
+  const its = items.filter((x) => x.k === 'surface' || x.k === 'component')
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, BOSS_MAX);
+  if (its.length < 2) throw new Error(`${at} zone needs at least 2 surfaces or components`);
+  return { cards: [], blank: true, pinIds: its.map((x) => x.id),
+    answer: { cards: its.map((x) => ({ id: x.id, label: x.label ?? x.id })), edges: edgesWithin(its.map((x) => x.id)) } };
+}
+
+export async function run(args, ctx) {
+  const arg = args._[0];
+  if (!arg) throw new Error('usage: build-missions <recipe.json>');
+  const file = resolve(ctx.root, arg);
+  let text;
+  try { text = readFileSync(file, 'utf8').replace(/^﻿/, ''); } catch { throw new Error(`missing file ${file}`); }
+  let recipe;
+  try { recipe = JSON.parse(text); } catch { throw new Error(`invalid JSON in ${file}`); }
+  const errs = check(recipe, RECIPE);
+  if (errs.length) throw new Error(`invalid recipe: ${errs.join('; ')}`);
+
+  const model = loadModel(ctx.root);
+  const progress = loadProgress(ctx.root);
+  const built = [];
+
+  recipe.missions.forEach((m, i) => {
+    const at = `missions[${i}]`;
+    if (!Object.hasOwn(model.zones, m.zone)) throw new Error(`unknown zone "${m.zone}" in ${at}`);
+    if (BOARD_OF[m.rung] !== m.board) throw new Error(`${at}: rung "${m.rung}" needs board "${BOARD_OF[m.rung]}"`);
+    const zone = model.zones[m.zone];
+    const items = zone.items || [];
+    const byId = new Map(items.map((x) => [x.id, x]));
+    const pz = Object.hasOwn(progress.zones, m.zone) ? progress.zones[m.zone] : defaultZoneProgress(zone.name);
+    const covered = new Set(pz.surfacesCovered || []);
+    gate({ ...m, __uncovered: items.filter((x) => x.k === 'surface' && !covered.has(x.id)).map((x) => x.id) }, pz);
+
+    const x = expand(m, i, items, byId);
+    const pins = m.pins || [];
+    const shown = new Set(x.pinIds || x.cards.map((c) => c.id));
+    for (const p of pins) if (!shown.has(p.card)) throw new Error(`pin card "${p.card}" not in ${at} cards`);
+
+    const id = `${m.zone}-${m.rung}-${progress.seq + 1 + i}`;
+    const mission = { id, zone: m.zone, rung: m.rung, board: m.board, brief: m.brief };
+    if (x.lanes) mission.lanes = x.lanes;
+    mission.cards = x.cards;
+    mission.pins = pins;
+    if (x.tokens) mission.tokens = x.tokens;
+    if (x.blank) mission.blank = true;
+    mission.answer = core.encode(x.answer);
+    const cardIds = x.blank ? x.answer.cards.map((c) => c.id) : x.cards.map((c) => c.id);
+    built.push({ mission, meta: { zone: m.zone, rung: m.rung, board: m.board, cardIds,
+      refresh: Boolean(m.refresh), threatIds: x.threatIds || [] } });
+  });
+
+  // All validation done; write.
+  const session = ctx.now().toISOString();
+  const missionIds = built.map((b) => b.mission.id);
+  const out = { session, mode: recipe.mode, root: toPosix(resolve(ctx.root)), missions: built.map((b) => b.mission) };
+  const missionJs = ownItPath(ctx.root, 'mission.js');
+  writeJsVar(missionJs, 'OWNIT_MISSIONS', out);
+  writeJson(ownItPath(ctx.root, 'session.json'), { session, mode: recipe.mode,
+    missions: Object.fromEntries(built.map((b) => [b.mission.id, b.meta])) });
+  progress.seq += built.length;
+  saveProgress(ctx.root, progress);
+  return { session, missions: missionIds, est: estimate(text, readFileSync(missionJs, 'utf8')) };
+}
