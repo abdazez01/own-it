@@ -72,3 +72,51 @@ test('unknown zone and invalid top level error clearly', async () => {
   await assert.rejects(checkRefs({ _: [write(root, { zone: 'x', files: [], items: [] })], flags: {} }, ctx(root)), /unknown zone "x"/);
   await assert.rejects(checkRefs({ _: [write(root, { zone: 'trips' })], flags: {} }, ctx(root)), /invalid extraction: files: required/);
 });
+
+test('refs escaping the project root are dropped as no-file', async () => {
+  const root = await setup();
+  const out = await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts'], items: [
+    it({ id: 'x1', k: 'surface', label: 'up', ref: '../x.ts:1', outside: true }),
+    it({ id: 'x2', k: 'surface', label: 'abs', ref: '/etc/passwd:1', outside: true }),
+    it({ id: 'x3', k: 'surface', label: 'unc', ref: '//srv/share/x:1', outside: true }),
+    it({ id: 'ok', k: 'surface', label: 'fine', ref: 'api/trips.ts:1' }),
+  ] })], flags: {} }, ctx(root));
+  assert.deepEqual(out.dropped.map((d) => `${d.id}:${d.why}`).sort(), ['x1:no-file', 'x2:no-file', 'x3:no-file']);
+  assert.equal(out.kept, 1);
+});
+
+test('integrity covers the merged set in both directions', async () => {
+  const root = await setup();
+  await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts', 'app/Trip.tsx'], items: [
+    it({ id: 'a', k: 'surface', label: 'api', ref: 'api/trips.ts:1' }),
+    it({ id: 'b', k: 'surface', label: 'screen', ref: 'app/Trip.tsx:1' }),
+    it({ id: 'e', k: 'edge', from: 'b', to: 'a', ref: 'app/Trip.tsx:2' }),
+  ] })], flags: {} }, ctx(root));
+  const out = await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts'], items: [
+    it({ id: 'n', k: 'surface', label: 'new', ref: 'api/trips.ts:3' }),
+    it({ id: 'ne', k: 'edge', from: 'n', to: 'b', ref: 'api/trips.ts:4' }),
+  ] })], flags: {} }, ctx(root));
+  assert.deepEqual(out.dropped.map((d) => `${d.id}:${d.why}`), ['e:dangling']);
+  assert.equal(out.kept, 2);
+  assert.deepEqual(loadModel(root).zones.trips.items.map((i) => i.id).sort(), ['b', 'n', 'ne']);
+});
+
+test('duplicate id is dropped even if the first was dropped for another reason', async () => {
+  const root = await setup();
+  const out = await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts'], items: [
+    it({ id: 'c1', k: 'surface', label: 'ghost', ref: 'api/nope.ts:1' }),
+    it({ id: 'c1', k: 'surface', label: 'real', ref: 'api/trips.ts:1' }),
+  ] })], flags: {} }, ctx(root));
+  assert.deepEqual(out.dropped.map((d) => `${d.id}:${d.why}`), ['c1:no-file', 'c1:dup-id']);
+  assert.equal(out.kept, 0);
+});
+
+test('extraction file with a BOM is accepted', async () => {
+  const root = await setup();
+  const p = join(root, 'ex.json');
+  writeFileSync(p, '\uFEFF' + JSON.stringify({ zone: 'trips', files: ['api/trips.ts'], items: [
+    it({ id: 'c1', k: 'surface', label: 'api', ref: 'api/trips.ts:1' }),
+  ] }));
+  const out = await checkRefs({ _: [p], flags: {} }, ctx(root));
+  assert.equal(out.kept, 1);
+});
