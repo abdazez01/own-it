@@ -14,7 +14,7 @@ const fileOf = (ref) => ref.slice(0, ref.lastIndexOf(':'));
 const lineOf = (ref) => Number(ref.slice(ref.lastIndexOf(':') + 1));
 
 function parseExtraction(path) {
-  const raw = readFileSync(path, 'utf8').replace(/^FEFF/, '');
+  const raw = readFileSync(path, 'utf8').replace(/^﻿/, '');
   try { return { raw, data: JSON.parse(raw) }; }
   catch { throw new Error(`invalid JSON in ${path}`); }
 }
