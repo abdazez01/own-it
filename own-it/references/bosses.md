@@ -13,7 +13,7 @@ Recipe mission, no pins. Zones with over 15 surfaces and components need `cards`
  "brief": "Blank board. Draw the whole zone from memory: every screen, route and service, and how they connect."}
 ```
 
-The user draws boxes and arrows from memory. The page matches box names to the zone's surfaces and components and grades the drawing; boxes naming unscored zone parts are neutral. Revealing the card list is a hint the page charges for. After "done", `collect <id>`; `wrong` holds box-label pairs.
+The user draws from memory. The page matches box names to zone parts and grades the drawing; boxes naming unscored parts are neutral. Showing the card list costs a hint. After "done", `collect <id>`; `wrong` holds box-label pairs. A challenged box naming the right item in other words counts as `--challenge-won`.
 
 ### 2. Cross-examination
 

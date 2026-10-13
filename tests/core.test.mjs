@@ -159,13 +159,27 @@ test('matchLabels: stopword-only/empty labels never match; one card claimed once
 });
 
 test('matchLabels: greedy picks globally highest score first, threshold inclusive at 0.5', () => {
-  const cards = [{ id: 'c1', label: 'trips api' }, { id: 'c2', label: 'trips table' }];
+  const cards = [{ id: 'c1', label: 'trips ledger' }, { id: 'c2', label: 'trips table' }];
   // u1 scores 0.5 with c1 and 0.2 with c2; u2 scores 1 with c1 -> u2 takes c1 even though u1 comes
   // first in input order, and u1's only remaining option (c2, 0.2) is below threshold.
-  const m = core.matchLabels([{ uid: 'u1', label: 'trips service api gateway' }, { uid: 'u2', label: 'Trips API' }], cards);
+  const m = core.matchLabels([{ uid: 'u1', label: 'trips ledger service gateway' }, { uid: 'u2', label: 'Trips Ledger' }], cards);
   assert.deepEqual(m, { u2: 'c1' });
   // exactly 0.5 is accepted
-  assert.deepEqual(core.matchLabels([{ uid: 'u', label: 'trips' }], [{ id: 'c', label: 'trips api' }]), { u: 'c' });
+  assert.deepEqual(core.matchLabels([{ uid: 'u', label: 'trips' }], [{ id: 'c', label: 'trips table' }]), { u: 'c' });
+});
+
+test('matchLabels: route syntax, camelCase and plurals; other words for the same item match', () => {
+  const cards = [{ id: 'r', label: 'POST /locks/:id/release-cable' }, { id: 's', label: 'tripCancelScreen' }];
+  assert.deepEqual(core.matchLabels([{ uid: 'u1', label: 'release cable endpoint' }, { uid: 'u2', label: 'trip cancel screen' }], cards), { u1: 'r', u2: 's' });
+  assert.deepEqual(core.matchLabels([{ uid: 'u', label: 'releaseCable API' }], cards), { u: 'r' });
+});
+
+test('matchLabels: sharing one word with a longer label is not a match; the better card wins', () => {
+  const approve = { id: 'a', label: 'Approve cancel' };
+  const cancel = { id: 'c', label: 'POST /trips/:id/cancel' };
+  assert.deepEqual(core.matchLabels([{ uid: 'u', label: 'cancel trip' }], [approve]), {});
+  assert.deepEqual(core.matchLabels([{ uid: 'u', label: 'cancel trip' }], [approve, cancel]), { u: 'c' });
+  assert.deepEqual(core.matchLabels([{ uid: 'u', label: 'GET /api/route' }], [{ id: 'x', label: 'delete endpoint' }]), {});
 });
 
 test('gradeBoss: unmatched boxes, missed edges, wrong edges reported as user uid pairs', () => {

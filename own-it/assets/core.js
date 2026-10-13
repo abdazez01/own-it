@@ -11,7 +11,9 @@
 
   const KEY = 'own-it:anti-spoiler:v1';
   const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const STOPWORDS = new Set(['the', 'a', 'an', 'of', 'to', 'and', 'for', 'in', 'on']);
+  // English fillers plus HTTP/route words, so "release cable endpoint" matches "POST /locks/:id/release-cable".
+  const STOPWORDS = new Set(['the', 'a', 'an', 'of', 'to', 'and', 'for', 'in', 'on',
+    'get', 'post', 'put', 'patch', 'delete', 'id', 'api', 'endpoint', 'route']);
 
   // ---- codec ----
 
@@ -150,10 +152,17 @@
     return { got: got, of: answer.threats.length, missed: missed, wrong: wrong };
   }
 
+  // Plain plural: "trips" -> "trip"; keeps short words and "-ss" ("access").
+  function singular(t) { return t.length > 3 && t.endsWith('s') && !t.endsWith('ss') ? t.slice(0, -1) : t; }
+
+  // Words of a label: camelCase split, lowercased, stopwords dropped, plurals folded.
   function tokens(label) {
     const set = new Set();
-    for (const t of String(label == null ? '' : label).toLocaleLowerCase().split(/[^\p{L}\p{N}]+/u)) {
-      if (t && !STOPWORDS.has(t)) set.add(t);
+    const spaced = String(label == null ? '' : label)
+      .replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, '$1 $2')
+      .replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, '$1 $2');
+    for (const t of spaced.toLocaleLowerCase().split(/[^\p{L}\p{N}]+/u)) {
+      if (t && !STOPWORDS.has(t)) set.add(singular(t));
     }
     return set;
   }
