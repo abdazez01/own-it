@@ -7,6 +7,7 @@ export function check(v, s, at = '') {
   if (!isType[s.type](v)) return [`${at || '(root)'}: expected ${s.type}`];
   if (s.enum && !s.enum.includes(v)) errs.push(`${at}: expected one of ${s.enum.join(',')}`);
   if (s.pattern && !new RegExp(s.pattern).test(v)) errs.push(`${at}: does not match ${s.pattern}`);
+  if (s.type === 'string' && s.max !== undefined && v.length > s.max) errs.push(`${at}: at most ${s.max} chars`);
   if (s.type === 'number' && s.min !== undefined && v < s.min) errs.push(`${at}: below ${s.min}`);
   if (s.type === 'array') {
     if (s.min !== undefined && v.length < s.min) errs.push(`${at}: at least ${s.min} items`);

@@ -23,6 +23,11 @@ test('check reports exact field paths', () => {
   assert.ok(errs.includes('missions[0].board: expected one of component,swimlanes'), errs.join('\n'));
 });
 
+test('check enforces string max', () => {
+  const errs = check({ mode: 'practice', missions: [{ zone: 'z', rung: 'map', board: 'component', brief: 'x'.repeat(301) }] }, RECIPE);
+  assert.ok(errs.includes('missions[0].brief: at most 300 chars'), errs.join('\n'));
+});
+
 test('check requires ref and conf on items', () => {
   const errs = check({ id: 'c1', k: 'surface', label: 'x' }, ITEM);
   assert.ok(errs.includes('ref: required'));
