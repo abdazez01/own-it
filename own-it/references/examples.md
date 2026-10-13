@@ -38,7 +38,7 @@
 }
 ```
 
-`{"zone":"trips","kept":13,"dropped":[],"est":509}` (`dropped`: `{id, why}`, why = invalid, dup-id, no-file, bad-line, outside-zone, dangling)
+`{"zone":"trips","kept":13,"dropped":[],"est":505}` (`dropped`: `{id, why}`, why = invalid, dup-id, no-file, bad-line, outside-zone, dangling)
 
 ## Recipe `.own-it/recipe.json` → `build-missions` it (format only: real map missions use 5-10 cards; one build mixes rungs only if all are open)
 
