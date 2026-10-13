@@ -63,6 +63,17 @@ function parseFlags(flags) {
     challengesWon: intFlag(flags, 'challenge-won'), tokens: parseTokens(flags) };
 }
 
+// Items a board mission scores: map grades arrows, trace cards, break threats, boss both.
+function gradedItems(rung, meta, items) {
+  const cardIds = meta.cardIds || [];
+  const cards = new Set(cardIds);
+  const edges = items.filter((x) => x.k === 'edge' && cards.has(x.from) && cards.has(x.to)).map((x) => x.id);
+  if (rung === 'map') return edges;
+  if (rung === 'trace') return cardIds;
+  if (rung === 'break') return meta.threatIds || [];
+  return [...cardIds, ...edges];
+}
+
 // Resolve the mission: a session board mission, or a words mission (<zone>-words-<n>).
 function resolveMission(root, id, model, f) {
   const sessionPath = ownItPath(root, 'session.json');
@@ -76,7 +87,8 @@ function resolveMission(root, id, model, f) {
     const answerPath = ownItPath(root, 'answers', `${id}.json`);
     let answer = { got: 0, of: 0, missed: [], hintsUsed: 0 };
     let answerText = '';
-    if (existsSync(answerPath)) {
+    const answered = existsSync(answerPath);
+    if (answered) {
       answerText = readFileSync(answerPath, 'utf8');
       answer = readJson(answerPath);
       if (answer.id !== id) throw new Error(`answer file is for "${answer.id}", expected "${id}"`);
@@ -91,14 +103,15 @@ function resolveMission(root, id, model, f) {
     const of = f.score ? f.score.of : answer.of;
     return { zone: meta.zone, rung: meta.rung, session: session.session ?? null, mode: session.mode || 'practice', refresh: meta.refresh === true,
       cardIds: [...(meta.cardIds || []), ...(meta.threatIds || [])], got, of,
-      missed: answer.missed, hintsUsed: answer.hintsUsed, answerText, meta };
+      missed: answer.missed, wrong: Array.isArray(answer.wrong) ? answer.wrong : [], answered,
+      hintsUsed: answer.hintsUsed, answerText, meta };
   }
   const w = id.match(/^(.+)-words-\d+$/);
   if (!w) throw new Error(`unknown mission "${id}"`);
   if (!Object.hasOwn(model.zones, w[1])) throw new Error(`unknown zone "${w[1]}" for mission "${id}"`);
   if (!f.score) throw new Error(`words mission "${id}" needs --got and --of`);
   return { zone: w[1], rung: 'words', session: session.session ?? null, mode: session.mode || 'practice', refresh: false, cardIds: [],
-    got: f.score.got, of: f.score.of, missed: [], hintsUsed: 0, answerText: '', meta: null };
+    got: f.score.got, of: f.score.of, missed: [], wrong: [], answered: false, hintsUsed: 0, answerText: '', meta: null };
 }
 
 export async function run(args, ctx) {
@@ -161,11 +174,11 @@ export async function run(args, ctx) {
     xp += XP.fog;
   }
 
-  // Weak spots: drop items answered correctly in this mission, add new misses.
+  // Weak spots: drop items this mission graded and the user got right, add new misses.
+  const graded = new Set(m.answered ? gradedItems(m.rung, m.meta, items) : []);
   const missed = new Set(m.missed);
-  const inMission = new Set([...m.cardIds, ...m.missed]);
-  for (const x of items) if (x.k === 'edge' && inMission.has(x.from) && inMission.has(x.to)) inMission.add(x.id);
-  pz.weakSpots = pz.weakSpots.filter((w) => !(inMission.has(w.item) && !missed.has(w.item)));
+  if (m.rung === 'trace') for (const w of m.wrong) if (Array.isArray(w) && typeof w[0] === 'string') missed.add(w[0]);
+  pz.weakSpots = pz.weakSpots.filter((w) => !(graded.has(w.item) && !missed.has(w.item)));
   for (const item of missed) {
     if (!pz.weakSpots.some((w) => w.item === item)) pz.weakSpots.push({ missionId: id, item });
   }

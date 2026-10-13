@@ -196,3 +196,58 @@ test('token log entries carry the session (null for words without a session file
   await apply({ _: ['trips-trace-1'], flags: {} }, ctx(root));
   assert.equal(loadProgress(root).tokens.at(-1).session, '2026-10-13T16:00:00.000Z');
 });
+
+function seedWeak(root, items) {
+  const p = loadProgress(root);
+  p.zones.trips.weakSpots = items.map((item) => ({ missionId: 'old-1', item }));
+  saveProgress(root, p);
+}
+const weakItems = (root) => loadProgress(root).zones.trips.weakSpots.map((w) => w.item).sort();
+
+test('weak spots: map clears only edges among its cards', async () => {
+  const root = await setup();
+  setRungs(root, { map: 'open' });
+  seedWeak(root, ['c0', 'c2', 'e1']);
+  mission(root, 'trips-map-1', { zone: 'trips', rung: 'map', board: 'component', cardIds: ['c0', 'c1', 'c2'] }, { got: 1, of: 1 });
+  await apply({ _: ['trips-map-1'], flags: {} }, ctx(root));
+  assert.deepEqual(weakItems(root), ['c0', 'c2']);
+});
+
+test('weak spots: trace clears its cards, not edges; wrong-lane cards become weak', async () => {
+  const root = await setup();
+  setRungs(root, { trace: 'open' });
+  seedWeak(root, ['c1', 'e1']);
+  mission(root, 'trips-trace-1', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0', 'c1'] },
+    { got: 1.5, of: 2, wrong: [['c0', 'Backend']] });
+  await apply({ _: ['trips-trace-1'], flags: {} }, ctx(root));
+  assert.deepEqual(weakItems(root), ['c0', 'e1']);
+});
+
+test('weak spots: break clears threats only', async () => {
+  const root = await setup();
+  setRungs(root, { break: 'open' });
+  seedWeak(root, ['c0', 'x1', 'x2']);
+  mission(root, 'trips-break-1', { zone: 'trips', rung: 'break', board: 'component', cardIds: ['c0', 'c1'], threatIds: ['x1', 'x2'] },
+    { got: 1, of: 2, missed: ['x2'] });
+  await apply({ _: ['trips-break-1'], flags: {} }, ctx(root));
+  assert.deepEqual(weakItems(root), ['c0', 'x2']);
+});
+
+test('weak spots: boss clears its cards and the edges among them', async () => {
+  const root = await setup();
+  setRungs(root, { boss: 'open' });
+  seedWeak(root, ['c0', 'e1', 'x1']);
+  mission(root, 'trips-boss-1', { zone: 'trips', rung: 'boss', board: 'component', cardIds: ['c0', 'c1'] }, { got: 3, of: 3 });
+  await apply({ _: ['trips-boss-1'], flags: {} }, ctx(root));
+  assert.deepEqual(weakItems(root), ['x1']);
+});
+
+test('weak spots: words and --got/--of without an answer file clear nothing', async () => {
+  const root = await setup();
+  setRungs(root, { map: 'open' });
+  seedWeak(root, ['c0', 'e1']);
+  await apply({ _: ['trips-words-1'], flags: { got: '5', of: '5' } }, ctx(root));
+  mission(root, 'trips-map-1', { zone: 'trips', rung: 'map', board: 'component', cardIds: ['c0', 'c1'] });
+  await apply({ _: ['trips-map-1'], flags: { got: '3', of: '3' } }, ctx(root));
+  assert.deepEqual(weakItems(root), ['c0', 'e1']);
+});
