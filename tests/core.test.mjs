@@ -139,7 +139,14 @@ test('gradeSwimlanes: LNDS tie prefers the earliest subsequence', () => {
 test('gradeSwimlanes: equal groups are non-decreasing (same-step cards in any order)', () => {
   const answer = { steps: [['a', 'b', 'c']], lanes: { a: 'L', b: 'L', c: 'M' } };
   const r = core.gradeSwimlanes(answer, [{ id: 'c', lane: 'L' }, { id: 'b', lane: 'L' }, { id: 'a', lane: 'L' }]);
-  assert.deepEqual(r, { got: 2.5, of: 3, missed: [], wrong: [] });
+  assert.deepEqual(r, { got: 2.5, of: 3, missed: [], wrong: [['c', 'L']] });
+});
+
+test('gradeSwimlanes: wrong lists in-order cards in the wrong lane as [id, placedLane]', () => {
+  const answer = { steps: [['c0'], ['c1'], ['c2']], lanes: { c0: 'Driver', c1: 'Backend', c2: 'Manager' } };
+  const r = core.gradeSwimlanes(answer, [{ id: 'c0', lane: 'Backend' }, { id: 'c2', lane: 'Manager' }, { id: 'c1', lane: 'Driver' }]);
+  // c1 is out of order (missed, not wrong); c0 is kept in the wrong lane.
+  assert.deepEqual(r, { got: 1.5, of: 3, missed: ['c1'], wrong: [['c0', 'Backend']] });
 });
 
 test('gradeBreak: unplaced threat is missed but not wrong; extra placements ignored', () => {

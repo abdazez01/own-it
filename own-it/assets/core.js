@@ -124,18 +124,21 @@
       seen.add(p.id);
       seq.push({ g: groupOf.get(p.id), id: p.id, lane: p.lane });
     }
+    // In order: full credit in the right lane, half credit (and listed in `wrong`) in another lane.
     const kept = new Set();
+    const wrong = [];
     let got = 0;
     for (const i of longestNonDecreasing(seq)) {
       const c = seq[i];
       kept.add(c.id);
-      got += c.lane === answer.lanes[c.id] ? 1 : 0.5;
+      if (c.lane === answer.lanes[c.id]) got += 1;
+      else { got += 0.5; wrong.push([c.id, c.lane]); }
     }
     return {
       got: got,
       of: order.length,
       missed: order.filter(function (id) { return !kept.has(id); }),
-      wrong: [],
+      wrong: wrong,
     };
   }
 

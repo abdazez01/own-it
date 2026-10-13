@@ -10,7 +10,7 @@
 
 Pass all grades: `apply <id> --text '{"s-cancel":"solid","tok:x-role":"partial"}'`.
 
-Break boards score threat-token placement only; their arrows are context. `missed` lists ids; `wrong` lists `[a, b]` pairs (map: card ids; boss: box labels; break: threat id, card id).
+Break boards score threat-token placement only; arrows are context. `missed` lists ids; `wrong` lists pairs (map: card ids; boss: box labels; break: threat id, card id; trace: card id, placed lane).
 
 ## Output caps
 
@@ -33,9 +33,9 @@ The user types `challenge <id>`: a model item id, or an arrow `A->B` (card ids o
 
 1. Re-read the code at the item's `ref`.
 2. User right: fix the truth model. Write `.own-it/fix-<zone>.json` as `{"zone": "<zone>", "files": [], "items": [<corrected or new item>]}` (same id replaces), run `check-refs` on it, then add `--challenge-won 1` per win to `apply`. To delete an item, put its file in `files` and include that file's other items from `model.json`.
-3. User wrong: show the `file:line` evidence, explain in ≤80 words. No XP change.
+3. User wrong: show `file:line` evidence, explain in ≤80 words. No XP change.
 
-Resolve challenges before `apply`; it runs once.
+Resolve challenges before `apply` (runs once).
 
 ## Exam mode
 

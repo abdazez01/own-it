@@ -1193,6 +1193,8 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
       if (B.kind === 'break') {
         // Every wrong threat is also missed; fold it into that row so each threat has one Challenge button.
         out.forEach(function (o) { if (o.id === w[0]) { o.kind = 'wrong'; o.label += '. You put it on ' + labelOf(w[1]); } });
+      } else if (B.kind === 'lanes') {
+        out.push({ kind: 'wrong', id: w[0], label: labelOf(w[0]) + ' in ' + w[1] + ', runs in ' + ans.lanes[w[0]] });
       } else {
         // Boss pairs are already labels; map pairs are card ids.
         var la = B.kind === 'boss' ? w[0] : labelOf(w[0]), lb = B.kind === 'boss' ? w[1] : labelOf(w[1]);
