@@ -118,6 +118,35 @@ test('refresh mission needs its rung cleared; error lists cleared rungs', async 
   assert.equal(out.missions.length, 1);
 });
 
+test('boss uses every card in a small zone and lists the zone pool', async () => {
+  const root = await setup();
+  open(root, 'boss');
+  await build({ _: [recipe(root, [{ zone: 'trips', rung: 'boss', board: 'component', brief: 'x' }])], flags: {} }, ctx(root));
+  const a = core.decode(loadMissions(root).missions[0].answer);
+  assert.deepEqual(a.cards.map((c) => c.id), ['c0', 'c1', 'c3', 'c4']);
+  assert.deepEqual(a.pool, [{ id: 'c0', label: 'Trip screen' }, { id: 'c1', label: 'POST cancel' }, { id: 'c3', label: 'Approvals' }, { id: 'c4', label: 'Trips table' }]);
+});
+
+test('boss in a zone over 15 cards needs recipe cards; pool keeps the whole zone', async () => {
+  const root = await setup();
+  const m = loadModel(root);
+  for (let i = 0; i < 12; i++) m.zones.trips.items.push(I({ id: `k${i}`, k: 'component', label: `Part ${i}` }));
+  saveModel(root, m);
+  open(root, 'boss');
+  await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'boss', board: 'component', brief: 'x' }])], flags: {} }, ctx(root)),
+    /boss in zone "trips" has 16 cards; pick up to 15 in recipe cards/);
+  await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'boss', board: 'component', brief: 'x', cards: ['c0', 'f1'] }])], flags: {} }, ctx(root)),
+    /missions\[0\] cards must be surface or component: f1/);
+  await build({ _: [recipe(root, [{ zone: 'trips', rung: 'boss', board: 'component', brief: 'x', cards: ['c4', 'c0', 'c1'],
+    pins: [{ card: 'c4', q: 'why?' }] }])], flags: {} }, ctx(root));
+  const a = core.decode(loadMissions(root).missions[0].answer);
+  assert.deepEqual(a.cards.map((c) => c.id), ['c4', 'c0', 'c1']);
+  assert.deepEqual(a.edges, [{ id: 'e1', from: 'c0', to: 'c1' }, { id: 'e2', from: 'c1', to: 'c4' }]);
+  assert.equal(a.pool.length, 16);
+  const session = JSON.parse(readFileSync(join(root, '.own-it', 'session.json'), 'utf8'));
+  assert.deepEqual(session.missions[loadMissions(root).missions[0].id].cardIds, ['c4', 'c0', 'c1']);
+});
+
 test('locked break and boss say which rung to clear first', async () => {
   const root = await setup();
   await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'break', board: 'component', brief: 'x', cards: ['c0', 'c1'], threats: ['x1'] }])], flags: {} }, ctx(root)),

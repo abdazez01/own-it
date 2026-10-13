@@ -6,14 +6,14 @@ Opens when `break` is cleared. Beating it claims the zone (+200 XP).
 
 ### 1. Blank board
 
-Recipe mission, no cards and no pins:
+Recipe mission, no pins. Zones with over 15 surfaces and components need `cards`: pick 2-15 ids to score.
 
 ```json
 {"zone": "trips", "rung": "boss", "board": "component",
  "brief": "Blank board. Draw the whole zone from memory: every screen, route and service, and how they connect."}
 ```
 
-The user draws boxes and arrows from memory. The page matches box names to the zone's surfaces and components and grades the drawing. Revealing the card list is a hint the page charges for. After "done", `collect <id>`; `wrong` holds box-label pairs.
+The user draws boxes and arrows from memory. The page matches box names to the zone's surfaces and components and grades the drawing; boxes naming unscored zone parts are neutral. Revealing the card list is a hint the page charges for. After "done", `collect <id>`; `wrong` holds box-label pairs.
 
 ### 2. Cross-examination
 

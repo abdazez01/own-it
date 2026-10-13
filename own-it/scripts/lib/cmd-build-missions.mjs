@@ -98,12 +98,23 @@ function expand(m, i, items, byId) {
       answer: { edges: edgesWithin([...cardIds]), threats: tits.map((t) => ({ id: t.id, card: t.card })) } };
   }
 
-  // boss
-  const its = items.filter((x) => x.k === 'surface' || x.k === 'component')
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, BOSS_MAX);
-  if (its.length < 2) throw new Error(`${at} zone needs at least 2 surfaces or components`);
+  // boss: score every zone surface/component, or the recipe's pick when the zone is too big.
+  // The pool lets the page recognise boxes for zone parts outside the scored set.
+  const pool = items.filter((x) => x.k === 'surface' || x.k === 'component')
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (pool.length < 2) throw new Error(`${at} zone needs at least 2 surfaces or components`);
+  let its = pool;
+  if (pool.length > BOSS_MAX) {
+    if (!m.cards) throw new Error(`boss in zone "${m.zone}" has ${pool.length} cards; pick up to ${BOSS_MAX} in recipe cards`);
+    if (m.cards.length < 2) throw new Error(`${at} needs 2-${BOSS_MAX} cards`);
+    if (new Set(m.cards).size !== m.cards.length) throw new Error(`duplicate cards in ${at}`);
+    its = pick(m.cards);
+    const bad = its.filter((x) => x.k !== 'surface' && x.k !== 'component');
+    if (bad.length) throw new Error(`${at} cards must be surface or component: ${bad.map((x) => x.id).join(', ')}`);
+  }
   return { cards: [], blank: true, pinIds: its.map((x) => x.id),
-    answer: { cards: its.map(cardOf), edges: edgesWithin(its.map((x) => x.id)) } };
+    answer: { cards: its.map(cardOf), edges: edgesWithin(its.map((x) => x.id)),
+      pool: pool.map((x) => ({ id: x.id, label: x.label ?? x.id })) } };
 }
 
 export async function run(args, ctx) {

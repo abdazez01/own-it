@@ -189,15 +189,32 @@
     return out;
   }
 
+  // Boxes are matched against the whole zone (`answer.pool`, falling back to the scored cards).
+  // `map`: box uid -> scored card id. `neutral`: box uid -> id of a zone card outside the scored set.
+  function matchBoss(answer, boxes) {
+    const scored = new Set(answer.cards.map(function (c) { return c.id; }));
+    const all = matchLabels(boxes, answer.pool || answer.cards);
+    const map = {};
+    const neutral = {};
+    Object.keys(all).forEach(function (uid) {
+      if (scored.has(all[uid])) map[uid] = all[uid];
+      else neutral[uid] = all[uid];
+    });
+    return { map: map, neutral: neutral };
+  }
+
   // Edges are graded in card space; `wrong` is reported as the user's own [uidFrom, uidTo]
-  // pairs (an edge touching an unmatched box has no card id to report). The page converts
-  // these uid pairs to label pairs for the payload.
+  // pairs (an edge touching an unmatched box has no card id to report). Boxes naming a zone
+  // card outside the scored set, and arrows touching them, are neutral: no points, not wrong.
+  // The page converts these uid pairs to label pairs for the payload.
   function gradeBoss(answer, boxes, userEdges) {
-    const map = matchLabels(boxes, answer.cards);
+    const m = matchBoss(answer, boxes);
+    const map = m.map;
     const matched = new Set(Object.keys(map).map(function (uid) { return map[uid]; }));
     const unmatchedCards = answer.cards.filter(function (c) { return !matched.has(c.id); }).map(function (c) { return c.id; });
 
     const has = function (uid) { return Object.prototype.hasOwnProperty.call(map, uid); };
+    const isNeutral = function (uid) { return Object.prototype.hasOwnProperty.call(m.neutral, uid); };
     const user = uniqueEdges(userEdges);
     const converted = user
       .filter(function (e) { return has(e[0]) && has(e[1]); })
@@ -205,6 +222,7 @@
     const edges = gradeComponent({ edges: answer.edges }, converted);
     const expected = new Set(answer.edges.map(function (e) { return pairKey(e.from, e.to); }));
     const wrong = user.filter(function (e) {
+      if (isNeutral(e[0]) || isNeutral(e[1])) return false;
       return !(has(e[0]) && has(e[1]) && expected.has(pairKey(map[e[0]], map[e[1]])));
     });
 
@@ -228,6 +246,6 @@
   return {
     KEY: KEY, encode: encode, decode: decode, toBase64: toBase64, fromBase64: fromBase64,
     gradeComponent: gradeComponent, gradeSwimlanes: gradeSwimlanes, gradeBreak: gradeBreak,
-    matchLabels: matchLabels, gradeBoss: gradeBoss, payload: payload,
+    matchLabels: matchLabels, matchBoss: matchBoss, gradeBoss: gradeBoss, payload: payload,
   };
 });

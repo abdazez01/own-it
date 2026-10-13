@@ -177,6 +177,18 @@ test('gradeBoss: unmatched boxes, missed edges, wrong edges reported as user uid
   assert.deepEqual(r, { got: 3, of: 5, missed: ['c3', 'e2'], wrong: [['y', 'x'], ['y', 'q']] });
 });
 
+test('gradeBoss with pool: boxes matching unscored zone cards and their arrows are neutral', () => {
+  const answer = { cards: [{ id: 'c1', label: 'Driver app' }, { id: 'c2', label: 'Trips API' }],
+    edges: [{ id: 'e1', from: 'c1', to: 'c2' }],
+    pool: [{ id: 'c1', label: 'Driver app' }, { id: 'c2', label: 'Trips API' }, { id: 'c9', label: 'Payments ledger' }] };
+  const boxes = [{ uid: 'x', label: 'driver app' }, { uid: 'y', label: 'trips' }, { uid: 'p', label: 'payments ledger' }, { uid: 'z', label: 'redis' }];
+  const r = core.gradeBoss(answer, boxes, [['x', 'y'], ['y', 'p'], ['p', 'x'], ['x', 'z']]);
+  assert.deepEqual(r, { got: 3, of: 3, missed: [], wrong: [['x', 'z']] });
+  // without a pool the payments box is a plain unmatched box and its arrows are wrong
+  const r2 = core.gradeBoss({ cards: answer.cards, edges: answer.edges }, boxes, [['x', 'y'], ['y', 'p']]);
+  assert.deepEqual(r2.wrong, [['y', 'p']]);
+});
+
 test('payload includes non-empty wrong', () => {
   const p = core.payload('m2', { got: 0, of: 1, missed: ['e1'], wrong: [['b', 'a']] }, {}, 2, ['ch1'], new Date('2026-01-01T00:00:00Z'));
   assert.deepEqual(p, { id: 'm2', submittedAt: '2026-01-01T00:00:00.000Z', got: 0, of: 1, missed: ['e1'], wrong: [['b', 'a']], text: {}, hintsUsed: 2, challenges: ['ch1'] });

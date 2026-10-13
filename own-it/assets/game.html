@@ -191,6 +191,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
 .node.half { border-color: var(--good); box-shadow: 3px 3px 0 var(--good); border-style: dotted; }
 .node.miss { border-color: var(--bad); border-style: dashed; box-shadow: none; }
 .node.wrongbox { border-color: var(--bad); box-shadow: 3px 3px 0 var(--bad); }
+.node.neutral { border-color: var(--muted); border-style: dotted; box-shadow: none; }
 .node.wrongbox .label { text-decoration: line-through; text-decoration-color: var(--bad); text-decoration-thickness: 2px; }
 .verdict { display: block; margin-top: 6px; font-size: 12.5px; font-weight: 600; }
 .verdict.good { color: var(--good); }
@@ -599,7 +600,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     }
     if (row.childNodes.length) d.appendChild(row);
     if (showRef && n.ref) d.appendChild(B.result ? refView(n.ref) : el('span', { class: 'ref' }, el('code', { text: n.ref })));
-    if (r && r.note) d.appendChild(el('span', { class: 'verdict ' + (r.good ? 'good' : 'bad'), text: r.note }));
+    if (r && r.note) d.appendChild(el('span', { class: 'verdict' + (r.good ? ' good' : r.good === false ? ' bad' : ''), text: r.note }));
 
     if (B.kind === 'break' && !inTray) {
       var chips = tokenChipsFor(n.id);
@@ -940,6 +941,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     if (B.reveal) {
       (B.reveal.context || []).forEach(function (e) { line(e[0], e[1], 'context', 'context'); });
       B.edges.forEach(function (e) {
+        if (B.reveal.edgeNeutral(e)) { line(e[0], e[1], 'context', 'context'); return; }
         var ok = B.reveal.edgeOk(e);
         line(e[0], e[1], ok ? 'ok' : 'bad', ok ? 'ok' : 'bad', ok ? null : function (p) {
           svg.appendChild(sv('path', { class: 'cross', d: 'M' + (p.mid.x - 8) + ' ' + (p.mid.y - 8) + 'L' + (p.mid.x + 8) + ' ' + (p.mid.y + 8) + 'M' + (p.mid.x + 8) + ' ' + (p.mid.y - 8) + 'L' + (p.mid.x - 8) + ' ' + (p.mid.y + 8) }));
@@ -1029,7 +1031,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
       if (wrongLane) return q(labelOf(wrongLane.id)) + ' runs in the ' + q(ans.lanes[wrongLane.id]) + ' lane.';
     }
     if (B.kind === 'boss') {
-      var map = Core.matchLabels(boxList(), ans.cards);
+      var map = Core.matchBoss(ans, boxList()).map;
       var matched = {};
       Object.keys(map).forEach(function (u) { matched[map[u]] = u; });
       var lost = ans.cards.filter(function (c) { return !matched[c.id]; })[0];
@@ -1068,7 +1070,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     B.pending = null; B.sel = -1; B.openPin = null;
     var ans = Core.decode(B.m.answer);
     B.answer = ans;
-    var reveal = { nodes: {}, ghosts: [], context: [], edgeOk: function () { return false; } };
+    var reveal = { nodes: {}, ghosts: [], context: [], edgeOk: function () { return false; }, edgeNeutral: function () { return false; } };
     var res, key = function (a, b) { return a + '\u0000' + b; };
 
     if (B.kind === 'map') {
@@ -1102,14 +1104,18 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
       // Claude reads the payload without the page's box uids, so report wrong arrows as label pairs.
       var boxLabel = function (uid) { var n = nodeById(uid); return n ? n.label : uid; };
       res.wrong = res.wrong.map(function (w) { return [boxLabel(w[0]), boxLabel(w[1])]; });
-      var map = Core.matchLabels(boxes, ans.cards), byCard = {}, exp2 = {};
+      var mb = Core.matchBoss(ans, boxes), map = mb.map, neutral = mb.neutral, byCard = {}, exp2 = {};
       Object.keys(map).forEach(function (u) { byCard[map[u]] = u; });
       ans.edges.forEach(function (e) { exp2[key(e.from, e.to)] = true; });
+      var poolLabel = function (id) { var c = (ans.pool || []).filter(function (x) { return x.id === id; })[0]; return c ? c.label : id; };
       boxes.forEach(function (b) {
         var cid = map[b.uid];
         var card = ans.cards.filter(function (c) { return c.id === cid; })[0];
-        reveal.nodes[b.uid] = cid ? { cls: 'ok', good: true, note: 'Matches ' + q(card.label) } : { cls: 'wrongbox', good: false, note: 'No match in this zone' };
+        if (cid) reveal.nodes[b.uid] = { cls: 'ok', good: true, note: 'Matches ' + q(card.label) };
+        else if (neutral[b.uid]) reveal.nodes[b.uid] = { cls: 'neutral', good: null, note: 'In this zone (' + q(poolLabel(neutral[b.uid])) + '), not scored' };
+        else reveal.nodes[b.uid] = { cls: 'wrongbox', good: false, note: 'No match in this zone' };
       });
+      reveal.edgeNeutral = function (e) { return !!(neutral[e[0]] || neutral[e[1]]); };
       reveal.edgeOk = function (e) { return !!(map[e[0]] && map[e[1]] && exp2[key(map[e[0]], map[e[1]])]); };
       reveal.ghosts = ans.edges.filter(function (e) { return byCard[e.from] && byCard[e.to] && res.missed.indexOf(e.id) >= 0; })
         .map(function (e) { return [byCard[e.from], byCard[e.to]]; });
@@ -1203,7 +1209,8 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     var items = revealItems();
     var legend = B.kind === 'lanes'
       ? 'Green cards are in order and in the right lane. Dotted green: right order, wrong lane (half credit). Red dashed: out of order. Cards you did not place are listed below.'
-      : 'Green is correct. Red dashed is what the code has that you missed. Red crossed out is not in the code.';
+      : 'Green is correct. Red dashed is what the code has that you missed. Red crossed out is not in the code.' +
+        (B.kind === 'boss' ? ' Dotted grey boxes and arrows name parts of this zone the boss does not score.' : '');
     side.appendChild(el('p', { class: 'how', text: legend }));
     if (items.length) {
       side.appendChild(el('div', null, el('h2', null, 'To review'), el('ul', { class: 'items' }, items.map(function (it) {
