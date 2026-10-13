@@ -25,17 +25,22 @@ export async function run(_args, ctx) {
     const files = filesOf.get(id);
 
     const stale = files.filter((f) => now.hashes[f] !== null && now.hashes[f] !== stored[f]);
-    const fogged = now.git && Object.values(pz.claimHashes || {})
-      .some((h) => Object.entries(h).some(([f, hash]) => now.hashes[f] !== hash));
+    // Files whose committed content moved since a rung was claimed. Unlike `stale`, this
+    // survives re-extraction and only resets when a refresh mission re-stamps claimHashes.
+    const changed = [...new Set(Object.values(pz.claimHashes || {})
+      .flatMap((h) => Object.entries(h).filter(([f, hash]) => now.hashes[f] !== hash).map(([f]) => f)))].sort();
+    const fogged = now.git && changed.length > 0;
 
     if (Object.hasOwn(progress.zones, id)) pz.fogged = fogged;
     weak += (pz.weakSpots || []).length;
-    zones.push({
+    const zone = {
       id, name: mz.name,
       rungs: RUNGS.map((r) => RUNG_CHAR[pz.rungs?.[r]] || '-').join(''),
       fogged,
       stale: stale.slice(0, MAX_STALE),
-    });
+    };
+    if (fogged) zone.changed = changed.slice(0, MAX_STALE);
+    zones.push(zone);
   }
 
   saveProgress(ctx.root, progress);

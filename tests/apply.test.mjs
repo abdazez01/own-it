@@ -48,6 +48,7 @@ test('map clears only after all surfaces covered across missions', async () => {
   mission(root, 'trips-map-1', { zone: 'trips', rung: 'map', board: 'component', cardIds: ['c0', 'c2'] }, { got: 1, of: 1 });
   let out = await apply({ _: ['trips-map-1'], flags: {} }, ctx(root));
   assert.deepEqual(out.cleared, []);
+  assert.equal('fog' in out, false);
   mission(root, 'trips-map-2', { zone: 'trips', rung: 'map', board: 'component', cardIds: ['c1', 'c2'] }, { got: 1, of: 1 });
   out = await apply({ _: ['trips-map-2'], flags: {} }, ctx(root));
   assert.deepEqual(out.cleared, ['map']);
@@ -106,6 +107,7 @@ test('refresh mission clears fog and re-stamps claim hashes', async () => {
   mission(root, 'trips-map-9', { zone: 'trips', rung: 'map', board: 'component', cardIds: ['c0'], refresh: true }, { got: 1, of: 1 });
   const out = await apply({ _: ['trips-map-9'], flags: {} }, ctx(root));
   assert.equal(out.xp, 10 + 30);
+  assert.equal(out.fog, 'cleared');
   const z = loadProgress(root).zones.trips;
   assert.equal(z.fogged, false);
   assert.notEqual(z.claimHashes.map['api/t.ts'], 'old');

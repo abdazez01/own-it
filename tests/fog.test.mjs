@@ -92,3 +92,30 @@ test('stale list is capped at 20', async () => {
   commit(root, 'many');
   assert.equal((await fog({ _: [], flags: {} }, ctx(root))).zones[0].stale.length, 20);
 });
+
+test('fogged zone lists changed files; they persist after re-extraction', async () => {
+  const root = await setup();
+  claimMap(root);
+  writeFiles(root, { 'api/trips.ts': 'changed\n' });
+  commit(root, 'change');
+  let z = (await fog({ _: [], flags: {} }, ctx(root))).zones[0];
+  assert.deepEqual(z.changed, ['api/trips.ts']);
+  await checkRefs({ _: [join(root, 'ex.json')], flags: {} }, ctx(root));
+  z = (await fog({ _: [], flags: {} }, ctx(root))).zones[0];
+  assert.deepEqual(z.stale, []);
+  assert.equal(z.fogged, true);
+  assert.deepEqual(z.changed, ['api/trips.ts']);
+});
+
+test('changed list is capped at 20', async () => {
+  const root = await setup();
+  const many = {};
+  for (let i = 0; i < 25; i++) many[`app/n${i}.tsx`] = `${i}\n`;
+  writeFiles(root, many);
+  commit(root, 'many');
+  const p = loadProgress(root);
+  p.zones.trips.rungs.map = 'cleared';
+  p.zones.trips.claimHashes.map = Object.fromEntries(Object.keys(many).map((f) => [f, 'old']));
+  saveProgress(root, p);
+  assert.equal((await fog({ _: [], flags: {} }, ctx(root))).zones[0].changed.length, 20);
+});

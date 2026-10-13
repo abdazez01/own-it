@@ -174,8 +174,10 @@ export async function run(args, ctx) {
     clearRung(m.rung);
   }
 
+  let fogCleared = false;
   if (m.refresh && passed) {
     for (const k of Object.keys(pz.claimHashes)) pz.claimHashes[k] = { ...hashes() };
+    fogCleared = pz.fogged === true;
     pz.fogged = false;
     progress.fogClears = (progress.fogClears || 0) + 1;
     xp += XP.fog;
@@ -206,6 +208,8 @@ export async function run(args, ctx) {
   progress.applied.push(id);
   saveProgress(ctx.root, progress);
 
-  return { id, xp, total: progress.xp, ratio: Math.round(ratio * 100) / 100, cleared, claimed, badges,
+  const out = { id, xp, total: progress.xp, ratio: Math.round(ratio * 100) / 100, cleared, claimed, badges,
     weak: pz.weakSpots.length };
+  if (fogCleared) out.fog = 'cleared';
+  return out;
 }
