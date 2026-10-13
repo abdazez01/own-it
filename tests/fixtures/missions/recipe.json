@@ -1,0 +1,12 @@
+{
+  "mode": "practice",
+  "missions": [
+    { "zone": "trips", "rung": "map", "board": "component", "brief": "A driver taps Cancel Trip. Draw which part calls which, from the screen to the server.", "cards": ["s-trip", "c-api", "s-cancel"],
+      "pins": [{ "card": "s-cancel", "q": "What stops a driver from cancelling a trip that already finished?" }] },
+    { "zone": "trips", "rung": "trace", "board": "swimlanes", "brief": "Trace a driver's cancel request from tap to manager approval. Put each step in the lane that runs it, left to right.", "flow": "f-cancel",
+      "pins": [{ "card": "s-approvals", "q": "How does the manager find out there is something to approve?" }] },
+    { "zone": "trips", "rung": "break", "board": "component", "brief": "Two things can go wrong here. Drop each threat on the part it attacks, then say what happens and what defends it.", "cards": ["s-approvals", "s-approve", "c-approvals", "s-cancel"], "threats": ["x-approve", "x-role"] },
+    { "zone": "trips", "rung": "boss", "board": "component", "brief": "Blank board. Draw the whole trips zone from memory: every screen, route and service, and how they connect.",
+      "pins": [{ "card": "c-approvals", "q": "Why does the cancel go through a separate approvals service instead of the route?" }] }
+  ]
+}

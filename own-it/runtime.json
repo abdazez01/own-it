@@ -1,0 +1,9 @@
+{
+  "minimum": "18.0.0",
+  "pinned": "v24.21.0",
+  "installers": {
+    "win-x64":   { "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-x64.msi", "sizeMB": 33.2, "sha256": "bb0eaee134f9357f22aea915ee793343e627aefc1e66488164bac6915bce2cac" },
+    "darwin":    { "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0.pkg", "sizeMB": 93.8, "sha256": "9831a74b04c270a429bd5a240e37712c4fe229b02b032e18ff2e0702c17c20fd" },
+    "linux-x64": { "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.xz", "sizeMB": 31.9, "sha256": "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6" }
+  }
+}

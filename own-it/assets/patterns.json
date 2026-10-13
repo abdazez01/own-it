@@ -1,0 +1,37 @@
+{
+  "frameworks": {
+    "express": { "detect": { "npm": ["express"] }, "patterns": [
+      { "k": "surface", "re": "\\b(?:app|router|r)\\.(get|post|put|patch|delete)\\(\\s*['\"`]([^'\"`]+)['\"`]", "label": "$1 $2", "upper1": true, "ext": [".js", ".ts", ".mjs", ".cjs"] } ] },
+    "react-router": { "detect": { "npm": ["react-router", "react-router-dom"] }, "patterns": [
+      { "k": "surface", "re": "<Route\\b[^>]*\\bpath=['\"{`]+([^'\"}`]+)", "label": "screen $1", "ext": [".jsx", ".tsx", ".js", ".ts"] },
+      { "k": "surface", "re": "\\bpath:\\s*['\"`]([^'\"`]+)['\"`]", "label": "screen $1", "ext": [".jsx", ".tsx", ".js", ".ts"] } ] },
+    "next": { "detect": { "npm": ["next"] }, "patterns": [
+      { "k": "surface", "re": "export\\s+(?:async\\s+)?function\\s+(GET|POST|PUT|PATCH|DELETE)\\b", "label": "route $1", "ext": [".js", ".ts"] },
+      { "k": "surface", "re": "export\\s+default\\s+(?:async\\s+)?function\\s+(\\w*Page)\\b", "label": "page $1", "ext": [".jsx", ".tsx"] } ] },
+    "fastapi": { "detect": { "pip": ["fastapi"] }, "patterns": [
+      { "k": "surface", "re": "@\\w+\\.(get|post|put|patch|delete)\\(\\s*['\"]([^'\"]+)", "label": "$1 $2", "upper1": true, "ext": [".py"] } ] },
+    "flask": { "detect": { "pip": ["flask"] }, "patterns": [
+      { "k": "surface", "re": "@\\w+\\.route\\(\\s*['\"]([^'\"]+)", "label": "route $1", "ext": [".py"] } ] },
+    "django": { "detect": { "pip": ["django"] }, "patterns": [
+      { "k": "surface", "re": "\\b(?:re_)?path\\(\\s*r?['\"]([^'\"]*)['\"]", "label": "route /$1", "ext": [".py"] } ] },
+    "rails": { "detect": { "gem": ["rails"] }, "patterns": [
+      { "k": "surface", "re": "^\\s*(get|post|put|patch|delete)\\s+['\"]([^'\"]+)", "label": "$1 $2", "upper1": true, "ext": [".rb"] },
+      { "k": "surface", "re": "^\\s*resources?\\s+:(\\w+)", "label": "resource $1", "ext": [".rb"] } ] },
+    "cli-node": { "detect": { "npm": ["commander", "yargs"] }, "patterns": [
+      { "k": "surface", "re": "\\.command\\(\\s*['\"`]([\\w:-]+)", "label": "command $1", "ext": [".js", ".ts", ".mjs"] } ] }
+  },
+  "generic": [
+    { "k": "state", "re": "\\benum\\s+(\\w*(?:Status|State)\\w*)", "label": "enum $1", "ext": [".ts", ".tsx", ".java", ".kt", ".cs", ".rs", ".swift"] },
+    { "k": "state", "re": "\\bclass\\s+(\\w*(?:Status|State)\\w*)\\s*\\(\\s*(?:str\\s*,\\s*)?(?:Enum|TextChoices|IntEnum)", "label": "enum $1", "ext": [".py"] },
+    { "k": "state", "re": "\\b(?:const|let|var)\\s+(\\w*(?:STATUS|Status|STATE|State)\\w*)\\s*=\\s*[\\[{]", "label": "status set $1", "ext": [".js", ".ts", ".jsx", ".tsx", ".mjs"] },
+    { "k": "role", "re": "\\b(requireRole|hasRole|authorize|checkRole|can|isAdmin|isManager|requirePermission)\\s*\\(\\s*['\"`]?(\\w*)", "label": "role check $1 $2", "ext": [".js", ".ts", ".jsx", ".tsx", ".mjs", ".py", ".rb"] },
+    { "k": "role", "re": "@(PreAuthorize|RolesAllowed|permission_required|login_required)\\b", "label": "role check $1", "ext": [".java", ".kt", ".py"] }
+  ],
+  "strings": [
+    { "kind": "ui", "re": ">\\s*([A-Z][A-Za-z ]{1,38}[A-Za-z])\\s*<", "ext": [".jsx", ".tsx", ".html", ".vue", ".svelte"] },
+    { "kind": "ui", "re": "\\b(?:title|label|placeholder|aria-label)=['\"]([A-Za-z][A-Za-z ]{1,38})['\"]", "ext": [".jsx", ".tsx", ".html", ".vue", ".svelte"] },
+    { "kind": "status", "re": "\\b(?:status|state)\\s*[:=]+\\s*['\"]([a-z][a-z_]{2,30})['\"]", "ext": [".js", ".ts", ".jsx", ".tsx", ".mjs", ".py", ".rb"] },
+    { "kind": "enum", "re": "^\\s*([A-Z][A-Z_]{2,30})\\s*[=,:]", "ext": [".ts", ".py", ".java", ".kt", ".cs"] },
+    { "kind": "model", "re": "\\b(?:class|interface|type|model)\\s+([A-Z][A-Za-z]{2,30})\\b", "ext": [".ts", ".tsx", ".py", ".rb", ".java", ".kt", ".prisma"] }
+  ]
+}

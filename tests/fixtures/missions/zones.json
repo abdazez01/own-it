@@ -1,0 +1,6 @@
+{
+  "zones": [
+    { "id": "trips", "name": "Trips & cancellations", "paths": ["server/routes", "server/services", "server/models", "server/store.ts", "driver-app", "manager-portal"] },
+    { "id": "access", "name": "Access & startup", "paths": ["server/middleware", "server/index.ts"] }
+  ]
+}

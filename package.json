@@ -1,0 +1,7 @@
+{
+  "name": "own-it-dev",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" },
+  "engines": { "node": ">=18" }
+}
