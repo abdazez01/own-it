@@ -345,6 +345,12 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
   function lastSessionTokens(tokens) {
     var missions = tokens.filter(function (t) { return t && t.kind === 'mission' && typeof t.t === 'string'; });
     if (!missions.length) return null;
+    var sessions = missions.map(function (t) { return t.session; }).filter(function (v) { return typeof v === "string" && v; });
+    if (sessions.length) {
+      var newest = sessions.sort().pop();
+      var mine = missions.filter(function (t) { return t.session === newest; });
+      return { day: newest, count: mine.length, est: mine.reduce(function (s, t) { return s + (+t.est || 0); }, 0) };
+    }
     var day = missions.map(function (t) { return t.t.slice(0, 10); }).sort().pop();
     var same = missions.filter(function (t) { return t.t.slice(0, 10) === day; });
     return { day: day, count: same.length, est: same.reduce(function (s, t) { return s + (+t.est || 0); }, 0) };
@@ -1210,7 +1216,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     }
     if (B.kind === 'boss') {
       side.appendChild(el('div', null, el('h2', null, 'In the code'), el('ul', { class: 'items' }, B.answer.cards.map(function (c) {
-        return el('li', null, el('span', { text: c.label }));
+        return el('li', null, el('span', { text: c.label }), c.ref ? refView(c.ref) : null);
       }))));
     }
     var copyBtn = el('button', { class: 'btn', onclick: function () { copyAnswer(copyBtn); } }, 'Copy answer');
