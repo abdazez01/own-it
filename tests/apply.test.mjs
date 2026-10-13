@@ -57,7 +57,7 @@ test('map clears only after all surfaces covered across missions', async () => {
 test('XP: halves, text grades, curiosity capped, challenge, hints, clamp at zero', async () => {
   const root = await setup();
   setRungs(root, { trace: 'open' });
-  mission(root, 'trips-trace-1', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0', 'c1'] }, { got: 2.5, of: 5, hintsUsed: 1, missed: ['c1'] });
+  mission(root, 'trips-trace-1', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0', 'c1'] }, { got: 2.5, of: 5, hintsUsed: 1, missed: ['c1'], text: { c0: 'a', c1: 'b' } });
   const out = await apply({ _: ['trips-trace-1'], flags: { text: '{"c1":"solid","c0":"partial"}', curiosity: '5', 'challenge-won': '1' } }, ctx(root));
   assert.equal(out.xp, 25 + 30 + 15 + 20 - 15);
   assert.equal(out.ratio, 0.5);
@@ -250,4 +250,27 @@ test('weak spots: words and --got/--of without an answer file clear nothing', as
   mission(root, 'trips-map-1', { zone: 'trips', rung: 'map', board: 'component', cardIds: ['c0', 'c1'] });
   await apply({ _: ['trips-map-1'], flags: { got: '3', of: '3' } }, ctx(root));
   assert.deepEqual(weakItems(root), ['c0', 'e1']);
+});
+
+test('--text keys must be answer text keys (plus q1..q5 on boss); never on words', async () => {
+  const root = await setup();
+  setRungs(root, { trace: 'open', boss: 'open' });
+  const before = JSON.stringify(loadProgress(root));
+  mission(root, 'trips-trace-1', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0'] }, { got: 1, of: 1, text: { c0: 'why', 'tok:x1': 'how' } });
+  await assert.rejects(apply({ _: ['trips-trace-1'], flags: { text: '{"c0":"solid","q1":"solid"}' } }, ctx(root)),
+    /--text key "q1" is not in the answer; allowed: c0,tok:x1/);
+  mission(root, 'trips-boss-1', { zone: 'trips', rung: 'boss', board: 'component', cardIds: ['c0', 'c1'] }, { got: 3, of: 3, text: { c0: 'pin' } });
+  await assert.rejects(apply({ _: ['trips-boss-1'], flags: { text: '{"q6":"solid"}' } }, ctx(root)),
+    /--text key "q6" is not in the answer; allowed: c0,q1,q2,q3,q4,q5/);
+  await assert.rejects(apply({ _: ['trips-words-1'], flags: { got: '1', of: '1', text: '{"q1":"solid"}' } }, ctx(root)),
+    /--text does not apply to words missions/);
+  assert.equal(JSON.stringify(loadProgress(root)), before);
+});
+
+test('boss solids count q1..q5 only', async () => {
+  const root = await setup();
+  setRungs(root, { boss: 'open' });
+  mission(root, 'trips-boss-1', { zone: 'trips', rung: 'boss', board: 'component', cardIds: ['c0', 'c1'] }, { got: 3, of: 3, text: { c0: 'pin' } });
+  const out = await apply({ _: ['trips-boss-1'], flags: { text: '{"c0":"solid","q1":"solid","q2":"solid"}' } }, ctx(root));
+  assert.deepEqual(out.cleared, []);
 });

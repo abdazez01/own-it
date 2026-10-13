@@ -10,6 +10,7 @@ import { XP, missionXp, badgesFor } from './scoring.mjs';
 const PASS = 0.7;
 const BOSS_SOLIDS = 3;
 const GRADES = ['solid', 'partial', 'miss'];
+const BOSS_KEYS = ['q1', 'q2', 'q3', 'q4', 'q5'];
 const USAGE = 'usage: apply <missionId> [--text <json>] [--curiosity <n>] [--challenge-won <n>] [--got <n> --of <n>] [--tokens <in>,<out>]';
 
 function intFlag(flags, name) {
@@ -99,6 +100,11 @@ function resolveMission(root, id, model, f) {
     } else if (!f.score) {
       throw new Error(`no answer for "${id}". Run collect first`);
     }
+    const allowed = Object.keys(answer.text && typeof answer.text === 'object' ? answer.text : {});
+    if (meta.rung === 'boss') allowed.push(...BOSS_KEYS.filter((k) => !allowed.includes(k)));
+    for (const k of Object.keys(f.text)) {
+      if (!allowed.includes(k)) throw new Error(`--text key "${k}" is not in the answer; allowed: ${allowed.join(',') || 'none'}`);
+    }
     const got = f.score ? f.score.got : answer.got;
     const of = f.score ? f.score.of : answer.of;
     return { zone: meta.zone, rung: meta.rung, session: session.session ?? null, mode: session.mode || 'practice', refresh: meta.refresh === true,
@@ -110,6 +116,7 @@ function resolveMission(root, id, model, f) {
   if (!w) throw new Error(`unknown mission "${id}"`);
   if (!Object.hasOwn(model.zones, w[1])) throw new Error(`unknown zone "${w[1]}" for mission "${id}"`);
   if (!f.score) throw new Error(`words mission "${id}" needs --got and --of`);
+  if (Object.keys(f.text).length) throw new Error('--text does not apply to words missions');
   return { zone: w[1], rung: 'words', session: session.session ?? null, mode: session.mode || 'practice', refresh: false, cardIds: [],
     got: f.score.got, of: f.score.of, missed: [], wrong: [], answered: false, hintsUsed: 0, answerText: '', meta: null };
 }
@@ -158,7 +165,7 @@ export async function run(args, ctx) {
       if (surfaces.every((s) => covered.has(s))) clearRung('map');
     }
   } else if (m.rung === 'boss') {
-    const solids = Object.values(f.text).filter((v) => v === 'solid').length;
+    const solids = BOSS_KEYS.filter((k) => f.text[k] === 'solid').length;
     if (passed && solids >= BOSS_SOLIDS) {
       clearRung('boss');
       if (!pz.claimed) { pz.claimed = true; claimed = true; xp += XP.claim; }
