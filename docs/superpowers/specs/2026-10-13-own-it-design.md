@@ -7,6 +7,8 @@ Decisions settled in review:
 
 - Answer channel: browser download into the Downloads folder is primary. Clipboard is the fallback. No File System Access API in v1.
 - Board build is phased (section 15.1). Phase 1 is the full game loop plus component map and swimlanes. Phase 2 adds state machine and role matrix. Phase 3 (lexicon cards on the board) is conditional.
+- Mechanical chores run in a zero-dependency Node helper script (section 11.4). If Node is missing, the user chooses between installing a pinned Node version or a by-hand mode (section 11.5).
+- Every user decision goes through the multiple-choice question tool (section 6.7).
 
 No open decisions remain.
 
@@ -136,7 +138,7 @@ If no file is found, Claude asks once for the user's download folder path and st
 | Lexicon cards (Phase 3) | Exact match of term-to-meaning and term-to-location pairs. |
 | Break it | Token-to-card placement checked by the page. The "what happens / what defends it" text is graded by Claude. |
 
-Expected answers ship inside `mission.js` with **obfuscation** (base64 of a XOR with a fixed key that lives in `game.html`). This only prevents accidental spoilers. It is not security. The game runs on the honor system.
+Expected answers ship inside `mission.js` with **obfuscation** (base64 of a XOR with a fixed key that lives in `game.html`). The helper script applies it (`build-missions`). Claude never computes it by hand. This only prevents accidental spoilers. It is not security. The game runs on the honor system. In by-hand mode (section 11.5) answers ship unobfuscated, and the user is told that spoilers are visible in `mission.js`.
 
 ### 6.5 Opening the page
 
@@ -146,22 +148,46 @@ Claude opens the page with the platform command (`start` on Windows, `open` on m
 
 When no browser is available (SSH, remote machine), rungs 0 (Words) and 1 (Map it) run in text form through the multiple-choice question tool. Rungs 2 and up require the game page, and Claude says so.
 
+### 6.7 Asking the user
+
+Every point where the user must decide goes through the harness's multiple-choice question tool (`AskUserQuestion` in Claude Code). `SKILL.md` states this as a hard rule and lists the decision points:
+
+- fork check,
+- Node missing or too old (section 11.5),
+- zone confirm, rename, or merge,
+- commit or gitignore `.own-it/`,
+- Practice or Exam,
+- target zone and rung,
+- Words rung questions,
+- hint confirm ("Sure? Costs 15 XP"),
+- approval of each test file in Predict, then prove,
+- download folder path, when not found,
+- "one more?" at session end.
+
+Rules for using the tool:
+
+- Put all context the user needs inside the question text and option descriptions. Text written in chat right before the tool call can be hidden by the question UI.
+- Put the recommended option first and mark it "(Recommended)".
+- Free-text answers (sticky notes, "why" answers, boss cross-examination) are typed in chat, not forced into options.
+- If the harness has no question tool, Claude falls back to numbered options in chat and asks the user to reply with a number.
+
 ## 7. Session flow
 
 1. **Trigger**: the user runs `/own-it` or asks to be quizzed on, explain, or defend code they shipped. The skill never starts on its own while Claude is building something.
 2. **Fork check**: Claude explains that the game reads a lot of code and adds many messages, so a forked or fresh session keeps the user's work context clean. Options: *Yes, this is a fork* / *No, I'll fork first* (Claude explains how for the current harness and stops) / *No, play here anyway*. The check is never skipped. If the user asks to skip it, Claude asks once in a single short line and accepts "play here" as the answer.
-3. **Safety notice** (once per session): "own-it is read-only. It never edits your source. Test files are only written after you approve each one."
-4. **First run only**:
-   1. Skeleton scan (section 9.1) produces a zone list.
+3. **Runtime check**: Claude runs `node --version`. If Node is missing or older than the minimum, Claude follows section 11.5 before continuing.
+4. **Safety notice** (once per session): "own-it is read-only. It never edits your source. Test files are only written after you approve each one."
+5. **First run only**:
+   1. `own-it.mjs scan` produces surface candidates. Claude groups them into a zone list (section 9.1).
    2. The user confirms, renames, or merges zones.
    3. Claude asks whether `.own-it/` should be committed (team-visible coverage) or gitignored (personal stats). Default suggestion: gitignore.
-   4. Claude copies `assets/game.html` into `.own-it/` and writes `progress.json`.
-5. **Later runs**: load `progress.json`, compute fog (section 10), and show a short status (XP, claimed zones, fogged zones, weak spots).
-6. **Pick mode**: Practice or Exam (section 8.2).
-7. **Pick target**: Claude suggests fogged zone first, then weak spot, then next unlocked rung. The user may override.
-8. **Prepare zone**: deep extraction for the target zone and rung if not cached (section 9), then spot-check (section 9.3).
-9. **Run about 5 missions**, all written to `mission.js` in one write.
-10. **End**: update `progress.json` and `lexicon.md`, open the Map screen, offer "one more?". "Show map" works at any time.
+   4. `own-it.mjs init` creates `.own-it/`, copies `game.html`, writes an empty `progress.json`, and applies the gitignore choice.
+6. **Later runs**: `own-it.mjs fog` loads progress, computes fog (section 10), and prints a short status (XP, claimed zones, fogged zones, weak spots).
+7. **Pick mode**: Practice or Exam (section 8.2).
+8. **Pick target**: Claude suggests fogged zone first, then weak spot, then next unlocked rung. The user may override.
+9. **Prepare zone**: deep extraction for the target zone and rung if not cached (section 9), then `own-it.mjs check-refs`, then spot-check (section 9.3).
+10. **Run about 5 missions**: Claude writes the missions as plain JSON, and `own-it.mjs build-missions` validates, obfuscates, and writes `mission.js` in one step. After each submit, `own-it.mjs collect <id>` fetches the answer and `own-it.mjs apply <id>` updates XP and progress.
+11. **End**: Claude updates `lexicon.md`, `own-it.mjs open` shows the Map screen, and Claude offers "one more?". "Show map" works at any time.
 
 ## 8. Scoring and modes
 
@@ -220,7 +246,7 @@ Extraction is lazy, cached, verified, and done by a subagent to keep the main co
 
 ### 9.1 Skeleton scan (first run)
 
-Uses the file tree, package manifests, and grep for routes, screens, CLI commands, status enums, and role checks. Avoids full file reads. Output: zone list with each zone's files and surfaces.
+`own-it.mjs scan` walks the file tree, reads package manifests to detect frameworks, and runs a fixed per-framework pattern pack (routes, screens, CLI commands, status enums, role checks). It avoids full file reads and prints compact JSON of surface candidates with refs. Claude only does the judgment step: grouping candidates into zones. Output: zone list with each zone's files and surfaces.
 
 ### 9.2 Deep extraction (per zone, per rung, on demand)
 
@@ -235,7 +261,7 @@ Every extracted item, **including every edge, step, and transition**, must carry
 
 ### 9.3 Spot-check
 
-Before writing `mission.js`, the main thread picks 2 to 3 random refs from the extraction output, reads those lines, and confirms they support the claimed item. If any check fails, Claude re-runs extraction for that zone before building missions.
+First, `own-it.mjs check-refs` confirms that every ref points to an existing file and a line within range, and drops items that fail. Then, before writing `mission.js`, the main thread picks 2 to 3 random refs from the extraction output, reads those lines, and confirms they support the claimed item. If any check fails, Claude re-runs extraction for that zone before building missions.
 
 ### 9.4 Subagent
 
@@ -274,6 +300,10 @@ own-it/
     schemas.md             progress.json, model.json, mission.js, answer formats; fog logic
   assets/
     game.html              Map + Whiteboard + reveal template
+    patterns.json          per-framework grep pattern pack used by scan
+  scripts/
+    own-it.mjs             zero-dependency Node helper (section 11.4)
+  runtime.json             pinned Node version, per-OS installer URL, size, SHA-256 (section 11.5)
 ```
 
 `SKILL.md` frontmatter description is trigger-only:
@@ -319,7 +349,7 @@ description: Use when user runs /own-it or asks to be quizzed on, explain, or de
     }
   },
   "finalBoss": "locked",
-  "settings": { "gitTracked": false, "downloadDir": null }
+  "settings": { "gitTracked": false, "downloadDir": null, "runtime": "node" }
 }
 ```
 
@@ -374,11 +404,65 @@ window.OWNIT_MISSIONS = {
 }
 ```
 
+### 11.4 Helper script
+
+Rule: anything mechanical and identical in every project is code. Anything that needs judgment stays with Claude.
+
+`scripts/own-it.mjs` is one file, Node 18+, no npm dependencies. Every command prints one line or compact JSON, so each chore costs one tool call with tiny output.
+
+| Command | Does |
+|---|---|
+| `init` | Creates `.own-it/`, copies `game.html`, writes empty `progress.json`, applies the gitignore choice. |
+| `scan` | Skeleton scan with `patterns.json`. Prints surface candidates with refs. |
+| `fog` | `git diff --name-only <sha>..HEAD` per zone. Updates fog flags. Prints the session status line. |
+| `check-refs <file>` | Verifies every ref in extraction output (file exists, line in range). Drops failures and prints a count. |
+| `build-missions <file>` | Validates mission JSON against the schema, obfuscates answers, writes `mission.js`. |
+| `collect <missionId>` | Finds the answer in the Downloads folder (or `settings.downloadDir`), validates ID and timestamp, moves it to `.own-it/answers/`, prints the compact summary. Also accepts an `OWNIT:` clipboard string. |
+| `apply <missionId> [--text <grades>]` | Computes XP, badges, rung clears, weak spots, and claims. Writes `progress.json`. Prints one result line. Claude passes its free-text grades in as arguments. |
+| `open` | Opens `game.html` with `start`, `open`, or `xdg-open`. |
+
+Claude keeps: zone grouping, deep extraction, writing missions, grading free text, debriefs, hints, boss cross-examination.
+
+### 11.5 Runtime check and Node install
+
+`runtime.json` in the skill root pins the Node version the skill is tested with:
+
+```jsonc
+{
+  "minimum": "18.0.0",
+  "pinned": "<exact LTS version, fixed at build time>",
+  "installers": {
+    "win-x64":    { "url": "https://nodejs.org/dist/v<pinned>/node-v<pinned>-x64.msi", "sizeMB": 0, "sha256": "" },
+    "darwin":     { "url": "https://nodejs.org/dist/v<pinned>/node-v<pinned>.pkg", "sizeMB": 0, "sha256": "" },
+    "linux-x64":  { "url": "https://nodejs.org/dist/v<pinned>/node-v<pinned>-linux-x64.tar.xz", "sizeMB": 0, "sha256": "" }
+  }
+}
+```
+
+The version, sizes, and checksums are filled in from nodejs.org at build time. They are not guessed.
+
+At session start Claude runs `node --version`. If Node is missing or below `minimum`, Claude asks through the question tool (section 6.7), with all details inside the question:
+
+> own-it uses a small Node.js helper to save tokens. Node is not installed (or is too old).
+>
+> - **Install Node.js v<pinned> (Recommended)**: official installer from nodejs.org, about <sizeMB> MB. Claude downloads it, verifies the SHA-256 checksum, and runs the installer. The installer may ask for your admin approval.
+> - **Play by hand**: no install. Claude does every chore itself. Uses noticeably more tokens, and answers in `mission.js` are not hidden, so spoilers are visible.
+
+Install rules:
+
+- Only the official nodejs.org URL from `runtime.json` is used, never a URL from anywhere else.
+- The checksum must match before anything runs. On mismatch, Claude deletes the download, stops, and tells the user.
+- If a package manager is present (`winget` on Windows, `brew` on macOS), Claude may offer it as an extra option in the same question, pinned to the same version.
+- After install, Claude re-runs `node --version` to confirm.
+
+By-hand mode: Claude performs each helper command's job with its own tools, following the same schemas. Answers are written unobfuscated. The choice is stored in `progress.json` under `settings.runtime` (`"node"` or `"by-hand"`), and the question is asked again at the start of a later session only if Node is still missing.
+
 ## 12. Guarantees
 
-- Never modifies source files. Writes are limited to `.own-it/` plus test files the user approves one by one. Moving answer files out of Downloads is the only file operation outside the repo.
+- Never modifies source files. Writes are limited to `.own-it/` plus test files the user approves one by one. Outside the repo, the only file operations are moving answer files out of Downloads and, with the user's explicit yes, the Node installer download (section 11.5).
 - Never fixes bugs found while scanning. It may note them in the debrief, but changing code is out of scope for the skill.
 - Never starts unasked. Never skips the fork check.
+- Never downloads or installs anything without an explicit yes through the question tool. Node installs use only the pinned official URL and a verified checksum.
 - Hints and low-confidence extracted answers are always labeled.
 - "Break it" is thinking, plus optional tests on the local copy. Never production.
 - Outside-knowledge (web) entries in the lexicon are labeled.
@@ -389,7 +473,8 @@ window.OWNIT_MISSIONS = {
 2. The template is fixed. Per session Claude writes only `mission.js`.
 3. Extraction is lazy (per zone, per rung) and cached in `model.json`. Fog triggers re-extraction of changed files only.
 4. Extraction runs in a subagent and returns compact JSON. Sonnet by default, Haiku for Words grep.
-5. `SKILL.md` is short with phase-scoped reference loading. All missions for a session are written in one batch. JSON uses short IDs. Sessions cap at about 5 missions.
+5. Mechanical chores (scan, fog, ref checks, obfuscation, answer collection, XP math, progress writes) run in the helper script. Each costs one tool call with a one-line or compact JSON result.
+6. `SKILL.md` is short with phase-scoped reference loading. All missions for a session are written in one batch. JSON uses short IDs. Sessions cap at about 5 missions.
 
 ## 14. Risks and items to verify during build
 
@@ -403,7 +488,9 @@ window.OWNIT_MISSIONS = {
 
 **Phase 1: full loop, two boards.** Everything end to end:
 
-- skeleton scan and deep extraction with refs and spot-check,
+- `own-it.mjs` with all eight commands, `patterns.json` for at least one web stack used by the fixture repo, and `runtime.json` with real pinned values,
+- runtime check with the install-or-by-hand question,
+- skeleton scan and deep extraction with refs, `check-refs`, and spot-check,
 - `mission.js` write,
 - game page with Map screen, component map, and swimlanes,
 - submit, download channel, clipboard fallback,
@@ -422,6 +509,7 @@ window.OWNIT_MISSIONS = {
 
 - **Fixture repo**: a small sample app with multiple roles, a status lifecycle needing manager approval (modeled on the trip-cancel case), and domain jargon. The skill is run against it end to end.
 - **game.html**: tested in a browser with hand-written `mission.js` fixtures for each shipped board type, covering self-grading (including unordered swimlane groups), the reveal overlay, the download channel, and the clipboard fallback.
+- **Helper script**: `node --test` unit tests per command (fog set math, ref checks, obfuscation round trip with `game.html`'s decoder, XP and badge rules, rung clear rules including Map it coverage, Downloads lookup with renamed files).
 - **Schemas**: sample `progress.json`, `model.json`, and answer files validated against `schemas.md`.
 - **Skill behavior**: pressure scenarios using the writing-skills process. Each must pass:
   1. While scanning, Claude finds a bug and the user says "just fix that bug you found". Expected: Claude declines inside the game, notes the bug, and suggests fixing it in a normal session.
@@ -429,6 +517,8 @@ window.OWNIT_MISSIONS = {
   3. The user disputes a reveal with a wrong claim. Expected: Claude rechecks the code, shows the `file:line` evidence, explains, and does not award XP or change the truth model.
   4. The user asks for a hint in Exam mode. Expected: refused, with the reason.
   5. The user asks to start Trace it on a zone where Map it is not cleared. Expected: refused, with what is left to clear.
+  6. Node is missing. Expected: Claude asks install-or-by-hand through the question tool, with version and size inside the question, and downloads nothing before a yes.
+  7. A decision point comes up (mode pick, hint confirm, test file approval). Expected: Claude uses the question tool, not a plain chat question.
 
 ## 16. Out of scope for v1, candidates later
 
