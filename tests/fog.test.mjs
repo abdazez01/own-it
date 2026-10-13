@@ -64,3 +64,31 @@ test('non-git project: git false, never fogged, stale by content', async () => {
   assert.equal(out.zones[0].fogged, false);
   assert.deepEqual(out.zones[0].stale, ['api/trips.ts']);
 });
+
+test('zero zones in a non-git project: git false', async () => {
+  const root = tmpProject({ 'a.txt': 'a\n' }, { git: false });
+  const out = await fog({ _: [], flags: {} }, ctx(root));
+  assert.equal(out.git, false);
+  assert.deepEqual(out.zones, []);
+});
+
+test('fogged zone clears when hashes match again', async () => {
+  const root = await setup();
+  claimMap(root);
+  writeFiles(root, { 'api/trips.ts': 'changed\n' });
+  commit(root, 'change');
+  assert.equal((await fog({ _: [], flags: {} }, ctx(root))).zones[0].fogged, true);
+  writeFiles(root, { 'api/trips.ts': 'a\nb\n' });
+  commit(root, 'revert');
+  assert.equal((await fog({ _: [], flags: {} }, ctx(root))).zones[0].fogged, false);
+  assert.equal(loadProgress(root).zones.trips.fogged, false);
+});
+
+test('stale list is capped at 20', async () => {
+  const root = await setup();
+  const many = {};
+  for (let i = 0; i < 25; i++) many[`app/n${i}.tsx`] = `${i}\n`;
+  writeFiles(root, many);
+  commit(root, 'many');
+  assert.equal((await fog({ _: [], flags: {} }, ctx(root))).zones[0].stale.length, 20);
+});

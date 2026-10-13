@@ -9,18 +9,20 @@ export async function run(_args, ctx) {
   const model = loadModel(ctx.root);
   const progress = loadProgress(ctx.root);
   const zones = [];
-  let git = true;
   let weak = 0;
 
-  for (const id of Object.keys(model.zones)) {
+  const ids = Object.keys(model.zones);
+  const filesOf = new Map(ids.map((id) => [id, zoneFiles(ctx.root, model.zones[id])]));
+  const claimedOf = (id) => Object.values(progress.zones[id]?.claimHashes || {}).flatMap((h) => Object.keys(h));
+  const all = new Set(ids.flatMap((id) => [...filesOf.get(id), ...claimedOf(id)]));
+  const now = hashesFor(ctx.root, [...all]);
+  const git = now.git;
+
+  for (const id of ids) {
     const mz = model.zones[id];
     const pz = Object.hasOwn(progress.zones, id) ? progress.zones[id] : defaultZoneProgress(mz.name);
     const stored = mz.files || {};
-
-    const files = zoneFiles(ctx.root, mz);
-    const claimed = Object.values(pz.claimHashes || {}).flatMap((h) => Object.keys(h));
-    const now = hashesFor(ctx.root, [...new Set([...files, ...claimed])]);
-    git = now.git;
+    const files = filesOf.get(id);
 
     const stale = files.filter((f) => now.hashes[f] !== null && now.hashes[f] !== stored[f]);
     const fogged = now.git && Object.values(pz.claimHashes || {})
