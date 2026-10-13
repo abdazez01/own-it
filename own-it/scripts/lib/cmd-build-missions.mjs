@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { check, RECIPE } from './validate.mjs';
 import { loadModel } from './model.mjs';
-import { loadProgress, saveProgress, defaultZoneProgress } from './progress.mjs';
+import { loadProgress, saveProgress, defaultZoneProgress, RUNGS } from './progress.mjs';
 import core from './core.mjs';
 import { writeJson, writeJsVar } from './json.mjs';
 import { ownItPath, toPosix } from './paths.mjs';
@@ -29,12 +29,18 @@ const shuffled = (missionId, cards) => cards
 function gate(m, pz) {
   if (m.refresh) {
     if (!pz.fogged) throw new Error(`zone "${m.zone}" is not fogged`);
+    if (pz.rungs[m.rung] !== 'cleared') {
+      const cleared = RUNGS.filter((r) => pz.rungs[r] === 'cleared');
+      throw new Error(`refresh needs a cleared rung in zone "${m.zone}"; cleared: ${cleared.join(',') || 'none'}`);
+    }
     return;
   }
   const state = Object.hasOwn(pz.rungs, m.rung) ? pz.rungs[m.rung] : 'locked';
   if (state === 'open' || state === 'cleared') return;
   let msg = `rung "${m.rung}" is locked in zone "${m.zone}"`;
+  const prev = RUNGS[RUNGS.indexOf(m.rung) - 1];
   if (m.rung === 'trace' && pz.rungs.map !== 'cleared') msg += `; map needs surfaces ${m.__uncovered.join(',')}`;
+  else if ((m.rung === 'break' || m.rung === 'boss') && pz.rungs[prev] !== 'cleared') msg += `; clear ${prev} first`;
   throw new Error(msg);
 }
 

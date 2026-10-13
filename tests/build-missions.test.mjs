@@ -106,6 +106,26 @@ test('refresh mission requires fogged zone', async () => {
   await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'map', board: 'component', brief: 'x', cards: ['c0', 'c1'], refresh: true }])], flags: {} }, ctx(root)), /zone "trips" is not fogged/);
 });
 
+test('refresh mission needs its rung cleared; error lists cleared rungs', async () => {
+  const root = await setup();
+  const p = loadProgress(root);
+  Object.assign(p.zones.trips, { fogged: true });
+  Object.assign(p.zones.trips.rungs, { words: 'cleared', map: 'cleared', trace: 'open', break: 'open' });
+  saveProgress(root, p);
+  await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'break', board: 'component', brief: 'x', cards: ['c0', 'c1'], threats: ['x1'], refresh: true }])], flags: {} }, ctx(root)),
+    /refresh needs a cleared rung in zone "trips"; cleared: words,map/);
+  const out = await build({ _: [recipe(root, [{ zone: 'trips', rung: 'map', board: 'component', brief: 'x', cards: ['c0', 'c1'], refresh: true }])], flags: {} }, ctx(root));
+  assert.equal(out.missions.length, 1);
+});
+
+test('locked break and boss say which rung to clear first', async () => {
+  const root = await setup();
+  await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'break', board: 'component', brief: 'x', cards: ['c0', 'c1'], threats: ['x1'] }])], flags: {} }, ctx(root)),
+    /rung "break" is locked in zone "trips"; clear trace first/);
+  await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'boss', board: 'component', brief: 'x' }])], flags: {} }, ctx(root)),
+    /rung "boss" is locked in zone "trips"; clear break first/);
+});
+
 test('emitted cards omit actor, are shuffled deterministically, boss answer cards carry ref and conf', async () => {
   const flat = ['c0', 'c1', 'c4', 'c3'];
   const orders = [];
