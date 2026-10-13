@@ -161,3 +161,38 @@ test('invalid input is rejected before any write', async () => {
   for (const [_, flags, re] of bad) await assert.rejects(apply({ _, flags }, ctx(root)), re);
   assert.equal(JSON.stringify(loadProgress(root)), before);
 });
+
+test('session mission with an unknown rung is rejected before any write', async () => {
+  const root = await setup();
+  mission(root, 'trips-x-1', { zone: 'trips', rung: 'bogus', board: 'component', cardIds: ['c0'] }, { got: 1, of: 1 });
+  const before = JSON.stringify(loadProgress(root));
+  await assert.rejects(apply({ _: ['trips-x-1'], flags: {} }, ctx(root)), /invalid rung "bogus" for mission "trips-x-1"/);
+  assert.equal(JSON.stringify(loadProgress(root)), before);
+});
+
+test('board mission in a session without mode defaults to practice (curiosity counts)', async () => {
+  const root = await setup();
+  setRungs(root, { trace: 'open' });
+  mission(root, 'trips-trace-1', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0'] }, { got: 1, of: 5 });
+  const sp = join(root, '.own-it', 'session.json');
+  const s = readJson(sp); delete s.mode; writeJson(sp, s);
+  await apply({ _: ['trips-trace-1'], flags: { curiosity: '2' } }, ctx(root));
+  assert.equal(loadProgress(root).curiosity, 2);
+});
+
+test('answer.missed must be string ids', async () => {
+  const root = await setup();
+  setRungs(root, { trace: 'open' });
+  mission(root, 'trips-trace-1', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0'] }, { got: 1, of: 5, missed: [1, 'c1'] });
+  await assert.rejects(apply({ _: ['trips-trace-1'], flags: {} }, ctx(root)), /invalid answer: missed must be string ids/);
+});
+
+test('token log entries carry the session (null for words without a session file)', async () => {
+  const root = await setup();
+  await apply({ _: ['trips-words-1'], flags: { got: '1', of: '1' } }, ctx(root));
+  assert.equal(loadProgress(root).tokens.at(-1).session, null);
+  setRungs(root, { trace: 'open' });
+  mission(root, 'trips-trace-1', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0'] }, { got: 1, of: 5 });
+  await apply({ _: ['trips-trace-1'], flags: {} }, ctx(root));
+  assert.equal(loadProgress(root).tokens.at(-1).session, '2026-10-13T16:00:00.000Z');
+});

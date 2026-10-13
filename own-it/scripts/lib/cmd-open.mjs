@@ -16,8 +16,9 @@ export async function run(_args, ctx) {
     // On Windows pass the command line verbatim so `start "" "<path>"` keeps its quoting.
     const win = process.platform === 'win32';
     const finalArgs = win ? args.slice(0, -1).concat(`"${file}"`) : args;
-    const child = spawn(cmd, finalArgs, { detached: true, stdio: 'ignore', windowsVerbatimArguments: win });
-    child.on('error', () => {});
+    const child = spawn(cmd, finalArgs, { detached: true, stdio: 'ignore', windowsVerbatimArguments: win, windowsHide: true });
+    child.on('error', (e) => process.stderr.write(`own-it: could not open browser (${e.message}); open ${toPosix(file)} manually
+`));
     child.unref();
   }
   return { opened: toPosix(file) };

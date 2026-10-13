@@ -70,6 +70,7 @@ function resolveMission(root, id, model, f) {
   const missions = session.missions || {};
   if (Object.hasOwn(missions, id)) {
     const meta = missions[id];
+    if (!RUNGS.includes(meta.rung)) throw new Error(`invalid rung "${meta.rung}" for mission "${id}"`);
     if (!Object.hasOwn(model.zones, meta.zone)) throw new Error(`unknown zone "${meta.zone}" for mission "${id}"`);
     if (f.score && meta.rung !== 'map') throw new Error('--got/--of only apply to words and map missions');
     const answerPath = ownItPath(root, 'answers', `${id}.json`);
@@ -80,6 +81,7 @@ function resolveMission(root, id, model, f) {
       answer = readJson(answerPath);
       if (answer.id !== id) throw new Error(`answer file is for "${answer.id}", expected "${id}"`);
       if (!Array.isArray(answer.missed)) throw new Error(`answer for "${id}": missed must be an array`);
+      if (!answer.missed.every((x) => typeof x === 'string')) throw new Error(`invalid answer: missed must be string ids`);
       if (!(Number.isInteger(answer.hintsUsed) && answer.hintsUsed >= 0)) throw new Error(`answer for "${id}": hintsUsed must be a non-negative integer`);
       checkScore(answer.got, answer.of, `answer for "${id}"`);
     } else if (!f.score) {
@@ -87,7 +89,7 @@ function resolveMission(root, id, model, f) {
     }
     const got = f.score ? f.score.got : answer.got;
     const of = f.score ? f.score.of : answer.of;
-    return { zone: meta.zone, rung: meta.rung, mode: session.mode, refresh: meta.refresh === true,
+    return { zone: meta.zone, rung: meta.rung, session: session.session ?? null, mode: session.mode || 'practice', refresh: meta.refresh === true,
       cardIds: [...(meta.cardIds || []), ...(meta.threatIds || [])], got, of,
       missed: answer.missed, hintsUsed: answer.hintsUsed, answerText, meta };
   }
@@ -95,7 +97,7 @@ function resolveMission(root, id, model, f) {
   if (!w) throw new Error(`unknown mission "${id}"`);
   if (!Object.hasOwn(model.zones, w[1])) throw new Error(`unknown zone "${w[1]}" for mission "${id}"`);
   if (!f.score) throw new Error(`words mission "${id}" needs --got and --of`);
-  return { zone: w[1], rung: 'words', mode: session.mode || 'practice', refresh: false, cardIds: [],
+  return { zone: w[1], rung: 'words', session: session.session ?? null, mode: session.mode || 'practice', refresh: false, cardIds: [],
     got: f.score.got, of: f.score.of, missed: [], hintsUsed: 0, answerText: '', meta: null };
 }
 
@@ -180,7 +182,7 @@ export async function run(args, ctx) {
   progress.badges.push(...badges);
 
   const est = f.tokens ?? estimate(m.answerText, m.meta ? JSON.stringify(m.meta) : '', typeof args.flags?.text === 'string' ? args.flags.text : '');
-  progress.tokens.push({ t: ctx.now().toISOString(), kind: 'mission', id, est });
+  progress.tokens.push({ t: ctx.now().toISOString(), kind: 'mission', id, session: m.session, est });
   progress.applied.push(id);
   saveProgress(ctx.root, progress);
 
