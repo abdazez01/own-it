@@ -159,6 +159,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
   position: absolute; left: calc(100% + 18px); top: -6px; width: 230px; background: var(--note); color: var(--note-ink);
   padding: 10px; border-radius: 2px; box-shadow: 3px 4px 0 rgba(0,0,0,.18); transform: rotate(-1deg); z-index: 6; cursor: default;
 }
+.tray .note { position: static; width: auto; transform: none; margin-top: 8px; box-shadow: none; }
 .note p { margin: 0 0 6px; font-size: 13.5px; font-weight: 600; }
 .note textarea, .side textarea {
   width: 100%; min-height: 74px; resize: vertical; border: 1px solid rgba(0,0,0,.25); border-radius: 4px; padding: 6px; background: rgba(255,255,255,.55); color: inherit;
@@ -285,6 +286,8 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
   var SVGNS = 'http://www.w3.org/2000/svg';
   function sv(tag, attrs) {
     var n = document.createElementNS(SVGNS, tag);
+    // Ink is decorative except focusable arrows (role=button) and lane names.
+    if (tag !== 'svg' && tag !== 'text' && !(attrs && attrs.role)) n.setAttribute('aria-hidden', 'true');
     Object.keys(attrs || {}).forEach(function (k) {
       if (k === 'text') n.textContent = attrs[k];
       else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), attrs[k]);
@@ -310,7 +313,8 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     var p = refParts(ref);
     if (!p) return null;
     var full = (ROOT ? ROOT.replace(/\/+$/, '') + '/' : '') + p.path;
-    var href = 'vscode://file/' + encodeURI(full.replace(/^\/+/, '')) + ':' + p.line;
+    var path = full.replace(/^\/+/, '').split('/').map(function (seg) { return /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg); }).join('/');
+    var href = 'vscode://file/' + path + ':' + p.line;
     return el('span', { class: 'ref' }, el('a', { href: href, title: 'Open in VS Code' }, 'Open in editor'), ' ', el('code', { text: p.path + ':' + p.line }));
   }
   function kindOf(m) {
@@ -481,7 +485,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     if (B.hint) scr.appendChild(el('div', { class: 'hintline', role: 'note' }, el('span', { text: B.hint }), el('small', null, 'Prediction, may be wrong')));
     var side = el('aside', { class: 'side', id: 'side', 'aria-label': B.result ? 'Results' : 'Tray' });
     canvas = el('div', { id: 'canvas', tabindex: '-1', class: (B.kind === 'lanes' ? 'lanes-board' : '') + (B.result ? ' revealed' : ''), role: 'region', 'aria-label': 'Whiteboard' });
-    canvas.appendChild(sv('svg', { id: 'ink', 'aria-hidden': 'true' }));
+    canvas.appendChild(sv('svg', { id: 'ink' }));
     scr.appendChild(el('div', { class: 'work' }, side, canvas));
     if (!B.laidOut) layout();
     renderSide();
@@ -577,7 +581,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
 
   function nodeEl(n, inTray) {
     var r = B.reveal && B.reveal.nodes[n.id];
-    var cls = 'node' + (r ? ' ' + r.cls : '') + (B.pending && B.pending.from === n.id ? ' target' : '') + (B.openPin === n.id && !inTray ? ' noted' : '');
+    var cls = 'node' + (r ? ' ' + r.cls : '') + (B.pending && B.pending.from === n.id ? ' target' : '') + (B.openPin === n.id ? ' noted' : '');
     var d = el('div', { class: cls, 'data-node': n.id, tabindex: '0', role: 'group', 'aria-label': (n.box ? 'Box ' : 'Card ') + n.label });
     if (!inTray) { d.style.left = n.x + 'px'; d.style.top = n.y + 'px'; }
     d.appendChild(el('div', { class: 'label', text: n.label }));
@@ -595,9 +599,9 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
       var chips = tokenChipsFor(n.id);
       if (chips.length) d.appendChild(el('div', { class: 'tokens-on' }, chips));
     }
-    if (B.pins[n.id] && B.kind !== 'boss' && !inTray) {
+    if (B.pins[n.id] && B.kind !== 'boss') {
       d.appendChild(el('button', { class: 'pin', 'aria-label': 'Question about ' + n.label, 'aria-expanded': B.openPin === n.id ? 'true' : 'false',
-        onclick: function () { B.openPin = B.openPin === n.id ? null : n.id; renderNodes(B.openPin ? null : n.id); if (B.openPin) { var t = $('.note textarea', canvas); if (t) t.focus(); } } }, '?'));
+        onclick: function () { B.openPin = B.openPin === n.id ? null : n.id; renderNodes(B.openPin ? null : n.id); if (B.openPin) { var t = $('.note textarea'); if (t) t.focus(); } } }, '?'));
       if (B.openPin === n.id) {
         var ta = el('textarea', { 'aria-label': B.pins[n.id], readonly: !!B.result });
         ta.value = B.text[n.id] || '';
@@ -638,7 +642,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
 
   function renderNodes(focusId) {
     Array.prototype.slice.call(canvas.querySelectorAll('.node, .edge-x')).forEach(function (n) { n.remove(); });
-    B.nodes.forEach(function (n) { if (n.placed) canvas.appendChild(nodeEl(n, false)); });
+    B.nodes.forEach(function (n) { if (n.placed) { snapLane(n); canvas.appendChild(nodeEl(n, false)); } });
     if (B.kind === 'lanes' && !B.result) renderSide();
     if (B.kind === 'break' && !B.result) renderSide();
     drawInk();
@@ -652,12 +656,30 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
 
   function clampNode(n, d) {
     var W = canvas.clientWidth, H = canvas.clientHeight;
-    var w = d ? d.offsetWidth : 196, h = d ? d.offsetHeight : 70;
+    var w = d ? d.offsetWidth : cardWidth(), h = d ? d.offsetHeight : n.h || 70;
     var minX = B.kind === 'lanes' ? LANE_LABEL_W + 4 : 4;
     n.x = Math.max(minX, Math.min(n.x, W - w - 16));
     n.y = Math.max(16, Math.min(n.y, H - h - 6));
   }
-  function moveNode(n, d, x, y) { n.x = x; n.y = y; clampNode(n, d); d.style.left = n.x + 'px'; d.style.top = n.y + 'px'; }
+  function cardWidth() { return B.kind === 'lanes' ? 176 : 196; }
+  function moveNode(n, d, x, y) { n.x = x; n.y = y; clampNode(n, d); noteLane(n, d); d.style.left = n.x + 'px'; d.style.top = n.y + 'px'; }
+  // Lane boards remember lane membership and the offset inside the lane, so a canvas height change
+  // (hint line, resize) re-snaps cards into the same lane instead of reassigning them.
+  function noteLane(n, d) {
+    if (B.kind !== 'lanes') return;
+    var lanes = B.m.lanes || [], lh = laneHeight();
+    n.h = d ? d.offsetHeight : n.h || 70;
+    n.lane = Math.max(0, Math.min(lanes.length - 1, Math.floor((n.y + n.h / 2) / lh)));
+    n.ly = n.y - n.lane * lh;
+  }
+  function snapLane(n) {
+    if (B.kind !== 'lanes' || typeof n.lane !== 'number') return;
+    var lh = laneHeight(), h = n.h || 70;
+    n.y = n.lane * lh + Math.max(1 - h / 2, Math.min(n.ly, lh - h / 2 - 1));
+    var lane = n.lane, ly = n.ly;
+    clampNode(n, null);
+    n.lane = lane; n.ly = ly;
+  }
 
   function nodePointerDown(e, n, d, inTray) {
     if (B.result || e.button !== 0) return;
@@ -730,16 +752,18 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     n.placed = true;
     n.x = pt.left - cr.left; n.y = pt.top - cr.top;
     clampNode(n, null);
+    noteLane(n, null);
     renderNodes(n.id);
     say(n.label + ' placed in the ' + laneAt(n) + ' lane.');
   }
 
   function autoPlace(n) {
     var right = LANE_LABEL_W + 16;
-    B.nodes.forEach(function (o) { if (o.placed && o !== n) right = Math.max(right, o.x + 196); });
+    B.nodes.forEach(function (o) { if (o.placed && o !== n) right = Math.max(right, o.x + cardWidth() + 16); });
     n.placed = true;
     n.x = right; n.y = laneHeight() / 2 - 35;
     clampNode(n, null);
+    noteLane(n, null);
     renderNodes(n.id);
     say(n.label + ' placed in the ' + laneAt(n) + ' lane. Use the arrow keys to move it.');
   }
@@ -869,6 +893,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
 
   function laneHeight() { var n = Math.max(1, (B.m.lanes || []).length); return canvas.clientHeight / n; }
   function laneIndex(n) {
+    if (typeof n.lane === 'number') return n.lane;
     var lanes = B.m.lanes || [];
     var d = nodeElById(n.id), h = d ? d.offsetHeight : 70;
     var i = Math.floor((n.y + h / 2) / laneHeight());
@@ -1004,7 +1029,8 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
       var lost = ans.cards.filter(function (c) { return !matched[c.id]; })[0];
       if (lost) return 'Add a box for ' + q(lost.label) + '.';
       var me = ans.edges.filter(function (e) { return !has(matched[e.from], matched[e.to]); })[0];
-      if (me) return 'Connect ' + q(labelOf(me.from)) + ' to ' + q(labelOf(me.to)) + '.';
+      var cardLabel = function (id) { var c = ans.cards.filter(function (x) { return x.id === id; })[0]; return c ? c.label : id; };
+      if (me) return 'Connect ' + q(cardLabel(me.from)) + ' to ' + q(cardLabel(me.to)) + '.';
     }
     return 'Nothing obvious is missing. Check your work, then submit.';
   }
@@ -1067,6 +1093,9 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     } else {
       var boxes = boxList();
       res = Core.gradeBoss(ans, boxes, B.edges);
+      // Claude reads the payload without the page's box uids, so report wrong arrows as label pairs.
+      var boxLabel = function (uid) { var n = nodeById(uid); return n ? n.label : uid; };
+      res.wrong = res.wrong.map(function (w) { return [boxLabel(w[0]), boxLabel(w[1])]; });
       var map = Core.matchLabels(boxes, ans.cards), byCard = {}, exp2 = {};
       Object.keys(map).forEach(function (u) { byCard[map[u]] = u; });
       ans.edges.forEach(function (e) { exp2[key(e.from, e.to)] = true; });
@@ -1153,9 +1182,9 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
         // Every wrong threat is also missed; fold it into that row so each threat has one Challenge button.
         out.forEach(function (o) { if (o.id === w[0]) { o.kind = 'wrong'; o.label += '. You put it on ' + labelOf(w[1]); } });
       } else {
-        var a = nodeById(w[0]), b = nodeById(w[1]);
-        var la = a ? a.label : w[0], lb = b ? b.label : w[1];
-        out.push({ kind: 'wrong', id: B.kind === 'boss' ? la + '->' + lb : w[0] + '->' + w[1], label: 'Arrow ' + la + ' → ' + lb + ' is not in the code' });
+        // Boss pairs are already labels; map pairs are card ids.
+        var la = B.kind === 'boss' ? w[0] : labelOf(w[0]), lb = B.kind === 'boss' ? w[1] : labelOf(w[1]);
+        out.push({ kind: 'wrong', id: w[0] + '->' + w[1], label: 'Arrow ' + la + ' → ' + lb + ' is not in the code' });
       }
     });
     return out;
@@ -1215,7 +1244,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monos
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
       if (!B || !canvas) return;
-      B.nodes.forEach(function (n) { if (n.placed) clampNode(n, nodeElById(n.id)); });
+      B.nodes.forEach(function (n) { if (n.placed && B.kind !== 'lanes') clampNode(n, nodeElById(n.id)); });
       renderNodes();
     }, 120);
   });
