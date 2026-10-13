@@ -37,7 +37,7 @@ Run `node --version`. Missing or below `<skill-dir>/runtime.json` `minimum`? Ask
 
 ## 4b. Later runs
 
-`fog` → per zone `rungs` (words map trace break boss: `c` cleared, `o` open, `-` locked), `fogged`, `stale`. Status: one line. `git: false` → say once fog is disabled.
+`fog` → per zone `rungs` (words map trace break boss: `c` cleared, `o` open, `-` locked), `fogged`, `stale`, `changed` (fogged only). Status: one line. `git: false` → say once fog is disabled.
 
 ## 5. Mode
 
