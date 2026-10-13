@@ -23,10 +23,15 @@ export const defaultProgress = () => ({
   zones: {},
   finalBoss: 'locked',
   tokens: [],
+  applied: [],
   settings: { gitTracked: false, downloadDir: null },
 });
 
-export const loadProgress = (root) => readJson(ownItPath(root, 'progress.json'), defaultProgress());
+export function loadProgress(root) {
+  const p = readJson(ownItPath(root, 'progress.json'), defaultProgress());
+  if (!Array.isArray(p.applied)) p.applied = [];
+  return p;
+}
 
 export function saveProgress(root, p) {
   writeJson(ownItPath(root, 'progress.json'), p);
