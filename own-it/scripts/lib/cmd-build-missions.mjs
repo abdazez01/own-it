@@ -12,11 +12,19 @@ const CARD_KINDS = ['surface', 'component', 'actor'];
 const BOARD_OF = { map: 'component', trace: 'swimlanes', break: 'component', boss: 'component' };
 const BOSS_MAX = 15;
 
-const cardOf = (it) => {
-  const c = { id: it.id, label: it.label ?? it.id, ref: it.ref, conf: it.conf };
-  if (it.actor) c.actor = it.actor;
-  return c;
+const cardOf = (it) => ({ id: it.id, label: it.label ?? it.id, ref: it.ref, conf: it.conf });
+
+// FNV-1a: small stable string hash for the deterministic card shuffle.
+const hash32 = (s) => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h;
 };
+// Deterministic per mission id, so trace cards are not listed in solution order.
+const shuffled = (missionId, cards) => cards
+  .map((c) => ({ c, h: hash32(missionId + c.id) }))
+  .sort((a, b) => a.h - b.h || (a.c.id < b.c.id ? -1 : 1))
+  .map((x) => x.c);
 
 function gate(m, pz) {
   if (m.refresh) {
@@ -89,7 +97,7 @@ function expand(m, i, items, byId) {
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, BOSS_MAX);
   if (its.length < 2) throw new Error(`${at} zone needs at least 2 surfaces or components`);
   return { cards: [], blank: true, pinIds: its.map((x) => x.id),
-    answer: { cards: its.map((x) => ({ id: x.id, label: x.label ?? x.id })), edges: edgesWithin(its.map((x) => x.id)) } };
+    answer: { cards: its.map(cardOf), edges: edgesWithin(its.map((x) => x.id)) } };
 }
 
 export async function run(args, ctx) {
@@ -126,7 +134,7 @@ export async function run(args, ctx) {
     const id = `${m.zone}-${m.rung}-${progress.seq + 1 + i}`;
     const mission = { id, zone: m.zone, rung: m.rung, board: m.board, brief: m.brief };
     if (x.lanes) mission.lanes = x.lanes;
-    mission.cards = x.cards;
+    mission.cards = shuffled(id, x.cards);
     mission.pins = pins;
     if (x.tokens) mission.tokens = x.tokens;
     if (x.blank) mission.blank = true;

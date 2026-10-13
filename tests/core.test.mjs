@@ -195,3 +195,8 @@ test('core.js runs as a classic browser script and exposes self.OwnItCore', asyn
   assert.equal(ctx.OwnItCore.encode({ x: 'é' }), enc);
   assert.deepEqual({ ...ctx.OwnItCore.decode(enc) }, { x: 'é' });
 });
+
+test('matchLabels: non-Latin (Arabic) labels tokenize and match', () => {
+  const m = core.matchLabels([{ uid: 'u1', label: 'إلغاء الرحلة' }], [{ id: 'c1', label: 'إلغاء الرحلة API' }]);
+  assert.deepEqual(m, { u1: 'c1' });
+});

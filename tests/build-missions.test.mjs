@@ -53,7 +53,7 @@ test('map mission expands cards and derives edges; answer is obfuscated', async 
   assert.deepEqual(out.missions, ['trips-map-1']);
   const M = loadMissions(root);
   const m = M.missions[0];
-  assert.deepEqual(m.cards.map((c) => c.id), ['c0', 'c1', 'c4']);
+  assert.deepEqual(m.cards.map((c) => c.id).sort(), ['c0', 'c1', 'c4']);
   assert.equal(m.cards[0].ref, 'api/t.ts:1');
   assert.doesNotMatch(readFileSync(join(root, '.own-it', 'mission.js'), 'utf8'), /"edges"/);
   assert.deepEqual(core.decode(m.answer), { edges: [{ id: 'e1', from: 'c0', to: 'c1' }, { id: 'e2', from: 'c1', to: 'c4' }] });
@@ -104,4 +104,24 @@ test('unknown ids, bad pins, bad recipe rejected', async () => {
 test('refresh mission requires fogged zone', async () => {
   const root = await setup();
   await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'map', board: 'component', brief: 'x', cards: ['c0', 'c1'], refresh: true }])], flags: {} }, ctx(root)), /zone "trips" is not fogged/);
+});
+
+test('emitted cards omit actor, are shuffled deterministically, boss answer cards carry ref and conf', async () => {
+  const flat = ['c0', 'c1', 'c4', 'c3'];
+  const orders = [];
+  for (let n = 0; n < 2; n++) {
+    const root = await setup();
+    open(root, 'trace', 'boss');
+    await build({ _: [recipe(root, [
+      { zone: 'trips', rung: 'trace', board: 'swimlanes', brief: 'Cancel', flow: 'f1' },
+      { zone: 'trips', rung: 'boss', board: 'component', brief: 'Defend' }])], flags: {} }, ctx(root));
+    const [t, boss] = loadMissions(root).missions;
+    assert.ok(t.cards.every((c) => !('actor' in c)), 'no actor on cards');
+    orders.push(t.cards.map((c) => c.id));
+    assert.deepEqual([...orders[n]].sort(), [...flat].sort());
+    const bc = core.decode(boss.answer).cards;
+    assert.ok(bc.every((c) => c.ref === 'api/t.ts:1' && c.conf === 'high' && c.label), JSON.stringify(bc));
+  }
+  assert.notDeepEqual(orders[0], flat);
+  assert.deepEqual(orders[0], orders[1]);
 });

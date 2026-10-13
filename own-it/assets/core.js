@@ -152,7 +152,7 @@
 
   function tokens(label) {
     const set = new Set();
-    for (const t of String(label == null ? '' : label).toLowerCase().split(/[^a-z0-9]+/)) {
+    for (const t of String(label == null ? '' : label).toLocaleLowerCase().split(/[^\p{L}\p{N}]+/u)) {
       if (t && !STOPWORDS.has(t)) set.add(t);
     }
     return set;
@@ -190,7 +190,8 @@
   }
 
   // Edges are graded in card space; `wrong` is reported as the user's own [uidFrom, uidTo]
-  // pairs (an edge touching an unmatched box has no card id to report).
+  // pairs (an edge touching an unmatched box has no card id to report). The page converts
+  // these uid pairs to label pairs for the payload.
   function gradeBoss(answer, boxes, userEdges) {
     const map = matchLabels(boxes, answer.cards);
     const matched = new Set(Object.keys(map).map(function (uid) { return map[uid]; }));
