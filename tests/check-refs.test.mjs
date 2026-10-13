@@ -7,7 +7,7 @@ import { run as checkRefs } from '../own-it/scripts/lib/cmd-check-refs.mjs';
 import { loadModel } from '../own-it/scripts/lib/model.mjs';
 import { loadProgress } from '../own-it/scripts/lib/progress.mjs';
 import { blobHash } from '../own-it/scripts/lib/hash.mjs';
-import { tmpProject, ctx } from './helpers.mjs';
+import { tmpProject, ctx, writeFiles, commit } from './helpers.mjs';
 
 async function setup() {
   const root = tmpProject({ 'api/trips.ts': 'a\nb\nc\nd\n', 'app/Trip.tsx': 'x\r\ny\r\n', 'other/z.ts': 'z\n' });
@@ -119,4 +119,22 @@ test('extraction file with a BOM is accepted', async () => {
   ] }));
   const out = await checkRefs({ _: [p], flags: {} }, ctx(root));
   assert.equal(out.kept, 1);
+});
+
+test('partial re-extraction re-stamps only re-extracted files', async () => {
+  const root = await setup();
+  await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts', 'app/Trip.tsx'], items: [
+    it({ id: 'c1', k: 'surface', label: 'api', ref: 'api/trips.ts:1' }),
+    it({ id: 'c2', k: 'surface', label: 'screen', ref: 'app/Trip.tsx:1' }),
+  ] })], flags: {} }, ctx(root));
+  const old = loadModel(root).zones.trips.files;
+  writeFiles(root, { 'api/trips.ts': 'a\nb\nc\nd\ne\n', 'app/Trip.tsx': 'x\ny\nz\n' });
+  commit(root, 'change');
+  await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts'], items: [
+    it({ id: 'c1', k: 'surface', label: 'api', ref: 'api/trips.ts:1' }),
+  ] })], flags: {} }, ctx(root));
+  const f = loadModel(root).zones.trips.files;
+  assert.equal(f['api/trips.ts'], blobHash('a\nb\nc\nd\ne\n'));
+  assert.notEqual(f['api/trips.ts'], old['api/trips.ts']);
+  assert.equal(f['app/Trip.tsx'], old['app/Trip.tsx']);
 });

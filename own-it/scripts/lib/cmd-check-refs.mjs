@@ -51,6 +51,7 @@ export async function run(args, ctx) {
   if (!Object.hasOwn(model.zones, ex.zone)) throw new Error(`unknown zone "${ex.zone}"`);
   const zone = model.zones[ex.zone];
 
+  const firstExtraction = zone.items.length === 0;
   const inZone = new Set(zoneFiles(ctx.root, zone));
   const dropped = [];
   const drop = (id, why) => dropped.push({ id, why });
@@ -84,7 +85,9 @@ export async function run(args, ctx) {
   }
 
   zone.items = [...merged.values()];
-  zone.files = hashesFor(ctx.root, [...inZone]).hashes;
+  // Partial re-extraction only re-stamps what was re-read, so changes elsewhere stay detectable as stale.
+  const stamp = firstExtraction ? [...inZone] : [...reExtracted];
+  zone.files = { ...(firstExtraction ? {} : zone.files), ...hashesFor(ctx.root, stamp).hashes };
   saveModel(ctx.root, model);
 
   const est = estimate(raw);
