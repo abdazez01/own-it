@@ -1,6 +1,6 @@
 # Examples (real formats; the helper validates every field)
 
-## Zones file → `init --zones zones.json`
+## Zones file `.own-it/zones.json` → `init --zones .own-it/zones.json`
 
 ```json
 {
@@ -13,7 +13,7 @@
 
 `{"created":true,"zones":["trips","access"],"gitTracked":false}`
 
-## Extraction file → `check-refs .own-it/extract-trips.json`
+## Extraction file `.own-it/extract-trips.json` → `check-refs` it
 
 ```json
 {
@@ -33,14 +33,14 @@
       "steps": [["c-api"], ["s-cancel"], ["c-approvals"], ["s-approvals"]] },
     { "id": "d1", "k": "decision", "label": "Why does cancel need manager approval?", "ref": "server/routes/trips.ts:25", "conf": "medium" },
     { "id": "x-role", "k": "failure", "card": "s-cancel", "threat": "Client sends a forged x-user-role header", "ref": "server/routes/trips.ts:19", "conf": "medium" },
-    { "id": "t1", "k": "term", "label": "release cable", "ref": "server/routes/locks.ts:14", "conf": "low", "outside": true }
+    { "id": "t1", "k": "term", "label": "release cable", "ref": "server/routes/locks.ts:14", "conf": "low" }
   ]
 }
 ```
 
 `{"zone":"trips","kept":13,"dropped":[],"est":509}` (`dropped`: `{id, why}`, why = invalid, dup-id, no-file, bad-line, outside-zone, dangling)
 
-## Recipe → `build-missions .own-it/recipe.json`
+## Recipe `.own-it/recipe.json` → `build-missions` it (format only: real map missions use 5-10 cards; one build mixes rungs only if all are open)
 
 ```json
 {

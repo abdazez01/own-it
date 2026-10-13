@@ -35,6 +35,8 @@ The user types `challenge <id>`: a model item id, or an arrow `A->B` (card ids o
 2. User right: fix the truth model. Write `.own-it/fix-<zone>.json` as `{"zone": "<zone>", "files": [], "items": [<corrected or new item>]}` (same id replaces), run `check-refs` on it, then add `--challenge-won 1` per win to `apply`. To delete an item, put its file in `files` and include that file's other items from `model.json`.
 3. User wrong: show the `file:line` evidence, explain in ≤80 words. No XP change.
 
+Resolve challenges before `apply`; it runs once.
+
 ## Exam mode
 
 No hints, no debriefs, no follow-ups until the end. Still grade text and `apply` each mission. At the end, the report card, one line per zone played:
@@ -45,4 +47,4 @@ No hints, no debriefs, no follow-ups until the end. Still grade text and `apply`
 - **shaky**: passed some, or text mostly partial.
 - **blind spot**: under 50%, or text mostly miss.
 
-Then answer held follow-ups (≤80 words each, no Curiosity XP).
+Then answer held follow-ups (≤80 words, no Curiosity XP).

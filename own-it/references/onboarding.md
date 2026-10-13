@@ -3,11 +3,11 @@
 ## 1. Fork check (never skipped)
 
 Question: "own-it reads a lot of code and adds many messages. A forked or fresh session keeps your work context clean. Is this a fork?"
-- **Yes, this is a fork** → continue.
+- **Yes, this is a fork / fresh session (Recommended)** → continue.
 - **No, I'll fork first** → say how (start a new session, or use your client's fork or branch option if it has one), then stop.
 - **No, play here anyway** → continue.
 
-Asked to skip it? Ask once, one line; "play here" answers it.
+Asked to skip it? Ask once, one line; accept "play here".
 
 ## 2. Runtime check
 
@@ -17,7 +17,7 @@ Run `node --version`. Missing or below `<skill-dir>/runtime.json` `minimum`? Ask
 > - **Install Node.js <pinned> (Recommended)**: official installer from nodejs.org, about <sizeMB> MB. Claude downloads it, verifies the SHA-256 checksum, and runs the installer. The installer may ask for your admin approval.
 > - **Not now**: own-it stops. Install Node yourself from nodejs.org, then run /own-it again.
 
-`winget`/`brew` present? Offer it too, same version.
+`winget`/`brew` present? Offer it, same version.
 
 - Download only the `runtime.json` URL.
 - `sha256` must match before running. Mismatch: delete, stop, tell the user.
@@ -33,7 +33,7 @@ Run `node --version`. Missing or below `<skill-dir>/runtime.json` `minimum`? Ask
 1. `scan` → surface candidates with refs. Group them into zones (subsystems; ids `a-z0-9-`, max 24 chars).
 2. Ask to confirm, rename, or merge; list zones and paths in the question.
 3. Ask: **Gitignore `.own-it/`, personal stats (Recommended)** / **Commit it, team-visible coverage**.
-4. Write the zones file (`examples.md`), run `init --zones <file>`, plus `--git-tracked` if they chose commit. A re-init without it turns tracking off: always pass it again for a tracked project.
+4. Write `.own-it/zones.json` (`examples.md`), run `init --zones .own-it/zones.json`, plus `--git-tracked` if they chose commit. Re-init without it turns tracking off: always repeat it when tracked.
 
 ## 4b. Later runs
 

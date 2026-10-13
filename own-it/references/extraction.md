@@ -26,13 +26,12 @@ Kinds (k) and fields:
 - state: label. transition: from, to (state ids), by (role or event).
 - flow: label, steps = ordered groups of card ids, e.g.
   [["a"],["b"],["c","d"],["e"]]; ids in one group may run in any order.
-  Every step card needs an actor.
+  2-12 cards per flow, each with actor.
 - decision: label (a "why X, not Y?" worth asking).
 - failure: card (surface/component id), threat (short attack or fault,
   e.g. "Client forges role header"). Cover validation, auth on mutating
   endpoints, idempotency, retries/timeouts, concurrency, external deps.
-- term: label.
-- outside: true when ref is outside the zone files.
+- term: label. outside: true when ref is outside the zone files.
 Return JSON only, no prose:
 {"zone":"<zone>","files":[<the Files list>],"items":[
 one item per line

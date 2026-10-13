@@ -4,16 +4,16 @@ description: Use when user runs /own-it or asks to be quizzed on, explain, or de
 ---
 # own-it
 
-A game that makes the user prove they understand their own codebase.
+A game: the user proves they understand their own code.
 
 ## Hard rules
 
-- Read-only toward source. Write only inside `.own-it/`, plus test files the user approves one by one.
-- Never fix bugs found while playing. Note them in the debrief only.
-- Never skip the fork check, even when asked to.
+- Read-only toward source. Write only in `.own-it/` (all scratch files too), plus test files the user approves one by one.
+- Never fix bugs found while playing; only note them.
+- Never skip the fork check, even if asked.
 - Every decision goes through the question tool, all context inside the question, recommended option first. No tool: numbered options in chat.
-- Obey the output caps in `grading.md`.
-- Run the helper from the project root: `node <skill-dir>/scripts/own-it.mjs <cmd>`.
+- Obey `grading.md` output caps.
+- Run helper commands as `node <skill-dir>/scripts/own-it.mjs <cmd>` from the project root, in a POSIX shell (Bash tool; PowerShell mangles `--text` JSON).
 
 ## Phases
 
