@@ -1,0 +1,27 @@
+{
+  "zone": "trips",
+  "files": ["driver-app/TripScreen.tsx", "driver-app/api.ts", "manager-portal/Approvals.tsx", "server/routes/trips.ts", "server/routes/locks.ts", "server/services/approvals.ts", "server/services/notifications.ts", "server/store.ts"],
+  "items": [
+    { "id": "s-trip", "k": "surface", "label": "Trip screen", "actor": "Driver app", "ref": "driver-app/TripScreen.tsx:5", "conf": "high" },
+    { "id": "c-api", "k": "component", "label": "Driver API client", "actor": "Driver app", "ref": "driver-app/api.ts:3", "conf": "high" },
+    { "id": "s-approvals", "k": "surface", "label": "Approvals page", "actor": "Manager portal", "ref": "manager-portal/Approvals.tsx:9", "conf": "high" },
+    { "id": "s-cancel", "k": "surface", "label": "POST /trips/:id/cancel", "actor": "Server", "ref": "server/routes/trips.ts:19", "conf": "high" },
+    { "id": "s-approve", "k": "surface", "label": "POST /trips/:id/cancel/approve", "actor": "Server", "ref": "server/routes/trips.ts:29", "conf": "high" },
+    { "id": "s-release", "k": "surface", "label": "POST /locks/:id/release-cable", "actor": "Server", "ref": "server/routes/locks.ts:14", "conf": "medium" },
+    { "id": "c-approvals", "k": "component", "label": "Approvals service", "actor": "Server", "ref": "server/services/approvals.ts:4", "conf": "high" },
+    { "id": "c-notify", "k": "component", "label": "Notification outbox", "actor": "Server", "ref": "server/services/notifications.ts:7", "conf": "low" },
+    { "id": "c-store", "k": "component", "label": "Trip store", "actor": "Server", "ref": "server/store.ts:3", "conf": "high" },
+    { "id": "e1", "k": "edge", "from": "s-trip", "to": "c-api", "ref": "driver-app/TripScreen.tsx:3", "conf": "high" },
+    { "id": "e2", "k": "edge", "from": "c-api", "to": "s-cancel", "ref": "driver-app/api.ts:11", "conf": "high" },
+    { "id": "e3", "k": "edge", "from": "s-cancel", "to": "c-approvals", "ref": "server/routes/trips.ts:25", "conf": "high" },
+    { "id": "e4", "k": "edge", "from": "c-approvals", "to": "c-notify", "ref": "server/services/approvals.ts:7", "conf": "high" },
+    { "id": "e5", "k": "edge", "from": "s-approvals", "to": "s-approve", "ref": "manager-portal/Approvals.tsx:6", "conf": "high" },
+    { "id": "e6", "k": "edge", "from": "s-approve", "to": "c-approvals", "ref": "server/routes/trips.ts:32", "conf": "high" },
+    { "id": "e7", "k": "edge", "from": "s-cancel", "to": "c-store", "ref": "server/routes/trips.ts:20", "conf": "high" },
+    { "id": "e8", "k": "edge", "from": "c-api", "to": "s-release", "ref": "driver-app/api.ts:12", "conf": "high" },
+    { "id": "f-cancel", "k": "flow", "label": "Driver cancels a trip", "ref": "server/routes/trips.ts:19", "conf": "high",
+      "steps": [["s-trip"], ["c-api"], ["s-cancel"], ["c-approvals", "c-notify"], ["s-approvals"], ["s-approve"]] },
+    { "id": "x-approve", "k": "failure", "card": "s-approve", "threat": "Manager approves a trip nobody asked to cancel", "ref": "server/routes/trips.ts:29", "conf": "high" },
+    { "id": "x-role", "k": "failure", "card": "s-cancel", "threat": "Client sends a forged x-user-role header", "ref": "server/routes/trips.ts:19", "conf": "medium" }
+  ]
+}
