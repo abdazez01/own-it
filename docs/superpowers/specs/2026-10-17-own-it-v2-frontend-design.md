@@ -70,7 +70,7 @@ All tokens live in `assets/engine/tokens.css` as CSS custom properties on `:root
 - **Contrast pairs, which must pass on the darkest glass:**
   - `--ink` on `--glass-deep` is about 15:1.
   - `--ink-2` on `--glass-deep` is about 10:1.
-  - `--gold-ink` on `--gold`, `--sage-ink` on `--sage`, and `--ink` on `--salmon` (bold labels only) are each ≥ 4.5:1.
+  - `--gold-ink` on `--gold`, `--sage-ink` on `--sage`, and `--gold-ink` on `--salmon` (dark text on alert tiles; `--ink` on salmon fails at about 2.2:1) are each ≥ 4.5:1.
   - The build verifies these with a script (section 12).
 - No text is ever placed directly on the background tile field. Text always sits on a glass panel, glass-deep, or a tile.
 - **Reduced transparency fallback** (`prefers-reduced-transparency: reduce`): glass becomes solid `#1B1C20`, and borders stay.
