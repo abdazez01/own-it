@@ -1,3 +1,8 @@
+import { readJson } from './json.mjs';
+
+// Reads a JSON schema file in the mini-schema format used by check().
+export const loadSchema = (path) => readJson(path);
+
 export function check(v, s, at = '') {
   const errs = [];
   const p = (k) => (at ? `${at}.${k}` : k);
@@ -9,6 +14,8 @@ export function check(v, s, at = '') {
   if (s.pattern && !new RegExp(s.pattern).test(v)) errs.push(`${at}: does not match ${s.pattern}`);
   if (s.type === 'string' && s.max !== undefined && v.length > s.max) errs.push(`${at}: at most ${s.max} chars`);
   if (s.type === 'number' && s.min !== undefined && v < s.min) errs.push(`${at}: below ${s.min}`);
+  if (s.type === 'number' && s.max !== undefined && v > s.max) errs.push(`${at}: above ${s.max}`);
+  if (s.type === 'number' && s.int && !Number.isInteger(v)) errs.push(`${at}: expected integer`);
   if (s.type === 'array') {
     if (s.min !== undefined && v.length < s.min) errs.push(`${at}: at least ${s.min} items`);
     if (s.max !== undefined && v.length > s.max) errs.push(`${at}: at most ${s.max} items`);
