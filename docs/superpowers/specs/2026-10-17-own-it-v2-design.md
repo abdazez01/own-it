@@ -185,10 +185,21 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
       - They sit behind the frosted panels, so the glass blur is visible and alive.
       - The user rejected the large "sun" glow blobs, so they are removed.
     - **Background music (user request).**
-      - Generative ambient pad music, synthesized in Web Audio with no audio files: slow 4-chord loop, soft triangle pads through a low-pass filter, and sparse pentatonic plucks.
+      - **Generative ambient music**, synthesized in Web Audio with no audio files. It is layered:
+        - an 8-chord progression with detuned stereo pads through a slowly sweeping low-pass filter,
+        - a soft sine bass line,
+        - a swung arpeggio through a tempo-synced echo (it enters after the first 8 bars),
+        - occasional melody phrases,
+        - very quiet hi-hat ticks.
+        - The arrangement evolves in 8-bar sections, so it does not loop flatly.
       - It plays at very low volume, barely audible under the sound effects, with a slow fade in and out.
-      - It is off until the player turns it on with the music button. The choice is remembered in `localStorage`.
-      - `M` mutes everything, and a separate music toggle sits in the header.
+      - **On by default (user request).** Browsers forbid sound before the first click or keypress, so the music starts on the player's first interaction with the page. The music button shows "on" from the start.
+      - The player's choice is remembered in `localStorage`.
+      - **Two header toggles**, each glowing gold when on:
+        - music on/off,
+        - sound effects on/off (also on by default).
+      - `M` mutes everything.
+      - The idle board shuffle is silent. Only flips the player causes make a clack. The mockup's "keeps repeating" bug came from this.
     - **Glass motion.**
       - The drifting tile background shows through the panels.
       - A soft light sheen sweeps across the glass panels periodically.
