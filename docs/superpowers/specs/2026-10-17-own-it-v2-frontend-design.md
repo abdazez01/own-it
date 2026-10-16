@@ -73,7 +73,7 @@ All tokens live in `assets/engine/tokens.css` as CSS custom properties on `:root
   - `--gold-ink` on `--gold`, `--sage-ink` on `--sage`, and `--gold-ink` on `--salmon` (dark text on alert tiles; `--ink` on salmon fails at about 2.2:1) are each ≥ 4.5:1.
   - The build verifies these with a script (section 12).
 - No text is ever placed directly on the background tile field. Text always sits on a glass panel, glass-deep, or a tile.
-- **Reduced transparency fallback** (`prefers-reduced-transparency: reduce`): glass becomes solid `#1B1C20`, and borders stay.
+- **Reduced transparency fallback** (`prefers-reduced-transparency: reduce`, or no `backdrop-filter` support): glass becomes solid `#1B1C20`, raised glass `#25262B`, and inset wells `#0F1012`, and borders stay.
 
 ### 2.2 Type
 
