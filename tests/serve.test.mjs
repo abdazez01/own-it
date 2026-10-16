@@ -5,7 +5,7 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { writeFileSync, readdirSync, readFileSync, existsSync, mkdirSync, mkdtempSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { startServer } from '../own-it/scripts/lib/cmd-serve.mjs';
 import { run as wait } from '../own-it/scripts/lib/cmd-wait.mjs';
 import { run as stop } from '../own-it/scripts/lib/cmd-stop.mjs';
@@ -264,4 +264,40 @@ test('collect falls back to an older valid inbox result', async () => {
   writeFileSync(join(inbox, '2000-result.json'), JSON.stringify({ type: 'result', id: 'trips-map-1', bogus: true }));
   writeFileSync(join(inbox, '3000-result.json'), JSON.stringify({ type: 'result', ...answer(0, '2020-01-01T00:00:00.000Z') }));
   assert.equal((await collect({ _: ['trips-map-1'], flags: {} }, c)).got, 1);
+});
+
+test('every script/link in assets/game.html is on the served allowlist', async () => {
+  const html = readFileSync(new URL('../own-it/assets/game.html', import.meta.url), 'utf8');
+  const refs = [...html.matchAll(/<(?:script[^>]*\ssrc|link[^>]*\shref)="([^"]+)"/g)].map((m) => m[1])
+    .filter((r) => !/^[a-z]+:|^\/\//i.test(r));
+  assert.ok(refs.length >= 3);
+  const { root, c } = setup();
+  const s = await startServer(c, { port: 0 });
+  try {
+    for (const r of refs) {
+      const p = r.split(/[?#]/)[0];
+      mkdirSync(dirname(join(root, '.own-it', p)), { recursive: true });
+      writeFileSync(join(root, '.own-it', p), 'x');
+      assert.equal((await req(s, { path: '/' + p })).status, 200, `${r} must be served`);
+    }
+  } finally { await s.close(); }
+});
+
+test('cross-site navigation GET is allowed, other cross-site requests are not', () => withServer(async (s) => {
+  const nav = { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate' };
+  assert.equal((await req(s, { path: '/game.html', headers: nav })).status, 200);
+  assert.equal((await req(s, { path: '/game.html', headers: { ...nav, 'Sec-Fetch-Site': 'same-site' } })).status, 200);
+  assert.equal((await req(s, { path: '/game.html', headers: { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'no-cors' } })).status, 403);
+  assert.equal((await post(s, '{"type":"pick"}', { headers: nav })).status, 403);
+}));
+
+test('serve treats a corrupt serve.json as stale and starts fresh', async () => {
+  const { root, c } = setup();
+  writeFileSync(join(root, '.own-it', 'serve.json'), '{not json');
+  const { run: serve } = await import('../own-it/scripts/lib/cmd-serve.mjs');
+  const out = await serve({ _: [], flags: {} }, { ...c, env: process.env });
+  try {
+    assert.ok(out.port > 0);
+    assert.equal(JSON.parse(readFileSync(join(root, '.own-it', 'serve.json'), 'utf8')).port, out.port);
+  } finally { await stop({ _: [], flags: {} }, c); }
 });

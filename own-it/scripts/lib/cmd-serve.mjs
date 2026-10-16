@@ -15,7 +15,7 @@ const TYPES = {
 };
 // Only these top-level names under .own-it/ are ever served (compared lowercased).
 // Everything else (serve.json, inbox/, session.json, answers/, ...) is a 404.
-const SERVED = new Set(['game.html', 'engine', 'games', 'brand', 'fonts', 'data', 'screens', 'recs.js', 'progress.js', 'screens.js']);
+const SERVED = new Set(['game.html', 'core.js', 'mission.js', 'engine', 'games', 'brand', 'fonts', 'data', 'screens', 'recs.js', 'progress.js', 'screens.js']);
 
 const send = (res, code, body, type = 'text/plain; charset=utf-8', extra = {}) => {
   res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...extra });
@@ -81,7 +81,9 @@ export function startServer(ctx, { port = 0 } = {}) {
     let url;
     try { url = new URL(req.url, 'http://127.0.0.1'); } catch { return send(res, 400, 'bad request'); }
     const site = req.headers['sec-fetch-site'];
-    if (site !== undefined && site !== 'same-origin' && site !== 'none') return send(res, 403, 'forbidden');
+    const topLevelNav = req.method === 'GET' && req.headers['sec-fetch-mode'] === 'navigate';
+    if (site !== undefined && site !== 'same-origin' && site !== 'none'
+      && !(topLevelNav && (site === 'cross-site' || site === 'same-site'))) return send(res, 403, 'forbidden');
     const host = req.headers.host;
     if (host !== `127.0.0.1:${boundPort}` && host !== `localhost:${boundPort}`) return send(res, 403, 'forbidden');
     const origin = req.headers.origin;
@@ -103,7 +105,8 @@ export function startServer(ctx, { port = 0 } = {}) {
         writeFileSync(tmp, JSON.stringify(ev), { flag: 'wx' });
         let ts = Date.now();
         while (existsSync(join(dir, `${ts}-${ev.type}.json`))) ts++;
-        renameSync(tmp, join(dir, `${ts}-${ev.type}.json`));
+        try { renameSync(tmp, join(dir, `${ts}-${ev.type}.json`)); }
+        catch (e) { try { unlinkSync(tmp); } catch { /* already gone */ } throw e; }
         res.writeHead(204, { 'Cache-Control': 'no-store' });
         res.end();
       });
@@ -171,9 +174,10 @@ export async function run(args, ctx) {
     return { url: urlFor({ port: s.port, token: s.token }), port: s.port, pid: process.pid };
   }
   const file = ownItPath(ctx.root, 'serve.json');
-  const prior = existsSync(file) ? readJson(file, null) : null;
+  let prior = null;
+  try { prior = existsSync(file) ? readJson(file, null) : null; } catch { /* corrupt: treat as stale */ }
   if (prior && await probeInstance(prior)) return { url: urlFor(prior), port: prior.port, pid: prior.pid };
-  if (prior) unlinkSync(file);
+  if (existsSync(file)) unlinkSync(file);
   const cli = fileURLToPath(new URL('../own-it.mjs', import.meta.url));
   const child = spawn(process.execPath, [cli, 'serve', '--foreground', '--port', String(port)], {
     cwd: ctx.root, env: { ...process.env, OWNIT_ROOT: ctx.root }, detached: true, stdio: 'ignore', windowsHide: true,
