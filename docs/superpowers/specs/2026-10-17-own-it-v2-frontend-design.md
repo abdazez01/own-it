@@ -622,6 +622,47 @@ own-it/assets/
 
 ---
 
+## 12a. Builder decisions (Claude's calls, from the builder check)
+
+1. **Data contract.** The data contract is owned by the parent spec (sections 5b-2 live link, 5c templates, 6.x, 11.3). The page loads data as classic `.js` files that set `window.OWNIT_*` globals:
+   - `progress.js`
+   - `recs.js`
+   - `data/<game>-<round>.js`
+   - `data/feedback-<id>.js`
+   - `screens.js`
+
+   **Live mode:** `GET /state` returns a version map, and the page re-injects a changed script.
+
+   **file:// mode:** a manual reload, with downloads and copy for results.
+2. **Scope per stage.** The library shows all 18 tiles from v2.0 on.
+   - Games that are not built yet appear as dimmed tiles with their logo and a "Coming in a later update" chip. They are not clickable.
+   - The library filters use real metadata from each template's `register()` call (`minutes`, `examReady`, `usesScreens`).
+   - Only the 6 v2.0 game layouts (section 6.3) are built in v2.0. All 18 logos are designed in v2.0, so the library looks complete.
+3. **Runtime.**
+   - Zero-build vanilla JS, as classic scripts (no ES modules, so `file://` works), with small custom elements for flap and toggle.
+   - Targets: the current Chrome, Edge, Firefox, and Safari.
+   - Where `backdrop-filter` is unsupported, the panels use the solid fallback from 2.1.
+4. **Screen copies.** Defined in the parent spec (sections 6.2, 6.2b, 11, 15.5):
+   - A screen copy is an HTML fragment stored as `screens/<id>.html` and inlined via `screens.js` as a string.
+   - It is rendered with `iframe srcdoc`, `sandbox="allow-same-origin"`, and no scripts.
+   - The page script attaches listeners through `contentDocument` and matches `data-ownit` ids.
+5. **Whiteboard and Boss.**
+   - **Layout:** the whiteboard uses a deterministic layered layout. Sources go left, sinks go right, and each column is ordered by the median of its neighbors' positions. A board holds at most 12 cards.
+   - **Arrow correctness** follows the parent spec's directed-edge-set grading (`core.js`).
+   - **Boss board grading** runs in the page. Boss typed answers are graded by Claude through the live link, or in chat in file:// mode.
+6. **Music test.**
+   - The test runs on a scheduled-note log produced by the engine in a test hook, not on rendered audio.
+   - The allowed pitch classes are the C-major diatonic set (C D E F G A B) in any octave. Em and the C2 swell pass.
+   - Sound effects (pager alarm, wrong "bonk" glide) are not part of the music test.
+7. **Persistence.**
+   - The game state (XP, rungs, badges, claims) lives in `.own-it/` files that the helper writes and the page reads.
+   - The page never writes game state. In live mode it sends events, and in file:// mode it downloads results.
+   - `localStorage` holds only view settings (sound, music, volume, last library filter).
+8. **Fonts and icons.**
+   - The fonts are fetched once at build time from their official OFL releases (IBM Plex, Geist), then subset to Latin and committed to the skill.
+   - Weights: Plex Mono 600 (flaps), Geist 400 and 600, Geist Mono 400. Four files, each ≤ 55 KB.
+   - Only the Tabler icons actually used are vendored into the sprite, with the MIT notice.
+
 ## 12. Acceptance checklist (build must pass)
 
 - Every surface in section 5 and 6 renders in the browser check at 1024, 1280, and 1600 px, with no layout overflow.
