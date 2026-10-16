@@ -157,7 +157,32 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
 - **Game logos (user request).** Every game has its own logo: a distinct mark in the shared split-flap style, used on its library tile, game header, and result card. Inline SVG lives in each template. The style is flat, one accent color, and readable at 32px. The "mid-flip" look was rejected by the user, so it is not used.
 - **Skill logo (user request).** One brand mark for the whole skill, separate from the game logos. It is used in the README banner, the dashboard header, the favicon, and the GitHub social preview. It must stand for the whole skill (owning your code and playing it), not for any one game. It is chosen with the user before the build and kept as SVG in `assets/brand/`, in light, dark, and mono versions.
   - **Chosen (2026-10-17): the "OI flag" mark.** Two split-flap tiles reading **O** and **I**, where the dot of the I is a small planted flag in amber, with an amber rail under the tiles. The mark is the app icon and favicon. The **lockup** is the mark with the `own-it` wordmark (monospace, cream) to its right, used in the README banner and the dashboard header. The palette is a dark board, cream letters, and an amber accent.
-  - **Visual style direction, being explored:** split-flap tiles combined with glassmorphism (frosted panels over soft ambient light). The mockup is shown to the user, and the final direction is confirmed before the build.
+  - **Visual style, confirmed (2026-10-17): split-flap + glassmorphism, both animated, dark mode only.**
+    - **Dark only.** The audience is developers, so there is no light theme. The page sets `color-scheme: dark` and ignores the host's light setting.
+    - **Inviting colors.**
+      - A warm, deep night base, not pure black.
+      - Ambient light in amber, coral, teal, and soft violet.
+      - Cream text.
+      - Amber as the main accent, teal for success, and coral-red for alerts.
+      - No cold greys.
+    - **Text must be visible.**
+      - All text meets WCAG AA on the darkest glass it sits on (≥4.5:1 body, ≥3:1 large).
+      - Muted text stays light enough (it is not grey-on-grey).
+      - Text never sits directly on bright ambient blobs; it always has a glass panel behind it.
+      - A contrast check is part of the browser verification.
+    - **Split-flap motion.**
+      - Flap flips run on load and on every value change: XP, scores, titles, statuses, recommendations, and timers.
+      - An idle board also shuffles one random status cell every few seconds, like a live departures board.
+      - Each flip plays the synthesized clack.
+    - **Glass motion.**
+      - Ambient light blobs drift slowly behind the panels.
+      - A soft light sheen sweeps across the glass panels periodically.
+      - Panels lift and gain an amber edge glow on hover or focus.
+      - The recommended cards tilt slightly toward the pointer.
+    - **Restraint.**
+      - `prefers-reduced-motion` turns off drift, sheen, tilt, and idle shuffles. Flaps then swap without animation.
+      - Animation never blocks input.
+      - The style mockup is an artifact made in this conversation (dashboard sample). It is a direction, not the final design.
 
 ## 5c. Template architecture (user request: templates save tokens)
 
