@@ -63,7 +63,82 @@ New request: a **model map** that tells Claude which model to use for which job,
 5. Claude prepares the content (section 9) and writes it into the page data, runs `open`, then says one line: "Page is open. Play, then type **done**." **Then it stops and waits.** Writing anything else before the player types `done` (or asks something) is a bug.
 6. On `done`: collect, grade any free text, keep the debrief within caps, apply, then offer the next pick.
 
-## 6. Game page v2 (one page, four modes)
+## 5b. Dashboard-first flow (user request, replaces step 4 of section 5)
+
+1. `/own-it` → fork check in chat, once. This is the only setup question asked in chat besides Node install, zones, and git tracking.
+2. Claude opens the **dashboard** (`.own-it/game.html`, Home view) and then waits.
+3. **On the dashboard:**
+   - A **Practice / Exam** toggle at the top.
+   - A **"Recommended for this app" row.** Claude picks 3–5 games or quests that fit this codebase best and writes the reason for each in one line. For example, "Quest: Cancel a trip. Your app has a multi-role approval flow, so walking it beats a Q&A." Claude edits only the data file `recs.js`, never the HTML.
+   - The **zone map** (as before) with progress, fog, and the screen strip.
+   - The **Game library**: a tile for every game, with an icon, a one-line description, a "how to play" preview (an animated mini-demo or 3 bullet steps), keyboard keys, and the time it takes. Tiles show "Ready" when content for it is already built, or "Ask Claude" when it isn't.
+4. **Picking a tile:**
+   - A **Ready** tile starts the game immediately in the page.
+   - An **Ask Claude** tile copies a short command (`play blast-radius trips`) and shows "Paste this in chat". Claude then builds the round's data (one small data file), the page reloads into the game, and Claude waits.
+   - Claude pre-builds content for the recommended row at session start, so those tiles are Ready.
+5. On finish: the result downloads, the player types `done`, and Claude collects, grades, debriefs, and applies. The dashboard updates (XP, unlocks, new recommendations).
+
+The Practice/Exam choice made on the dashboard goes into every result file. Claude reads it from there and never asks it in chat.
+
+## 5c. Template architecture (user request: templates save tokens)
+
+- **One engine, many game templates, all shipped in the skill.**
+  - `assets/engine/` holds the shared parts: the router (Home ↔ games), sound (Web Audio synth), juice (confetti, shake, XP pop), keyboard manager, timer, result builder (download/copy), obfuscation decoder, and the screen iframe host.
+  - `assets/games/<game>.js` holds one template per game, a classic script that registers with the engine: `OwnIt.register({id, name, icon, describe, keys, minutes, needs:[...], play(data, ctx)})`.
+- **Claude never writes HTML, CSS, or game logic at runtime.** For a round it writes one compact data JSON, which the helper validates and obfuscates into `.own-it/data/<game>-<round>.js`. Per-round token cost is the data only.
+- **One builder for every game:** `build-round <game> <data.json>`. Each template ships a schema (in `assets/games/<game>.schema.json`), and the helper validates against it. This replaces the per-game build commands of section 10, while `build-screen` stays.
+- **A new game later** = one template file + one schema + one line in `references/games.md`. No engine change.
+- `init` copies the engine and all templates into `.own-it/` once. The page loads them with `<script src>`, which works on `file://`.
+- `references/games.md` (≤400 words) is the catalogue Claude reads to decide recommendations. For each game it lists what model data it needs, when it fits an app, and its data shape (pointing to the schema).
+
+## 5d. Game catalogue (agreed with user)
+
+Each game uses data from the model (flows, elements, roles, failures, terms) unless noted otherwise. All of them have sound, juice, and keyboard play.
+
+| Game | Teaches | Core loop | Built from |
+|---|---|---|---|
+| Quiz (5 Q) | words, product | 1–4 answer, confetti / why-not | terms, purpose |
+| Memory Match | words | flip cards to pair term ↔ meaning | terms |
+| Spot the Lie | any zone | 5 statements, find the false one | model + Claude-written lie |
+| Screen Tour | your screens | tap → pick what happens / find it / who sees it | screen copies, elements |
+| Quests | your workflow | goal pop-up, walk the flow across screens and roles | screens, flows, elements |
+| Guess the Screen | your screens | blurred screen sharpens, buzz in (Space) to name it | screen copies |
+| Whiteboard: Map | structure | click card → card to draw arrows | components, edges |
+| Chain Reaction | flows | click steps in order before the fuse burns | flows |
+| Data Detective | state lifecycle | stamp statuses on a record's timeline, and who moved it | states, transitions |
+| Who's Allowed? | roles | rapid-fire ← deny / → allow, combo streak | roles, permissions, elements |
+| Pipe Plumber | data flow | rotate tiles to pipe a button through to the DB | flows, components |
+| Blast Radius | dependencies | explode a part, click everything that breaks | edges, components |
+| 3am Pager | failure | alarm, fake logs, find the breaking step on the clock | failures, flows |
+| What-If Dial | failure / scale | turn a dial (10x traffic, timeouts, two admins), predict what fails first | failures |
+| Design Duel | "why X not Y" | two designs side by side, pick yours and the real reason | decisions (Claude writes the alternative) |
+| Escape Room | mixed | 3 puzzles (role, flow, failure) unlock the door | mixed |
+| Boss Battle | everything | HP bars: good answers hit the boss, wrong ones hit you, 3 lives | zone + Claude cross-exam |
+| Teach-back | communication | explain a screen in 2 sentences to a PM, Claude grades in chat | screen, purpose |
+
+- **Rung mapping, kept for progress and claims:**
+  - Words: Quiz, Memory Match, Spot the Lie.
+  - Map: Whiteboard Map, Screen Tour, Guess the Screen, Blast Radius.
+  - Trace: Quests, Chain Reaction, Data Detective, Pipe Plumber, Who's Allowed?.
+  - Break: 3am Pager, What-If Dial, Design Duel.
+  - Boss: Boss Battle, Escape Room.
+  - Teach-back gives Curiosity XP and counts toward no rung.
+- **Model data growth.** The structure pass also extracts `decision` items. Each needs a one-line real reason and is needed for Design Duel and the "why" questions. Most Phase 1 kinds already exist (`state`, `transition`, `permission`, `failure`).
+
+## 5e. Delivery in stages (Claude's call: 18 games is several projects)
+
+- **v2.0 "Engine + core".** Covers:
+  - all bug fixes (section 12),
+  - the dashboard and the template engine (sound, juice, keyboard, router, results),
+  - `build-round`, soft gates, the model map, model schema growth, and screen rebuilds (`build-screen` and its sandbox),
+  - and 6 games: Quiz, Screen Tour, Quests, Guess the Screen, Whiteboard Map (simplified), and Boss Battle.
+
+  This is enough for the "see and play your own app" experience the playtest asked for.
+- **v2.1 "Game pack 1":** Memory Match, Spot the Lie, Chain Reaction, Who's Allowed?, Blast Radius, 3am Pager.
+- **v2.2 "Game pack 2":** Data Detective, Pipe Plumber, What-If Dial, Design Duel, Escape Room, Teach-back.
+- Each stage gets its own plan, review, and fixture end-to-end run. The engine's template API is frozen after v2.0, so the packs only add files.
+
+## 6. Game page v2 (one page, many modes)
 
 The same single `game.html` (data from `.js` files; works on `file://`). Modes:
 
