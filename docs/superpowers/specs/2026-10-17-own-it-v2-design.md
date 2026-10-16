@@ -65,8 +65,17 @@ New request: a **model map** that tells Claude which model to use for which job,
 
 ## 5b. Dashboard-first flow (user request, replaces step 4 of section 5)
 
-1. `/own-it` → fork check in chat, once. This is the only setup question asked in chat besides Node install, zones, and git tracking.
-2. Claude opens the **dashboard** (`.own-it/game.html`, Home view) and then waits.
+Exact order (confirmed with the user):
+
+1. The user calls `/own-it`.
+2. **Fork check** in chat, once. On "No, I'll fork first", Claude explains how to fork and stops.
+3. **Storage notice**, right after "Yes, it's a fork" (or "play here"). One message, merged with the safety notice: "Everything own-it creates is stored in the `.own-it/` folder in this project: game page, progress, screen copies, sample data, answers. Delete that folder to remove it all. own-it never edits your code."
+4. Runtime check (Node), only if it is missing.
+5. First run only: scan, zone confirm, and git-tracking question in chat, then `init`. Later runs: `fog`.
+6. **Claude customizes the dashboard for this app.** It reads the zone list and model and writes `recs.js` (the 3–5 recommended games and quests with one-line reasons), then pre-builds the data for those recommended rounds.
+7. `serve`, then `open`. **The dashboard is shown.** Claude says one line ("Dashboard is open.") and waits (background `wait`).
+
+This is the only setup asked in chat. Everything after it happens on the dashboard.
 3. **On the dashboard:**
    - A **Practice / Exam** toggle at the top.
    - A **"Recommended for this app" row.** Claude picks 3–5 games or quests that fit this codebase best and writes the reason for each in one line. For example, "Quest: Cancel a trip. Your app has a multi-role approval flow, so walking it beats a Q&A." Claude edits only the data file `recs.js`, never the HTML.
