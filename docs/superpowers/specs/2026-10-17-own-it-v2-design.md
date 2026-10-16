@@ -210,6 +210,13 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
             9. loop to 1
           - One full cycle lasts about 2 minutes 8 seconds.
           - Melodies alternate between two phrase sets on each cycle, so repeats feel fresh.
+        - **Smooth transitions (user playtest: the loop end felt abrupt).**
+          - Layers never switch on or off at once. Over the 4 bars at a section edge, an entering layer fades in (30% → 60% → 85% → 100%) and a leaving layer fades out (100% → 85% → 55% → 28%).
+          - The last bar of the cycle is a turnaround:
+            - a soft rising filtered-air swell,
+            - a gentle bell arpeggio (C–E–G–C),
+            - a low sustained root note,
+            - then the pad restarts softly (55% → 85% → 100% over 2 bars).
         - **Drums (user request), soft and lo-fi, all synthesized:**
           - a sine kick with a pitch drop on beat 1, the "and" of 2, and beat 3,
           - a light filtered-noise snare with a small tone on beats 2 and 4,
@@ -388,6 +395,11 @@ The same single `game.html` (data from `.js` files; works on `file://`). Modes:
     - Every envelope starts from an exponential ramp, which avoids clicks.
   - **Mix.** A master compressor keeps everything balanced. No sound is louder than the confetti moment. All sounds are under 600 ms except the fanfares (≤1.2 s).
   - **Tuning.** A sound test strip in the key-help overlay plays each sound. The design pass during the build tunes them by ear, against the bar "would you click again just to hear it?".
+- **Liquid-glass toggles (user request).** Every segmented control has a glass bubble (Practice/Exam, mode pickers, settings).
+  - The bubble is a frosted, highlighted thumb with a soft gold underglow.
+  - It slides to the chosen option with a springy overshoot.
+  - It squashes and stretches like liquid in motion (horizontal stretch, then a small wobble settle) instead of jumping.
+  - It respects `prefers-reduced-motion`.
 - **Every click has feel (user playtest).** Every interactive element gives:
   - on press: a scale-down to about 0.965, a gold ripple from the pointer, and a short pitched "tock" with a tiny noise click,
   - the press pitch differs by element type (card, tile, toggle, button),
