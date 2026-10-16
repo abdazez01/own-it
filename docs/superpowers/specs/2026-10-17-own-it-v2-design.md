@@ -88,6 +88,29 @@ The same single `game.html` (data from `.js` files; works on `file://`). Modes:
 - Each tour step can link to the matching board card ("see it on the whiteboard").
 - **Keyboard:** Tab or arrow keys move between tagged elements, Enter picks, and 1–4 choose a chain.
 
+### 6.2b Quests (user request): play through your own workflow
+
+- A quest is a goal that spans several screens, such as "Place an order", "Cancel a trip and get it approved", or "Release the cable after the trip ends".
+- When a quest starts, a **quest pop-up** appears before the screen. It shows the goal and a short checklist of objectives ("1. Open the trip. 2. Request the cancel. 3. Switch to the manager and approve it."). The player dismisses it with Enter, and the checklist stays pinned in a side panel.
+- The player walks the flow on the rebuilt screens:
+  - **Clicking.** A tagged element with `goes` loads the next screen into the iframe.
+  - **Forms.** Form fields can be typed into, and there are no scripts in the copy, so typing is safe.
+  - **Switching role.** Changing user means picking the role from a role switcher. This is the "other account" moment the user found confusing in their real app.
+  - **Ticking objectives.** Each objective ticks off with a small confetti burst when its tagged element is used in the right order.
+- **Wrong turn.** A click that leaves the expected path makes the panel show "That's not how this flow goes. Why?" with the element's `purpose`. The player can retry, at a cost of −5 XP per wrong turn.
+- **End of the quest.** A summary shows the objectives done, the wrong turns, and the time taken. Then the usual download/copy happens, and Claude checks it on `done`:
+  - It grades the order of steps against the model flow.
+  - It writes a debrief within the caps.
+  - It points out any step the player hesitated on.
+- **Where the data comes from:**
+  - The quest objectives come from a model `flow`. Each step maps to an `element` whose `does` belongs to that flow.
+  - Navigation comes from the new `element.goes` field (the target surface id).
+- **Scoring.** +10 per objective done in order, −5 per wrong turn, and +50 for completing with no wrong turns. A quest counts toward Trace for its flow.
+- **Keyboard.** Tab or arrow keys move between tagged elements, Enter clicks, R opens the role switcher, Q shows the quest list.
+- **Helper:**
+  - `build-missions` gets a `quest` kind. It takes `flow` from the recipe and derives the objectives and the expected path.
+  - `build-screen` requires every `goes` target to be a registered screen, or marks that element "dead end (not rebuilt)".
+
 ### 6.3 Whiteboard mode (simplified)
 
 - **Map ("who talks to whom"):** cards are laid out automatically (no free dragging needed). To connect, click or press Enter on a card, then on its target; an arrow appears. Press Delete on a selected arrow to remove it. Dragging still works for people who like it.
@@ -193,7 +216,7 @@ The Phase 1 targets stay. New items:
 ## 15. Decisions from the builder check (Claude's calls, user to confirm)
 
 1. **The model schema is extended.** The new tour and quiz content must be checkable against something, so the structure pass collects more:
-   - New item kind `element`: a button, link, or input on a screen. Fields: `on` (surface id), `label`, `does` (the flow id or edge it triggers), `roles` (role ids that can see or use it), `ref`, `conf`.
+   - New item kind `element`: a button, link, or input on a screen. Fields: `on` (surface id), `label`, `does` (the flow id or edge it triggers), `goes` (optional: the surface id it navigates to), `roles` (role ids that can see or use it), `ref`, `conf`.
    - New optional field `purpose`: one plain-language line saying what it is for a user, on surfaces, components, flows, and failures.
    - `extraction.md` and `check-refs` validation are updated. The `element.on` and `element.does` references must resolve.
    - `data-ownit` ids in screen copies must be `element` or `surface` ids from the model, and `build-screen` rejects unknown ids.
@@ -219,7 +242,14 @@ The Phase 1 targets stay. New items:
    - The `screens.js` registry stores each screen's input files and their committed hashes.
    - `fog` marks a screen stale if any input file changed. The map strip shows a fog badge on stale thumbnails.
    - A stale screen is rebuilt only when it is next played.
-8. **Fork check once** is enforced by the docs only. Claude cannot see the conversation's id, so a marker file would be wrong across sessions. A pressure scenario covers it.
+9. **Everything lives in `.own-it/` (user request).** Deleting the folder removes all trace of the game from the project.
+   - Game page, data, screens, quests, answers, progress, cache, and logs all go there.
+   - Answer files are moved out of Downloads into `.own-it/answers/`, so nothing is left behind in Downloads.
+   - *Change from Phase 1:* "predict, then prove" test files are written to `.own-it/tests/`, not the project's test folder. The docs tell the player how to copy a test into their own suite if they want to keep it.
+   - Outside the project, the only footprint is the skill itself (`~/.claude/skills/own-it`) and Node.js, if the player chose to install it.
+   - `init` writes nothing outside `.own-it/`. That was already true and gets a test.
+   - The README and the safety notice say: "Delete `.own-it/` to remove everything."
+10. **Fork check once** is enforced by the docs only. Claude cannot see the conversation's id, so a marker file would be wrong across sessions. A pressure scenario covers it.
 
 ## 16. Open for the builder
 
