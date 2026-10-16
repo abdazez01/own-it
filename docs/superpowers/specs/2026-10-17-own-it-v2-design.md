@@ -188,8 +188,13 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
       - **Generative ambient music**, synthesized in Web Audio with no audio files. It is layered:
         - an 8-chord progression with detuned stereo pads through a slowly sweeping low-pass filter,
         - a soft sine bass line,
-        - a swung arpeggio through a tempo-synced echo (it enters after the first 8 bars),
-        - occasional melody phrases,
+        - **a soft, clean electric guitar as the lead (user request)**:
+          - Karplus-Strong plucked-string synthesis,
+          - a very gentle tanh saturation,
+          - a warm low-pass "neck pickup" tone with a small body boost,
+          - a light chorus and a tempo-synced echo,
+          - played as a humanized, swung fingerpicked pattern that gets busier after the first 8 bars, with occasional melody phrases;
+        - the pad sits quieter and softer underneath (sine, slow attack), because the user disliked the pad droning alone,
         - very quiet hi-hat ticks.
         - The arrangement evolves in 8-bar sections, so it does not loop flatly.
       - It plays at very low volume, barely audible under the sound effects, with a slow fade in and out.
