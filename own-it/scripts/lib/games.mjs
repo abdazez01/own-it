@@ -16,19 +16,25 @@ const META = { type: 'object', required: ['id', 'name', 'rung', 'minutes', 'exam
   stage: { type: 'string', enum: ['2.0', '2.1', '2.2'] },
   line: { type: 'string', max: 140 } } };
 
+// Per-directory cache: the metas are read and validated once per process.
+const cache = new Map();
+
 // Reads every <id>.meta.json, validating each one. Returns the metas sorted by file name.
 export function listGames(dir = GAMES_DIR) {
-  return readdirSync(dir).filter((f) => f.endsWith('.meta.json')).sort().map((f) => {
+  if (cache.has(dir)) return cache.get(dir);
+  const metas = readdirSync(dir).filter((f) => f.endsWith('.meta.json')).sort().map((f) => {
     const meta = readJson(join(dir, f));
     const errs = check(meta, META);
-    if (meta.id + '.meta.json' !== f) errs.push(`id: must match file name ${f}`);
+    if (meta && meta.id + '.meta.json' !== f) errs.push(`id: must match file name ${f}`);
     if (errs.length) throw new Error(`invalid game meta ${f}: ${errs.join('; ')}`);
     return meta;
   });
+  cache.set(dir, metas);
+  return metas;
 }
 
 // Looks a game up by id with Object.hasOwn. Returns the meta, or null when unknown.
 export function getGame(id, dir = GAMES_DIR) {
-  const byId = Object.fromEntries(listGames(dir).map((g) => [g.id, g]));
+  const byId = Object.fromEntries(listGames(dir).filter((g) => g && g.id).map((g) => [g.id, g]));
   return Object.hasOwn(byId, id) ? byId[id] : null;
 }

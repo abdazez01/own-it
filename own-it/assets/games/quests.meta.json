@@ -3,7 +3,7 @@
   "name": "Quests",
   "rung": "trace",
   "minutes": 6,
-  "examReady": false,
+  "examReady": true,
   "usesScreens": true,
   "stage": "2.0",
   "line": "Walk a real flow across your screens and roles, one step at a time."

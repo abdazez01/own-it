@@ -6,5 +6,5 @@
   "examReady": true,
   "usesScreens": false,
   "stage": "2.2",
-  "line": "Rotate the tiles until a button's request reaches the database."
+  "line": "You rotate the tiles until a button's request reaches the database."
 }

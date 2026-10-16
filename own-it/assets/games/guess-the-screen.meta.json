@@ -3,8 +3,8 @@
   "name": "Guess the Screen",
   "rung": "map",
   "minutes": 2,
-  "examReady": false,
+  "examReady": true,
   "usesScreens": true,
   "stage": "2.0",
-  "line": "A blurred screen slowly sharpens. Name it before the picture is clear."
+  "line": "Your screen blurs, then sharpens slowly. You name it before the picture clears."
 }
