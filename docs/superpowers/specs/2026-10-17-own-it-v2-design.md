@@ -118,6 +118,13 @@ The same single `game.html` (data from `.js` files; works on `file://`). Modes:
 - **Break:** unchanged concept, simpler input. You select a threat token (1–4), then click or Enter on the card where it breaks, then type one line on what happens.
 - **Keyboard everywhere:** arrows move the selection, Enter acts, Delete removes, H hints, ? shows the key help overlay.
 
+### 6.3b Sound and juice (user request: sound effects for everything)
+
+- Every action has a sound: click, card pick, arrow drawn, correct, wrong, combo or streak, objective ticked, quest complete, level up or rung cleared, badge earned, hint used, timer tick, and fog lifted.
+- Sounds are synthesized with the Web Audio API in `core`-adjacent page code. There are no audio files, so the page stays offline and small (a few short oscillator and noise envelopes).
+- A mute toggle (`M`, plus a speaker icon) and a volume slider are remembered in `localStorage`, wrapped in try/catch. The default is on at a moderate volume. Sound starts only after the first user gesture, as browser autoplay rules require.
+- Visual juice pairs with each sound: confetti for correct answers and clears, a shake for wrong ones, XP pop-ups, combo counters, and a level-up banner.
+
 ### 6.4 Map screen
 
 As in Phase 1, plus:
