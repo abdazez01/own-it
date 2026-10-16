@@ -80,6 +80,36 @@ New request: a **model map** that tells Claude which model to use for which job,
 
 The Practice/Exam choice made on the dashboard goes into every result file. Claude reads it from there and never asks it in chat.
 
+## 5b-2. Live link: page talks to Claude (user request)
+
+The user asked that the page talk to Claude directly, with no copy/paste and no typing "done".
+
+- **`own-it serve`.** A new helper command and a zero-dependency Node HTTP server.
+  - It binds to `127.0.0.1` on a free port.
+  - It serves `.own-it/` (game page, engine, data).
+  - It accepts `POST /event` with JSON events.
+  - It writes every event to `.own-it/inbox/<timestamp>-<type>.json`.
+  - It prints `{url, port, pid}` as one line and then keeps running.
+- **Security:**
+  - Loopback only.
+  - A random token per serve run, put in the page URL (`?t=…`). Every POST must carry it, so other sites cannot post (CSRF).
+  - It rejects non-JSON bodies and bodies over 256 KB.
+  - It serves files only from inside `.own-it/`, so no path traversal.
+  - It stops when `own-it stop` runs or the session ends. The pid is stored in `.own-it/serve.json`.
+- **`own-it wait [--timeout 600]`.** It blocks until a new inbox event arrives, prints it as one compact line, and exits.
+  - Claude runs it as a **background** command. In Claude Code, the exit of a background command re-invokes Claude, so Claude reacts to page clicks.
+  - On timeout it prints `{"idle":true}`. Claude then starts another wait silently, at most 6 times in a row, then stops and says one line: "Still here. Click in the page or type here."
+- **Events from the page:**
+  - `pick` (game, zone, mode)
+  - `result` (the same payload as the Phase 1 answer files)
+  - `challenge`
+  - `hint`
+  - `ask` (a free-text question typed into the page's "Ask Claude" box)
+- **Claude to the page.** Claude writes data files (round data, recommendations, debrief text in `.own-it/data/feedback-<id>.js`). The page polls `GET /state` every 2 s and loads new data when its version changes. A debrief appears in the page, and Claude also posts it in chat.
+- **The loop.** You click a tile, the page shows "Claude is building your round…" with a sound, then Claude builds the data, the page auto-loads the game, and you play. When the round ends, the result is posted, Claude grades it and writes feedback, and the feedback shows in the page.
+- **Fallback.** If serve can't run (no background tasks in the harness, port blocked, other editor), use the file:// page plus download/copy and "done" as in Phase 1. The skill tries serve first.
+- `collect` reads from `.own-it/inbox/` before falling back to Downloads.
+
 ## 5c. Template architecture (user request: templates save tokens)
 
 - **One engine, many game templates, all shipped in the skill.**
