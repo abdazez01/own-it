@@ -43,6 +43,14 @@
   --glass-deep-solid: #0F1012;
   --scrim: rgba(10,11,13,.55);
   --gold-glow: rgba(232,194,106,.5);
+  --gold-a14: rgba(232,194,106,.14);
+  --gold-a16: rgba(232,194,106,.16);
+  --gold-a35: rgba(232,194,106,.35);
+  --gold-a45: rgba(232,194,106,.45);
+  --gold-a60: rgba(232,194,106,.6);
+  --gold-a0: rgba(232,194,106,0);
+  --sage-a16: rgba(143,211,168,.16);
+  --salmon-a16: rgba(240,138,122,.16);
   --track: rgba(0,0,0,.35);
 
   /* 2.2 Type */
@@ -57,10 +65,10 @@
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
   --s-6: 24px; --s-8: 32px; --s-12: 48px; --s-16: 64px;
   --content: min(1180px, 100% - 32px);
-  --gutter: 16px;
   --flap-size: clamp(14px, 1.1vw + 8px, 22px);
   --flap-size-lg: clamp(22px, 2.4vw + 10px, 40px);
   --hit: 44px;
+  --hit-sm: 40px;
 
   /* 2.4 Radius */
   --r-flap: 6px; --r-flap-lg: 10px; --r-inset: 10px; --r-card: 16px; --r-panel: 22px; --r-pill: 999px;
@@ -75,7 +83,7 @@
   --sheen: rgba(245,240,230,.08);
   --bubble-fill: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.06));
   --bubble-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.25),
-    0 0 0 1px var(--edge), 0 6px 18px -6px rgba(232,194,106,.45);
+    0 0 0 1px var(--edge), 0 6px 18px -6px var(--gold-a45);
 
   /* 2.6 z-index (mirrors assets/engine/z.js) */
   --z-bg: 0; --z-content: 1; --z-header: 10; --z-side: 20; --z-pop: 30;
@@ -91,6 +99,8 @@
   --t-flap: 380ms;
   --t-toggle: 550ms;
   --t-sheen: 9s;
+  --t-drift-min: .08;
+  --t-drift-max: .30;
 }
 
 /* Reduced transparency: glass becomes solid, borders stay. */

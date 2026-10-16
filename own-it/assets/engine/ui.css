@@ -19,7 +19,7 @@ img, svg, canvas, iframe { max-width: 100%; }
 /* Layout shell */
 .wrap {
   position: relative; z-index: var(--z-content);
-  width: var(--content); margin: 0 auto; padding-block: var(--s-6) var(--s-12);
+  width: var(--content); padding-inline: 0; margin: 0 auto; padding-block: var(--s-6) var(--s-12);
   display: grid; gap: var(--s-5);
 }
 @media (min-width: 1600px) { .wrap { width: min(1440px, 100% - 64px); } }
@@ -58,7 +58,7 @@ img, svg, canvas, iframe { max-width: 100%; }
 }
 
 /* 5.1 Flap tiles. Real text lives in aria-label on .flap; tiles are aria-hidden. */
-.flap { display: inline-flex; gap: 3px; font-size: var(--flap-size); vertical-align: middle; }
+.flap { display: inline-flex; gap: 3px; font-size: var(--flap-size); vertical-align: middle; perspective: 400px; }
 .flap.lg { font-size: var(--flap-size-lg); }
 .flap-tile {
   position: relative; display: grid; place-items: center; overflow: hidden;
@@ -87,7 +87,7 @@ img, svg, canvas, iframe { max-width: 100%; }
   background: var(--track); border: 1px solid var(--edge); border-radius: var(--r-pill);
 }
 .toggle button {
-  position: relative; z-index: 1; min-height: 36px; padding: 0 16px;
+  position: relative; z-index: 1; min-height: var(--hit-sm); padding: 0 16px;
   background: none; border: 0; border-radius: var(--r-pill); cursor: pointer;
   font: 600 var(--fs-13) var(--f-ui); color: var(--ink-2); transition: color 300ms;
 }
@@ -108,35 +108,34 @@ img, svg, canvas, iframe { max-width: 100%; }
 /* Icon buttons (music, sound, help) */
 .icon-btn {
   position: relative; overflow: hidden; display: grid; place-items: center;
-  width: 40px; height: 40px; padding: 0; cursor: pointer;
-  background: var(--track); border: 1px solid var(--edge); border-radius: 12px; color: var(--ink);
+  width: var(--hit-sm); height: var(--hit-sm); padding: 0; cursor: pointer;
+  background: var(--track); border: 1px solid var(--edge); border-radius: var(--r-inset); color: var(--ink);
   transition: background var(--t-hover), box-shadow var(--t-hover);
 }
-.icon-btn[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--gold); background: rgba(232,194,106,.14); }
+.icon-btn[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--gold); background: var(--gold-a14); }
 
 /* 5.6 Buttons */
 .btn {
   position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center;
-  height: 40px; padding: 0 18px; border: 1px solid transparent; border-radius: var(--r-pill);
+  min-height: var(--hit); padding: 0 18px; border: 1px solid transparent; border-radius: var(--r-pill);
   font: 600 var(--fs-15) var(--f-ui); white-space: nowrap; cursor: pointer; text-decoration: none;
   transition: transform var(--t-press), box-shadow var(--t-hover), background var(--t-hover);
 }
 .btn-primary { background: var(--gold); color: var(--gold-ink); }
 .btn-primary:hover { box-shadow: 0 8px 24px -10px var(--gold-glow); }
 .btn-secondary { background: var(--glass); border-color: var(--edge); color: var(--ink); box-shadow: var(--hi-1); }
-.btn-secondary:hover { background: var(--glass-hi); }
 .btn-quiet { background: none; color: var(--ink); padding: 0 8px; }
 .btn-quiet:hover { text-decoration: underline; text-underline-offset: 3px; }
 .btn[disabled], .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: auto; }
 .btn[disabled]:hover { box-shadow: none; text-decoration: none; }
 
 /* Shared press feel */
-.btn:active, .icon-btn:active, .toggle button:active, .card-rec:active, .tile-game:active {
+.btn:active, button.board-row:active, .icon-btn:active, .toggle button:active, .card-rec:active, .tile-game:active {
   transform: scale(.965); transition: transform var(--t-press);
 }
 .ripple {
   position: absolute; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle, rgba(232,194,106,.45), rgba(232,194,106,0) 70%);
+  background: radial-gradient(circle, var(--gold-a45), var(--gold-a0) 70%);
   transform: translate(-50%, -50%) scale(0); animation: ripple 500ms ease-out forwards;
 }
 @keyframes ripple { to { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
@@ -150,8 +149,8 @@ img, svg, canvas, iframe { max-width: 100%; }
   transition: transform var(--t-hover) var(--ease-out), border-color var(--t-hover), box-shadow var(--t-hover);
 }
 .card-rec:hover, .card-rec:focus-visible {
-  transform: translateY(-2px); border-color: rgba(232,194,106,.6);
-  box-shadow: 0 0 0 1px var(--gold-glow), 0 10px 30px -12px rgba(232,194,106,.35);
+  transform: translateY(-2px); border-color: var(--gold-a60);
+  box-shadow: 0 0 0 1px var(--gold-glow), 0 10px 30px -12px var(--gold-a35);
 }
 .card-rec .top { display: flex; align-items: center; gap: var(--s-3); }
 .card-rec .title { font: 600 var(--fs-17)/var(--lh-display) var(--f-ui); }
@@ -171,21 +170,21 @@ img, svg, canvas, iframe { max-width: 100%; }
   background: var(--glass-deep); border: 1px solid var(--edge); border-radius: var(--r-card); color: var(--ink);
   transition: background var(--t-hover), box-shadow var(--t-hover), border-color var(--t-hover);
 }
-.tile-game:hover, .tile-game:focus-visible {
-  background: var(--glass-hi); box-shadow: 0 0 0 1px var(--gold-glow), 0 10px 30px -12px rgba(232,194,106,.35);
+.tile-game:focus-visible {
+  background: var(--glass-hi); box-shadow: 0 0 0 1px var(--gold-glow), 0 10px 30px -12px var(--gold-a35);
 }
 .tile-game .name { font: 600 var(--fs-15) var(--f-ui); }
-.tile-game .what { color: var(--ink-2); font-size: var(--fs-13); }
+.tile-game .what { color: var(--ink-2); font-size: var(--fs-15); }
 .tile-game .meta { display: flex; justify-content: space-between; gap: var(--s-2); color: var(--ink-2); font: 500 var(--fs-12) var(--f-flap); }
 
 /* Chips */
 .chip {
   display: inline-flex; align-items: center; justify-self: start; min-height: 24px; padding: 2px 8px;
-  border-radius: var(--r-inset); background: rgba(232,194,106,.16); color: var(--gold);
+  border-radius: var(--r-inset); background: var(--gold-a16); color: var(--gold);
   font: 600 var(--fs-12) var(--f-flap); letter-spacing: .04em; white-space: nowrap;
 }
-.chip.ok { background: rgba(143,211,168,.16); color: var(--sage); }
-.chip.alert { background: rgba(240,138,122,.16); color: var(--salmon); }
+.chip.ok { background: var(--sage-a16); color: var(--sage); }
+.chip.alert { background: var(--salmon-a16); color: var(--salmon); }
 
 /* 5.9 Departures board */
 .board { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -197,12 +196,11 @@ img, svg, canvas, iframe { max-width: 100%; }
   color: var(--ink); text-align: left; width: 100%; border: 0; min-height: var(--hit);
 }
 button.board-row, a.board-row { cursor: pointer; transition: background var(--t-hover); }
-button.board-row:hover, a.board-row:hover { background: var(--glass-hi); }
 .board-head { color: var(--ink-2); font: 600 var(--fs-12) var(--f-ui); background: none; min-height: 0; padding-block: 0; }
 .rungs { display: inline-flex; gap: 4px; }
 .rung-cell {
   position: relative; display: grid; place-items: center; width: 22px; height: 28px;
-  border-radius: 4px; background: var(--tile); opacity: .6;
+  border-radius: var(--r-flap); background: var(--tile); opacity: .6;
   font: 600 var(--fs-12) var(--f-flap); color: var(--ink-2);
 }
 .rung-cell.c { background: var(--sage); color: var(--sage-ink); opacity: 1; }
@@ -304,25 +302,25 @@ button.board-row:hover, a.board-row:hover { background: var(--glass-hi); }
 
 /* Touch: 44px hit targets, no hover-only effects */
 @media (pointer: coarse) {
-  .btn, .toggle button, .icon-btn, .tile-game, .chip.action { min-height: var(--hit); }
+  .btn, .toggle button, .icon-btn, .tile-game, .menu-btn { min-height: var(--hit); }
   .icon-btn { min-width: var(--hit); }
   .btn-quiet { padding-inline: var(--s-3); }
 }
+@media (hover: hover) {
+  .btn-secondary:hover { background: var(--glass-hi); }
+  button.board-row:hover, a.board-row:hover { background: var(--glass-hi); }
+  .tile-game:hover { background: var(--glass-hi); box-shadow: 0 0 0 1px var(--gold-glow), 0 10px 30px -12px var(--gold-a35); }
+}
 @media (hover: none) {
-  .card-rec:hover, .tile-game:hover, button.board-row:hover, .btn-primary:hover, .btn-secondary:hover {
-    transform: none; box-shadow: none; background: revert-layer;
-  }
-  .card-rec:hover { border-color: var(--edge); }
-  .card-rec { background: var(--glass-deep); }
-  .tile-game { background: var(--glass-deep); }
-  button.board-row { background: var(--glass-deep); }
-  .btn-primary { background: var(--gold); }
-  .btn-secondary { background: var(--glass); }
+  .card-rec:hover, .card-rec:focus-visible { transform: none; border-color: var(--edge); box-shadow: none; }
+  .tile-game:focus-visible { box-shadow: none; background: var(--glass-deep); }
+  .btn-primary:hover { box-shadow: none; }
+  .btn-quiet:hover { text-decoration: none; }
 }
 
 /* Phones: body text stays >= 15px; tighten panels */
 @media (max-width: 639.98px) {
-  .panel, .side { padding: var(--s-4); border-radius: 18px; }
+  .panel, .side { padding: var(--s-4); }
   .wrap { padding-block: var(--s-4) var(--s-8); gap: var(--s-4); }
 }
 
@@ -333,7 +331,7 @@ button.board-row:hover, a.board-row:hover { background: var(--glass-hi); }
   .flap-tile.flip, .toggle-bubble.moving, .shake { animation: none; }
   .toggle-bubble, .toggle button { transition: none; }
   .dialog, .toast { animation: none; }
-  .btn, .card-rec, .tile-game, .icon-btn { transition: none; }
-  .btn:active, .icon-btn:active, .toggle button:active, .card-rec:active, .tile-game:active { transform: none; }
+  .btn, .card-rec, .tile-game, .icon-btn { transition: transform var(--t-press); }
+  .btn:active, button.board-row:active, .icon-btn:active, .toggle button:active, .card-rec:active, .tile-game:active { transform: none; }
   .card-rec:hover, .card-rec:focus-visible { transform: none; }
 }

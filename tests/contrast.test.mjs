@@ -93,10 +93,12 @@ for (const [label, fg, bg] of textPairs) {
 }
 
 test('contrast on the reduced-transparency solid fill', () => {
-  const solidFill = parseColor(tokens['glass-solid']);
-  for (const fg of ['ink', 'ink-2', 'gold', 'sage', 'salmon']) {
-    const r = ratio(solid(fg), solidFill);
-    assert.ok(r >= 4.5, `${fg} on glass-solid is ${r.toFixed(2)}:1`);
+  for (const bg of ['glass-solid', 'glass-hi-solid', 'glass-deep-solid']) {
+    const fill = parseColor(tokens[bg]);
+    for (const fg of ['ink', 'ink-2', 'gold', 'sage', 'salmon']) {
+      const r = ratio(solid(fg), fill);
+      assert.ok(r >= 4.5, `${fg} on ${bg} is ${r.toFixed(2)}:1`);
+    }
   }
 });
 
