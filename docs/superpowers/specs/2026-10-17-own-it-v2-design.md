@@ -196,6 +196,25 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
         - **Mood: chill, not mysterious, and familiar (user request).** The music stays in one key, with the familiar I–V–vi–IV progression: C → G → Am → F, one chord per 4 s bar.
           - Melodies are original, and they are written note by note from chord tones and passing tones in C major.
           - It never copies existing songs. The user cited a chill anime track as the vibe, so the feel is the target, not the notes.
+        - **Two progressions and a layered loop (user request).**
+          - A: C → G → Am → F. B: F → G → Em → Am.
+          - Each section is 4 bars. The arrangement adds one layer, then removes one, then loops:
+            1. pad + bass
+            2. + electric-piano arpeggio
+            3. + soft lo-fi drums
+            4. + melody (progression A)
+            5. progression B, everything playing
+            6. B, without melody
+            7. back to A, without drums
+            8. A, without arpeggio
+            9. loop to 1
+          - One full cycle lasts about 2 minutes 8 seconds.
+          - Melodies alternate between two phrase sets on each cycle, so repeats feel fresh.
+        - **Drums (user request), soft and lo-fi, all synthesized:**
+          - a sine kick with a pitch drop on beat 1, the "and" of 2, and beat 3,
+          - a light filtered-noise snare with a small tone on beats 2 and 4,
+          - soft eighth-note hi-hats,
+          - kept well under the electric piano in the mix.
         - **Tight, not wobbly (user playtest).**
           - Every note lands exactly on an eighth-note grid, with no swing and no random humanize.
           - The melody is in quarter notes on the beat.
