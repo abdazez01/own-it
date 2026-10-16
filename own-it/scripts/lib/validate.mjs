@@ -25,8 +25,10 @@ const str = { type: 'string' };
 const ids = { type: 'array', items: str };
 export const ITEM = { type: 'object', required: ['id', 'k', 'ref', 'conf'], props: {
   id: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,24}$' },
-  k: { type: 'string', enum: ['surface', 'component', 'edge', 'actor', 'role', 'permission', 'state', 'transition', 'flow', 'decision', 'failure', 'term'] },
+  k: { type: 'string', enum: ['surface', 'component', 'edge', 'actor', 'role', 'permission', 'state', 'transition', 'flow', 'decision', 'failure', 'term', 'element'] },
   label: str, actor: str, from: str, to: str, by: str, card: str, threat: str, role: str, action: str,
+  on: str, does: str, goes: str, roles: ids,
+  purpose: { type: 'string', max: 160 }, reason: { type: 'string', max: 200 },
   steps: { type: 'array', items: ids },
   ref: { type: 'string', pattern: '^[^:]+:\\d+$' },
   conf: { type: 'string', enum: ['high', 'medium', 'low'] },

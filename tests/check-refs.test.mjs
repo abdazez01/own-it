@@ -138,3 +138,51 @@ test('partial re-extraction re-stamps only re-extracted files', async () => {
   assert.notEqual(f['api/trips.ts'], old['api/trips.ts']);
   assert.equal(f['app/Trip.tsx'], old['app/Trip.tsx']);
 });
+
+test('element with missing surface is dropped dangling', async () => {
+  const root = await setup();
+  const out = await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts'], items: [
+    it({ id: 's1', k: 'surface', label: 'Trip screen', ref: 'api/trips.ts:1' }),
+    it({ id: 'el1', k: 'element', on: 's1', label: 'Cancel button', ref: 'api/trips.ts:2' }),
+    it({ id: 'el2', k: 'element', on: 'nope', label: 'Ghost button', ref: 'api/trips.ts:2' }),
+    it({ id: 'el3', k: 'element', on: 's1', roles: ['r9'], label: 'Admin button', ref: 'api/trips.ts:2' }),
+  ] })], flags: {} }, ctx(root));
+  assert.deepEqual(out.dropped, [{ id: 'el2', why: 'dangling' }, { id: 'el3', why: 'dangling' }]);
+  assert.deepEqual(loadModel(root).zones.trips.items.map((i) => i.id), ['s1', 'el1']);
+});
+
+test('element with goes to unknown surface dropped; valid does/goes/roles kept', async () => {
+  const root = await setup();
+  const out = await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts'], items: [
+    it({ id: 's1', k: 'surface', label: 'A', ref: 'api/trips.ts:1' }),
+    it({ id: 's2', k: 'surface', label: 'B', ref: 'api/trips.ts:1' }),
+    it({ id: 'r1', k: 'role', label: 'Driver', ref: 'api/trips.ts:1' }),
+    it({ id: 'f1', k: 'flow', label: 'Cancel', steps: [['s1']], ref: 'api/trips.ts:1' }),
+    it({ id: 'ok', k: 'element', on: 's1', does: 'f1', goes: 's2', roles: ['r1'], ref: 'api/trips.ts:2' }),
+    it({ id: 'bad', k: 'element', on: 's1', goes: 'zzz', ref: 'api/trips.ts:2' }),
+    it({ id: 'bad2', k: 'element', on: 's1', does: 's2', ref: 'api/trips.ts:2' }),
+    it({ id: 'bad3', k: 'element', on: 'r1', ref: 'api/trips.ts:2' }),
+  ] })], flags: {} }, ctx(root));
+  assert.deepEqual(out.dropped.map((d) => d.id).sort(), ['bad', 'bad2', 'bad3']);
+  assert.ok(loadModel(root).zones.trips.items.some((i) => i.id === 'ok'));
+});
+
+test('purpose over 160 chars invalid', async () => {
+  const root = await setup();
+  const out = await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts'], items: [
+    it({ id: 'a', k: 'surface', purpose: 'x'.repeat(161), ref: 'api/trips.ts:1' }),
+    it({ id: 'b', k: 'surface', purpose: 'x'.repeat(160), ref: 'api/trips.ts:1' }),
+  ] })], flags: {} }, ctx(root));
+  assert.deepEqual(out.dropped, [{ id: 'a', why: 'invalid' }]);
+});
+
+test('decision keeps reason', async () => {
+  const root = await setup();
+  await checkRefs({ _: [write(root, { zone: 'trips', files: ['api/trips.ts'], items: [
+    it({ id: 'd1', k: 'decision', label: 'Soft delete', reason: 'Keep audit trail', ref: 'api/trips.ts:1' }),
+    it({ id: 'd2', k: 'decision', reason: 'y'.repeat(201), ref: 'api/trips.ts:1' }),
+  ] })], flags: {} }, ctx(root));
+  const items = loadModel(root).zones.trips.items;
+  assert.deepEqual(items.map((i) => i.id), ['d1']);
+  assert.equal(items[0].reason, 'Keep audit trail');
+});

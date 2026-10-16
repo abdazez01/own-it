@@ -28,6 +28,11 @@ function dependencies(item, kept) {
     case 'transition': return Boolean(item.from && item.to) && states([item.from, item.to]);
     case 'flow': return (item.steps || []).flat().every((id) => kept.has(id));
     case 'failure': return Boolean(item.card) && kept.has(item.card);
+    case 'element': {
+      const is = (id, k) => kept.get(id)?.k === k;
+      return is(item.on, 'surface') && (item.does === undefined || is(item.does, 'flow'))
+        && (item.goes === undefined || is(item.goes, 'surface')) && (item.roles || []).every((id) => is(id, 'role'));
+    }
     case 'permission': return Boolean(item.role) && kept.has(item.role);
     default: return true;
   }
