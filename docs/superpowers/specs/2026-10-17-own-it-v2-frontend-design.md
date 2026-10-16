@@ -94,7 +94,14 @@ All tokens live in `assets/engine/tokens.css` as CSS custom properties on `:root
 
 - The spacing base is 4 px. The scale is 4 · 8 · 12 · 16 · 20 · 24 · 32 · 48 · 64.
 - The content width is `min(1180px, 100% - 32px)`, centered, with a 16 px minimum side gutter.
-- The layout is desktop-first. Supported widths are 1024–1920 px. Below 1024 px, a glass notice says "The game board needs a wider window (1024 px or more)." The map screen still renders in a single column for reading.
+- **Fully responsive (user request, 2026-10-17).** Every surface and every game template works from 360 px phone width up to 2560 px ultrawide, with no horizontal page scroll.
+  - Breakpoints: `sm` < 640, `md` 640–1023, `lg` 1024–1599, `xl` ≥ 1600.
+  - **Wide (≥ 1600 px):** the content max-width grows to 1440 px. The library shows more columns, and boards use the extra room instead of stretching cards.
+  - **Small (< 1024 px):** side panels (objectives, tokens, notes) move under the play area or into a bottom sheet. Recommended cards and the library go to 1–2 columns. The departures board scrolls inside its own panel.
+  - **Phones (< 640 px):** the header collapses to the logo, XP, and a menu button holding the toggles. Quiz answers are a single column. Screen copies scale to fit the width with `transform: scale()`, and the hit areas scale with them.
+  - **Touch is a first-class input.** Every drag has a tap-to-select, tap-to-place alternative. Hit targets are ≥ 44 px. Hover-only effects (tilt, hover tick) are skipped on `(hover: none)`.
+  - **Boards:** the whiteboard and pipe grid lay out to the available width and re-run their auto-layout on resize. Swimlanes and timelines stack vertically under `md`.
+  - Text stays ≥ 15 px body on every width. The flap size scales with `clamp()`.
 
 ### 2.4 Radius (one documented system)
 
@@ -665,7 +672,7 @@ own-it/assets/
 
 ## 12. Acceptance checklist (build must pass)
 
-- Every surface in section 5 and 6 renders in the browser check at 1024, 1280, and 1600 px, with no layout overflow.
+- Every surface in sections 5 and 6, and every game template, renders in the browser check at 375, 768, 1280, and 1920 px (plus 2560 for the dashboard), with no horizontal overflow and with touch alternatives working.
 - The contrast script passes for every text/background pair in use.
 - Flaps animate on load and on value change. Only flips the player causes make sound.
 - The liquid toggle squashes and stretches and springs. Every button has press scale, ripple, and sound.
