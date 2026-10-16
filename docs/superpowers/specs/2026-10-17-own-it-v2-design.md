@@ -310,6 +310,13 @@ The same single `game.html` (data from `.js` files; works on `file://`). Modes:
     - Level-up and quest-complete: a short fanfare chord with sparkle.
   - **Variation.** Each play shifts pitch by about ±3% and gain by about ±10% at random, so repeated sounds never feel robotic. Rapid flap runs are staggered like a real board.
   - **Escalation.** Combo and streak sounds rise in pitch with each hit, and a streak break resets with a gentle down-step.
+  - **No clipping or pile-ups (user playtest of the mockup).**
+    - Clacks are rate-limited to one every ≥55 ms. A multi-tile flip plays one clack per tick, not one per tile.
+    - Each sound has a choke group, so retriggering it fades out the previous instance (15 ms) instead of stacking.
+    - At most 3 notes per chord.
+    - Master gain is at about 0.45 into a gentle compressor (−24 dB threshold, 3:1).
+    - Reverb is kept short and quiet (0.35 s, low wet).
+    - Every envelope starts from an exponential ramp, which avoids clicks.
   - **Mix.** A master compressor keeps everything balanced. No sound is louder than the confetti moment. All sounds are under 600 ms except the fanfares (≤1.2 s).
   - **Tuning.** A sound test strip in the key-help overlay plays each sound. The design pass during the build tunes them by ear, against the bar "would you click again just to hear it?".
 - Visual juice pairs with each sound: confetti for correct answers and clears, a shake for wrong ones, XP pop-ups, combo counters, and a level-up banner.
