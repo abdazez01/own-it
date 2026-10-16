@@ -45,6 +45,7 @@ function checkChoices(game, input, byId) {
     choices.forEach((c, j) => {
       if (!byId.has(c) && free && identifierOnly(c)) throw new Error(`identifier-only answer in ${lists[0]}[${i}].choices[${j}]; ${HINT}`);
     });
+    if (!choices.length && game === 'screen-tour' && !byId.has(e.answer)) throw new Error(`answer not in zone "${input.zone}" in ${lists[0]}[${i}]`);
     if (choices.length && !choices.includes(e.answer)) throw new Error(`answer is not one of the choices in ${lists[0]}[${i}]`);
   });
 }
@@ -61,6 +62,8 @@ function checkQuest(input, byId) {
     if (seen.has(o.element)) throw new Error(`duplicate objective element "${o.element}"`);
     seen.add(o.element);
   }
+  const start = byId.get(input.start);
+  if (start.k !== 'surface' || byId.get(input.objectives[0].element).on !== input.start) throw new Error('start must be the screen of the first objective');
 }
 
 // Surface ids a round shows, so a map-rung pass counts toward coverage.

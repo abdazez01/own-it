@@ -147,7 +147,6 @@ test('apply teach-back style rung none gives only curiosity xp', async () => {
   answered(root, 'trips-teach-back-1', { got: 1, of: 1 });
   const out = await apply({ _: ['trips-teach-back-1'], flags: { curiosity: '2' } }, ctx(root));
   assert.equal(out.xp, 10);
-  answered(root, 'trips-teach-back-1', { got: 1, of: 1 });
   assert.deepEqual(out.cleared, []);
 });
 
@@ -216,4 +215,15 @@ test('rung none ignores text grades, challenges and hints', async () => {
   answered(root, 'trips-teach-back-1', { got: 1, of: 1, text: { t: 'solid' }, hintsUsed: 2 });
   const out = await apply({ _: ['trips-teach-back-1'], flags: { text: '{"t":"solid"}', curiosity: '1', 'challenge-won': '2' } }, ctx(root));
   assert.equal(out.xp, 5);
+});
+
+test('screen-tour find answer must be a zone id; quest start must match first objective', async () => {
+  const root = await setup();
+  const t = tour(); delete t.steps[0].choices; t.steps[0].answer = 'ghost';
+  await assert.rejects(bld(root, 'screen-tour', t), /answer not in zone "trips" in steps\[0\]/);
+  t.steps[0].answer = 'el1';
+  await bld(root, 'screen-tour', t);
+  const q = (start) => bld(root, 'quests', { zone: 'trips', flow: 'f1', goal: 'g', start, objectives: [{ text: 'a', element: 'el1' }, { text: 'b', element: 'el2' }] });
+  await assert.rejects(q('s2'), /start must be the screen of the first objective/);
+  await assert.rejects(q('el1'), /start must be the screen of the first objective/);
 });
