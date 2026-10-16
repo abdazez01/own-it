@@ -33,7 +33,7 @@ test('clean zone: no fog, no stale, rung string', async () => {
   claimMap(root);
   const out = await fog({ _: [], flags: {} }, ctx(root));
   assert.equal(out.git, true);
-  assert.deepEqual(out.zones, [{ id: 'trips', name: 'Trips', rungs: 'cco--', fogged: false, stale: [] }]);
+  assert.deepEqual(out.zones, [{ id: 'trips', name: 'Trips', rungs: 'cco--', fogged: false, stale: [], staleScreens: [] }]);
 });
 
 test('uncommitted edit does not fog; committed edit fogs and marks stale', async () => {

@@ -2,7 +2,7 @@
 import { parseArgs } from './lib/args.mjs';
 import { projectRoot } from './lib/paths.mjs';
 
-const COMMANDS = ['init', 'scan', 'check-refs', 'fog', 'build-missions', 'build-round', 'collect', 'apply', 'open', 'build-recs', 'serve', 'wait', 'stop'];
+const COMMANDS = ['init', 'scan', 'check-refs', 'fog', 'build-missions', 'build-round', 'build-screen', 'collect', 'apply', 'open', 'build-recs', 'serve', 'wait', 'stop'];
 const USAGE = `usage: own-it <${COMMANDS.join('|')}> [args]`;
 
 async function main() {
