@@ -302,6 +302,16 @@ The same single `game.html` (data from `.js` files; works on `file://`). Modes:
 - Every action has a sound: click, card pick, arrow drawn, correct, wrong, combo or streak, objective ticked, quest complete, level up or rung cleared, badge earned, hint used, timer tick, and fog lifted.
 - Sounds are synthesized with the Web Audio API in `core`-adjacent page code. There are no audio files, so the page stays offline and small (a few short oscillator and noise envelopes).
 - A mute toggle (`M`, plus a speaker icon) and a volume slider are remembered in `localStorage`, wrapped in try/catch. The default is on at a moderate volume. Sound starts only after the first user gesture, as browser autoplay rules require.
+- **Sounds must feel satisfying (user request).** This is game feel, not beeps.
+  - **Layered synthesis.** Each sound is 2–3 layers: a transient click, a tonal body, and a soft tail through a small generated reverb (a convolver with a noise impulse).
+    - Flap clack: a filtered noise snap plus a short low wooden thump.
+    - Correct: a warm bell-like rising arpeggio (sine plus triangle, soft attack).
+    - Wrong: a soft low "bonk", never a harsh buzzer.
+    - Level-up and quest-complete: a short fanfare chord with sparkle.
+  - **Variation.** Each play shifts pitch by about ±3% and gain by about ±10% at random, so repeated sounds never feel robotic. Rapid flap runs are staggered like a real board.
+  - **Escalation.** Combo and streak sounds rise in pitch with each hit, and a streak break resets with a gentle down-step.
+  - **Mix.** A master compressor keeps everything balanced. No sound is louder than the confetti moment. All sounds are under 600 ms except the fanfares (≤1.2 s).
+  - **Tuning.** A sound test strip in the key-help overlay plays each sound. The design pass during the build tunes them by ear, against the bar "would you click again just to hear it?".
 - Visual juice pairs with each sound: confetti for correct answers and clears, a shake for wrong ones, XP pop-ups, combo counters, and a level-up banner.
 
 ### 6.4 Map screen
