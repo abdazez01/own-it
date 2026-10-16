@@ -188,13 +188,15 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
       - **Generative ambient music**, synthesized in Web Audio with no audio files. It is layered:
         - an 8-chord progression with detuned stereo pads through a slowly sweeping low-pass filter,
         - a soft sine bass line,
-        - **a soft, clean electric guitar as the lead (user request)**:
-          - Karplus-Strong plucked-string synthesis,
-          - a very gentle tanh saturation,
-          - a warm low-pass "neck pickup" tone with a small body boost,
-          - a light chorus and a tempo-synced echo,
-          - played as a humanized, swung fingerpicked pattern that gets busier after the first 8 bars, with occasional melody phrases;
-        - the pad sits quieter and softer underneath (sine, slow attack), because the user disliked the pad droning alone,
+        - **a soft electric piano as the lead (user request; replaces the guitar the user tried and rejected)**:
+          - FM synthesis with a quickly decaying modulation index, plus a faint bell partial, which gives a soft but defined, slightly bright attack,
+          - a warm low-pass tone, a light chorus, and a tempo-synced echo,
+          - played as a humanized, swung arpeggio with occasional melody phrases;
+        - the organ-like pad stays as a quiet bed under the lead, because the user wants it there but not alone,
+        - **faster development**:
+          - bars of 4 s,
+          - a new layer every 4 bars (bars 0–3 sparse; bars 4–7 add arpeggio density and ticks),
+          - then alternating full sections with and without melody every 8 bars,
         - very quiet hi-hat ticks.
         - The arrangement evolves in 8-bar sections, so it does not loop flatly.
       - It plays at very low volume, barely audible under the sound effects, with a slow fade in and out.
@@ -350,6 +352,13 @@ The same single `game.html` (data from `.js` files; works on `file://`). Modes:
     - Every envelope starts from an exponential ramp, which avoids clicks.
   - **Mix.** A master compressor keeps everything balanced. No sound is louder than the confetti moment. All sounds are under 600 ms except the fanfares (≤1.2 s).
   - **Tuning.** A sound test strip in the key-help overlay plays each sound. The design pass during the build tunes them by ear, against the bar "would you click again just to hear it?".
+- **Every click has feel (user playtest).** Every interactive element gives:
+  - on press: a scale-down to about 0.965, a gold ripple from the pointer, and a short pitched "tock" with a tiny noise click,
+  - the press pitch differs by element type (card, tile, toggle, button),
+  - on hover over cards and tiles: a faint tick,
+  - for keyboard Enter or Space on a button: the same press sound.
+
+  This is part of the engine, so every game inherits it.
 - Visual juice pairs with each sound: confetti for correct answers and clears, a shake for wrong ones, XP pop-ups, combo counters, and a level-up banner.
 
 ### 6.4 Map screen
