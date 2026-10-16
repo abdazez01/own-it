@@ -254,6 +254,8 @@ The Phase 1 targets stay. New items:
    - Answer files are moved out of Downloads into `.own-it/answers/`, so nothing is left behind in Downloads.
    - *Change from Phase 1:* "predict, then prove" test files are written to `.own-it/tests/`, not the project's test folder. The docs tell the player how to copy a test into their own suite if they want to keep it.
    - Outside the project, the only footprint is the skill itself (`~/.claude/skills/own-it`) and Node.js, if the player chose to install it.
+   - Any derived artifact goes there too: sample databases, seeded sample data, screen copies, thumbnails, caches, and sound settings. Nothing is ever written to a system temp folder or to a global cache. The game never copies the user's real database or real data. Any sample database it creates is made-up data and lives in `.own-it/`.
+   - The player is told on first run (in the safety notice) and on the Map screen footer: "Everything own-it creates is in `.own-it/`. Delete that folder to remove it all."
    - `init` writes nothing outside `.own-it/`. That was already true and gets a test.
    - The README and the safety notice say: "Delete `.own-it/` to remove everything."
 10. **Fork check once** is enforced by the docs only. Claude cannot see the conversation's id, so a marker file would be wrong across sessions. A pressure scenario covers it.
