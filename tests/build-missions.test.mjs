@@ -86,11 +86,20 @@ test('break mission adds tokens; boss mission is blank with all cards', async ()
   assert.equal(core.decode(boss.answer).cards.length, 4);
 });
 
-test('locked rung refused with what is left to clear; nothing written', async () => {
+test('locked rung still builds, listed as not recommended with what is left to clear', async () => {
   const root = await setup();
-  await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'trace', board: 'swimlanes', brief: 'x', flow: 'f1' }])], flags: {} }, ctx(root)),
-    /rung "trace" is locked in zone "trips"; map needs surfaces c0,c1,c3/);
-  assert.equal(existsSync(join(root, '.own-it', 'mission.js')), false);
+  const out = await build({ _: [recipe(root, [{ zone: 'trips', rung: 'trace', board: 'swimlanes', brief: 'x', flow: 'f1' }])], flags: {} }, ctx(root));
+  assert.deepEqual(out.notRecommended, [{ id: 'trips-trace-1', rung: 'trace',
+    reason: 'rung "trace" is locked in zone "trips"; map needs surfaces c0,c1,c3' }]);
+  assert.equal(existsSync(join(root, '.own-it', 'mission.js')), true);
+  assert.equal(loadMissions(root).missions[0].rung, 'trace');
+});
+
+test('open rung is not listed as not recommended', async () => {
+  const root = await setup();
+  open(root, 'map');
+  const out = await build({ _: [recipe(root, [{ zone: 'trips', rung: 'map', board: 'component', brief: 'x', cards: ['c0', 'c1'] }])], flags: {} }, ctx(root));
+  assert.deepEqual(out.notRecommended, []);
 });
 
 test('unknown ids, bad pins, bad recipe rejected', async () => {
@@ -149,10 +158,12 @@ test('boss in a zone over 15 cards needs recipe cards; pool keeps the whole zone
 
 test('locked break and boss say which rung to clear first', async () => {
   const root = await setup();
-  await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'break', board: 'component', brief: 'x', cards: ['c0', 'c1'], threats: ['x1'] }])], flags: {} }, ctx(root)),
-    /rung "break" is locked in zone "trips"; clear trace first/);
-  await assert.rejects(build({ _: [recipe(root, [{ zone: 'trips', rung: 'boss', board: 'component', brief: 'x' }])], flags: {} }, ctx(root)),
-    /rung "boss" is locked in zone "trips"; clear break first/);
+  const out = await build({ _: [recipe(root, [
+    { zone: 'trips', rung: 'break', board: 'component', brief: 'x', cards: ['c0', 'c1'], threats: ['x1'] },
+    { zone: 'trips', rung: 'boss', board: 'component', brief: 'x' }])], flags: {} }, ctx(root));
+  assert.deepEqual(out.notRecommended.map((n) => n.reason), [
+    'rung "break" is locked in zone "trips"; clear trace first',
+    'rung "boss" is locked in zone "trips"; clear break first']);
 });
 
 test('emitted cards omit actor, are shuffled deterministically, boss answer cards carry ref and conf', async () => {

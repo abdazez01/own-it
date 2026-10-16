@@ -99,6 +99,20 @@ test('boss needs board ratio and 3 solid answers; claim opens final boss for sin
   assert.equal(loadProgress(root).finalBoss, 'open');
 });
 
+test('boss before rungs cleared is practice, no claim', async () => {
+  const root = await setup();
+  setRungs(root, { words: 'cleared', map: 'cleared', trace: 'open', break: 'open', boss: 'open' });
+  mission(root, 'trips-boss-1', { zone: 'trips', rung: 'boss', board: 'component', cardIds: ['c0', 'c1', 'c2'] }, { got: 4, of: 5 });
+  const out = await apply({ _: ['trips-boss-1'], flags: { text: '{"q1":"solid","q2":"solid","q3":"solid"}' } }, ctx(root));
+  assert.equal(out.claimed, false);
+  assert.equal(out.practice, true);
+  assert.deepEqual(out.cleared, []);
+  assert.equal(out.xp, 40 + 60);
+  const p = loadProgress(root);
+  assert.equal(p.zones.trips.rungs.boss, 'open');
+  assert.equal(p.zones.trips.claimed, false);
+});
+
 test('refresh mission clears fog and re-stamps claim hashes', async () => {
   const root = await setup();
   const p = loadProgress(root);

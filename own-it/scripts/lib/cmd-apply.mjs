@@ -9,6 +9,7 @@ import { XP, missionXp, badgesFor } from './scoring.mjs';
 
 const PASS = 0.7;
 const BOSS_SOLIDS = 3;
+const CLAIM_RUNGS = ['words', 'map', 'trace', 'break'];
 const GRADES = ['solid', 'partial', 'miss'];
 const BOSS_KEYS = ['q1', 'q2', 'q3', 'q4', 'q5'];
 const USAGE = 'usage: apply <missionId> [--text <json>] [--curiosity <n>] [--challenge-won <n>] [--got <n> --of <n>] [--tokens <in>,<out>]';
@@ -156,6 +157,7 @@ export async function run(args, ctx) {
   };
 
   let claimed = false;
+  let bossPractice = false;
   if (m.rung === 'map') {
     if (passed) {
       const surfaces = items.filter((x) => x.k === 'surface').map((x) => x.id);
@@ -165,10 +167,15 @@ export async function run(args, ctx) {
       if (surfaces.every((s) => covered.has(s))) clearRung('map');
     }
   } else if (m.rung === 'boss') {
-    const solids = BOSS_KEYS.filter((k) => f.text[k] === 'solid').length;
-    if (passed && solids >= BOSS_SOLIDS) {
-      clearRung('boss');
-      if (!pz.claimed) { pz.claimed = true; claimed = true; xp += XP.claim; }
+    // A boss pass claims the zone only once every earlier rung is cleared; before that it is practice.
+    if (!CLAIM_RUNGS.every((r) => pz.rungs[r] === 'cleared')) {
+      bossPractice = true;
+    } else {
+      const solids = BOSS_KEYS.filter((k) => f.text[k] === 'solid').length;
+      if (passed && solids >= BOSS_SOLIDS) {
+        clearRung('boss');
+        if (!pz.claimed) { pz.claimed = true; claimed = true; xp += XP.claim; }
+      }
     }
   } else if (passed) {
     clearRung(m.rung);
@@ -212,6 +219,7 @@ export async function run(args, ctx) {
 
   const out = { id, xp, total: progress.xp, ratio: Math.round(ratio * 100) / 100, cleared, claimed, badges,
     weak: pz.weakSpots.length };
+  if (bossPractice) out.practice = true;
   if (fogCleared) out.fog = 'cleared';
   return out;
 }
