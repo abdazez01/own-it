@@ -119,6 +119,29 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
 - **Fallback.** If serve can't run (no background tasks in the harness, port blocked, other editor), use the file:// page plus download/copy and "done" as in Phase 1. The skill tries serve first.
 - `collect` reads from `.own-it/inbox/` before falling back to Downloads.
 
+## 5b-3. Visual theme: split-flap display (user request)
+
+- **The whole page is themed as a split-flap board, like an airport or train departures board.**
+- **Dashboard as a departures board.** Each zone is a row:
+  - zone name,
+  - rung progress as flap cells,
+  - status ("ON TIME" = claimed, "FOG" = fogged, "BOARDING" = recommended next).
+- **Flap motion.**
+  - Text changes animate as flap flips: XP counters, scores, game titles, the quest pop-up, and recommendations appearing.
+  - A short mechanical clatter plays with each flip, synthesized like all other sounds (section 6.3b).
+- **Look.**
+  - A dark board with a cream or amber monospace character set, built from tiles split by a hinge line.
+  - One accent color for alerts (fog, wrong answer, the 3am Pager).
+  - The 3am Pager's alarm flips the whole board red.
+- **Games keep the theme.** Their headers, timers, and score cards use flap tiles. Game boards themselves (screen copies, whiteboard) stay clean and readable inside the theme frame.
+- **Accessibility.**
+  - Respect `prefers-reduced-motion`: flaps swap instantly, with no clatter loop.
+  - Text stays real DOM text, not images.
+  - Keep contrast at AA or above.
+- **Build requirement.** The dashboard and engine UI are designed using both the `frontend-design:frontend-design` and `design-taste-frontend` skills during the build, at build time. Nothing runs at runtime, and both skills feed one consistent design system for the engine.
+- **Icons.** Every game gets its own icon in the same style: a single-color line glyph on a flap tile, used on the library tiles and game headers. Icons are inline SVG in the templates.
+- **Skill logo.** The skill gets one logo: a split-flap tile, chosen with the user. It is used in the README banner, the dashboard header, and the favicon.
+
 ## 5c. Template architecture (user request: templates save tokens)
 
 - **One engine, many game templates, all shipped in the skill.**
