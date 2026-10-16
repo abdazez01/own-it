@@ -156,6 +156,8 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
   Each surface is designed with both design skills and gets a browser check in light and dark mode at 1024–1600px widths.
 - **Game logos (user request).** Every game has its own logo: a distinct mark in the shared split-flap style, used on its library tile, game header, and result card. Inline SVG lives in each template. The style is flat, one accent color, and readable at 32px. The "mid-flip" look was rejected by the user, so it is not used.
 - **Skill logo (user request).** One brand mark for the whole skill, separate from the game logos. It is used in the README banner, the dashboard header, the favicon, and the GitHub social preview. It must stand for the whole skill (owning your code and playing it), not for any one game. It is chosen with the user before the build and kept as SVG in `assets/brand/`, in light, dark, and mono versions.
+  - **Chosen (2026-10-17): the "OI flag" mark.** Two split-flap tiles reading **O** and **I**, where the dot of the I is a small planted flag in amber, with an amber rail under the tiles. The mark is the app icon and favicon. The **lockup** is the mark with the `own-it` wordmark (monospace, cream) to its right, used in the README banner and the dashboard header. The palette is a dark board, cream letters, and an amber accent.
+  - **Visual style direction, being explored:** split-flap tiles combined with glassmorphism (frosted panels over soft ambient light). The mockup is shown to the user, and the final direction is confirmed before the build.
 
 ## 5c. Template architecture (user request: templates save tokens)
 
