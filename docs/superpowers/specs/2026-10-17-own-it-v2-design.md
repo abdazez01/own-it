@@ -139,8 +139,23 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
   - Text stays real DOM text, not images.
   - Keep contrast at AA or above.
 - **Build requirement.** The dashboard and engine UI are designed using both the `frontend-design:frontend-design` and `design-taste-frontend` skills during the build, at build time. Nothing runs at runtime, and both skills feed one consistent design system for the engine.
-- **Icons.** Every game gets its own icon in the same style: a single-color line glyph on a flap tile, used on the library tiles and game headers. Icons are inline SVG in the templates.
-- **Skill logo.** The skill gets one logo: a split-flap tile, chosen with the user. It is used in the README banner, the dashboard header, and the favicon.
+- **Full redesign, not a reskin (user request).** Every UI surface is redesigned from scratch in this theme. The Phase 1 `game.html` look is not reused. The surfaces are:
+  - welcome/dashboard
+  - recommended row
+  - zone board
+  - game library
+  - every game screen
+  - quest pop-up
+  - result and score cards
+  - feedback panel
+  - hint dialog
+  - key-help overlay
+  - Exam report card
+  - fog states and empty states
+
+  Each surface is designed with both design skills and gets a browser check in light and dark mode at 1024–1600px widths.
+- **Game logos (user request).** Every game has its own logo: a distinct mark in the shared split-flap style, used on its library tile, game header, and result card. Inline SVG lives in each template. The style is flat, one accent color, and readable at 32px. The "mid-flip" look was rejected by the user, so it is not used.
+- **Skill logo (user request).** One brand mark for the whole skill, separate from the game logos. It is used in the README banner, the dashboard header, the favicon, and the GitHub social preview. It must stand for the whole skill (owning your code and playing it), not for any one game. It is chosen with the user before the build and kept as SVG in `assets/brand/`, in light, dark, and mono versions.
 
 ## 5c. Template architecture (user request: templates save tokens)
 
