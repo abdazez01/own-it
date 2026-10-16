@@ -1,0 +1,10 @@
+{
+  "id": "design-duel",
+  "name": "Design Duel",
+  "rung": "break",
+  "minutes": 3,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.2",
+  "line": "Pick the design you would ship and the real reason it beats the alternative."
+}

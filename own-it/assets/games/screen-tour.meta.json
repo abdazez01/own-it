@@ -1,0 +1,10 @@
+{
+  "id": "screen-tour",
+  "name": "Screen Tour",
+  "rung": "map",
+  "minutes": 4,
+  "examReady": false,
+  "usesScreens": true,
+  "stage": "2.0",
+  "line": "Tap a screen, then pick what it does, where you find it, or who sees it."
+}

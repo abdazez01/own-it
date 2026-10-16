@@ -1,0 +1,10 @@
+{
+  "id": "guess-the-screen",
+  "name": "Guess the Screen",
+  "rung": "map",
+  "minutes": 2,
+  "examReady": false,
+  "usesScreens": true,
+  "stage": "2.0",
+  "line": "A blurred screen slowly sharpens. Name it before the picture is clear."
+}

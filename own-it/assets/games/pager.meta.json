@@ -1,0 +1,10 @@
+{
+  "id": "pager",
+  "name": "3am Pager",
+  "rung": "break",
+  "minutes": 4,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.1",
+  "line": "An alarm goes off. Find the step that breaks first on the clock."
+}

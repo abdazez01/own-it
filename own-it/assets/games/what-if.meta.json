@@ -1,0 +1,10 @@
+{
+  "id": "what-if",
+  "name": "What-If Dial",
+  "rung": "break",
+  "minutes": 3,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.2",
+  "line": "Turn up the traffic or the timeouts and predict what fails first."
+}

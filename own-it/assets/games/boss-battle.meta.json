@@ -1,0 +1,10 @@
+{
+  "id": "boss-battle",
+  "name": "Boss Battle",
+  "rung": "boss",
+  "minutes": 6,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.0",
+  "line": "Answer well to hit the boss. Three wrong answers and you lose."
+}

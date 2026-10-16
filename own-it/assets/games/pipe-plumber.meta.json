@@ -1,0 +1,10 @@
+{
+  "id": "pipe-plumber",
+  "name": "Pipe Plumber",
+  "rung": "trace",
+  "minutes": 4,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.2",
+  "line": "Rotate the tiles until a button's request reaches the database."
+}

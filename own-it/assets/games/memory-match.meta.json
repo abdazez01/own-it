@@ -1,0 +1,10 @@
+{
+  "id": "memory-match",
+  "name": "Memory Match",
+  "rung": "words",
+  "minutes": 3,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.1",
+  "line": "Flip cards to pair each term with what it means in your app."
+}

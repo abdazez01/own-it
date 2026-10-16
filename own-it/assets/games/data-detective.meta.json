@@ -1,0 +1,10 @@
+{
+  "id": "data-detective",
+  "name": "Data Detective",
+  "rung": "trace",
+  "minutes": 4,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.2",
+  "line": "Stamp each status on a record's timeline and say who moved it."
+}

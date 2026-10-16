@@ -1,0 +1,10 @@
+{
+  "id": "teach-back",
+  "name": "Teach-back",
+  "rung": "none",
+  "minutes": 3,
+  "examReady": false,
+  "usesScreens": true,
+  "stage": "2.2",
+  "line": "Explain one of your screens to a product manager in two sentences."
+}

@@ -46,6 +46,9 @@ export const RECIPE = { type: 'object', required: ['mode', 'missions'], props: {
     brief: { type: 'string', max: 300 }, cards: { type: 'array', items: str, max: 15 },
     flow: str, threats: ids, refresh: { type: 'boolean' },
     pins: { type: 'array', max: 3, items: { type: 'object', required: ['card', 'q'], props: { card: str, q: { type: 'string', max: 160 } } } } } } } } };
+export const RECS = { type: 'object', required: ['recs'], props: { recs: { type: 'array', min: 3, max: 5, items: {
+  type: 'object', required: ['game', 'zone', 'reason'], props: {
+    game: str, zone: str, reason: { type: 'string', max: 120, pattern: '\\S' } } } } } };
 export const ANSWER = { type: 'object', required: ['id', 'submittedAt', 'got', 'of', 'missed', 'text', 'hintsUsed'], props: {
   id: str, submittedAt: str, got: { type: 'number', min: 0 }, of: { type: 'number', min: 0 },
   missed: ids, wrong: { type: 'array', items: { type: 'any' } }, text: { type: 'object' },

@@ -1,0 +1,10 @@
+{
+  "id": "whos-allowed",
+  "name": "Who's Allowed?",
+  "rung": "trace",
+  "minutes": 3,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.1",
+  "line": "Decide quickly who may do each action, and build a streak as you go."
+}

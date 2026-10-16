@@ -1,0 +1,10 @@
+{
+  "id": "spot-the-lie",
+  "name": "Spot the Lie",
+  "rung": "words",
+  "minutes": 4,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.1",
+  "line": "Read five statements about this zone and find the one that is false."
+}

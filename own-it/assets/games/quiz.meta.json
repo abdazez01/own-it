@@ -1,0 +1,10 @@
+{
+  "id": "quiz",
+  "name": "Quiz",
+  "rung": "words",
+  "minutes": 3,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.0",
+  "line": "Answer five questions about the words your product uses."
+}

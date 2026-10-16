@@ -1,0 +1,10 @@
+{
+  "id": "whiteboard",
+  "name": "Whiteboard Map",
+  "rung": "map",
+  "minutes": 5,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.0",
+  "line": "Draw the arrows between the parts of your app from memory."
+}

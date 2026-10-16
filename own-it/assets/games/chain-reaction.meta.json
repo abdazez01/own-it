@@ -1,0 +1,10 @@
+{
+  "id": "chain-reaction",
+  "name": "Chain Reaction",
+  "rung": "trace",
+  "minutes": 3,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.1",
+  "line": "Click the steps of a flow in order before the fuse burns down."
+}

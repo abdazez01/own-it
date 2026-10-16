@@ -1,0 +1,10 @@
+{
+  "id": "blast-radius",
+  "name": "Blast Radius",
+  "rung": "map",
+  "minutes": 4,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.1",
+  "line": "Break one part of your app, then click everything else that breaks with it."
+}
