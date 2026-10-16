@@ -174,8 +174,23 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
       - Flap flips run on load and on every value change: XP, scores, titles, statuses, recommendations, and timers.
       - An idle board also shuffles one random status cell every few seconds, like a live departures board.
       - Each flip plays the synthesized clack.
+    - **Palette, chosen (2026-10-17): "Graphite gold".**
+      - Graphite background `#111214` with charcoal flap tiles.
+      - Off-white text `#F5F3EE`, muted text `#CFCBC2`.
+      - Soft gold accent `#E8C26A`, sage for success `#8FD3A8`, salmon for alerts `#F08A7A`.
+      - Steel-blue and navy secondary tones.
+    - **Background behind the glass, chosen: drifting split-flap tiles.**
+      - A canvas of dim flap tiles in the palette colors, about 26 at most, scaled by screen size.
+      - The tiles drift slowly upward with a slight rotation, and each one flips to a new character every few seconds.
+      - They sit behind the frosted panels, so the glass blur is visible and alive.
+      - The user rejected the large "sun" glow blobs, so they are removed.
+    - **Background music (user request).**
+      - Generative ambient pad music, synthesized in Web Audio with no audio files: slow 4-chord loop, soft triangle pads through a low-pass filter, and sparse pentatonic plucks.
+      - It plays at very low volume, barely audible under the sound effects, with a slow fade in and out.
+      - It is off until the player turns it on with the music button. The choice is remembered in `localStorage`.
+      - `M` mutes everything, and a separate music toggle sits in the header.
     - **Glass motion.**
-      - Ambient light blobs drift slowly behind the panels.
+      - The drifting tile background shows through the panels.
       - A soft light sheen sweeps across the glass panels periodically.
       - Panels lift and gain an amber edge glow on hover or focus.
       - The recommended cards tilt slightly toward the pointer.
