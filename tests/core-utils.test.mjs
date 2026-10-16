@@ -69,5 +69,5 @@ test('CLI: unknown command exits 1 with own-it: prefix', () => {
 test('CLI: no command prints usage and exits 1', () => {
   const r = spawnSync(process.execPath, [CLI], { encoding: 'utf8' });
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /usage: own-it <init\|scan\|check-refs\|fog\|build-missions\|collect\|apply\|open\|build-recs>/);
+  assert.match(r.stderr, /usage: own-it <init\|scan\|check-refs\|fog\|build-missions\|collect\|apply\|open\|build-recs\|serve\|wait\|stop>/);
 });

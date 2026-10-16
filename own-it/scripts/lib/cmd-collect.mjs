@@ -17,6 +17,19 @@ function parseAnswer(text) {
   return a;
 }
 
+function inboxResult(root, id) {
+  const dir = ownItPath(root, 'inbox');
+  let names;
+  try { names = readdirSync(dir).filter((n) => /^\d+-result\.json$/.test(n)); } catch { return null; }
+  names.sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
+  for (const n of names) {
+    let ev;
+    try { ev = JSON.parse(readFileSync(join(dir, n), 'utf8').replace(/^﻿/, '')); } catch { continue; }
+    if (ev && ev.id === id) { const { type, ...answer } = ev; return answer; }
+  }
+  return null;
+}
+
 function newestDownload(dir, id) {
   const re = new RegExp(`^own-it-${escapeRe(id)}(?:\\s*\\(\\d+\\))?\\.json$`);
   let files;
@@ -45,9 +58,13 @@ export async function run(args, ctx) {
     missionKnown(wanted);
   } else {
     missionKnown(arg);
-    const progress = loadProgress(ctx.root);
-    source = newestDownload(downloadsDir(progress.settings?.downloadDir, ctx.env), arg);
-    answer = parseAnswer(readFileSync(source, 'utf8'));
+    const fromInbox = inboxResult(ctx.root, arg);
+    if (fromInbox) answer = parseAnswer(JSON.stringify(fromInbox));
+    else {
+      const progress = loadProgress(ctx.root);
+      source = newestDownload(downloadsDir(progress.settings?.downloadDir, ctx.env), arg);
+      answer = parseAnswer(readFileSync(source, 'utf8'));
+    }
   }
 
   if (answer.id !== wanted) throw new Error(`answer file is for "${answer.id}", expected "${wanted}"`);
