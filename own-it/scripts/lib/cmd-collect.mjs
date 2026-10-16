@@ -17,15 +17,19 @@ function parseAnswer(text) {
   return a;
 }
 
-function inboxResult(root, id) {
+// Newest valid inbox result for this mission that is not older than the session.
+function inboxResult(root, id, sessionStart) {
   const dir = ownItPath(root, 'inbox');
   let names;
   try { names = readdirSync(dir).filter((n) => /^\d+-result\.json$/.test(n)); } catch { return null; }
   names.sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
   for (const n of names) {
-    let ev;
-    try { ev = JSON.parse(readFileSync(join(dir, n), 'utf8').replace(/^﻿/, '')); } catch { continue; }
-    if (ev && ev.id === id) { const { type, ...answer } = ev; return answer; }
+    try {
+      const { type, ...answer } = JSON.parse(readFileSync(join(dir, n), 'utf8').replace(/^\uFEFF/, ''));
+      if (answer.id !== id || check(answer, ANSWER).length) continue;
+      if (!(Date.parse(answer.submittedAt) >= Date.parse(sessionStart))) continue;
+      return answer;
+    } catch { /* unreadable or invalid: try an older one */ }
   }
   return null;
 }
@@ -58,7 +62,7 @@ export async function run(args, ctx) {
     missionKnown(wanted);
   } else {
     missionKnown(arg);
-    const fromInbox = inboxResult(ctx.root, arg);
+    const fromInbox = inboxResult(ctx.root, arg, session.session);
     if (fromInbox) answer = parseAnswer(JSON.stringify(fromInbox));
     else {
       const progress = loadProgress(ctx.root);

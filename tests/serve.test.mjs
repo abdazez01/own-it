@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { writeFileSync, readdirSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import net from 'node:net';
+import { spawn } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { writeFileSync, readdirSync, readFileSync, existsSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { startServer } from '../own-it/scripts/lib/cmd-serve.mjs';
 import { run as wait } from '../own-it/scripts/lib/cmd-wait.mjs';
@@ -136,4 +139,129 @@ test('collect prefers inbox result', async () => {
   const out = await collect({ _: ['trips-map-1'], flags: {} }, c);
   assert.deepEqual(out, { id: 'trips-map-1', got: 2, of: 2, missed: [], text: {} });
   assert.ok(existsSync(join(root, '.own-it', 'answers', 'trips-map-1.json')));
+});
+
+test('malformed request target gets 400 and server stays up', () => withServer(async (s) => {
+  const reply = await new Promise((ok, fail) => {
+    const sock = net.connect(s.port, '127.0.0.1', () => sock.write(`GET //[ HTTP/1.1\r\nHost: 127.0.0.1:${s.port}\r\nConnection: close\r\n\r\n`));
+    let buf = '';
+    sock.on('data', (d) => { buf += d; });
+    sock.on('close', () => ok(buf));
+    sock.on('error', fail);
+  });
+  assert.match(reply, /^HTTP\/1\.1 400/);
+  assert.equal((await req(s, { path: '/game.html' })).status, 200);
+}));
+
+test('garbage on the socket gets 400 via clientError and server stays up', () => withServer(async (s) => {
+  const reply = await new Promise((ok) => {
+    const sock = net.connect(s.port, '127.0.0.1', () => sock.write('\x01\x02 not http\r\n\r\n'));
+    let buf = '';
+    sock.on('data', (d) => { buf += d; });
+    sock.on('close', () => ok(buf));
+    sock.on('error', () => ok(buf));
+  });
+  assert.match(reply, /^HTTP\/1\.1 400/);
+  assert.equal((await req(s, { path: '/game.html' })).status, 200);
+}));
+
+test('inbox write failure gives 500 and server stays up', () => withServer(async (s, root) => {
+  writeFileSync(join(root, '.own-it', 'inbox'), 'i am a file');
+  assert.equal((await post(s, '{"type":"pick"}')).status, 500);
+  assert.equal((await req(s, { path: '/game.html' })).status, 200);
+}));
+
+test('hidden names are blocked case-insensitively and only allowlisted paths serve', () => withServer(async (s, root) => {
+  mkdirSync(join(root, '.own-it', 'inbox'), { recursive: true });
+  writeFileSync(join(root, '.own-it', 'inbox', 'x.json'), '{}');
+  writeFileSync(join(root, '.own-it', 'session.json'), '{}');
+  for (const p of ['/SERVE.JSON', '/Serve.Json', '/Inbox/x.json', '/inbox/x.json', '/session.json']) {
+    assert.equal((await req(s, { path: p })).status, 404, p);
+  }
+  assert.equal((await req(s, { path: '/data/trips.js' })).status, 200);
+}));
+
+test('cross-site Sec-Fetch-Site is rejected', () => withServer(async (s) => {
+  for (const v of ['cross-site', 'same-site']) {
+    assert.equal((await req(s, { path: '/game.html', headers: { 'Sec-Fetch-Site': v } })).status, 403, v);
+  }
+  assert.equal((await req(s, { path: '/game.html', headers: { 'Sec-Fetch-Site': 'same-origin' } })).status, 200);
+  assert.equal((await req(s, { path: '/game.html', headers: { 'Sec-Fetch-Site': 'none' } })).status, 200);
+}));
+
+test('stop does not kill an unrelated pid when serve.json is stale', async () => {
+  const { root, c } = setup();
+  const victim = spawn(process.execPath, ['-e', 'setTimeout(()=>{},30000)'], { stdio: 'ignore' });
+  try {
+    writeJson(join(root, '.own-it', 'serve.json'), { port: 1, pid: victim.pid, token: 'abc', startedAt: 'x' });
+    assert.deepEqual(await stop({ _: [], flags: {} }, c), { stopped: true, stale: true });
+    assert.equal(existsSync(join(root, '.own-it', 'serve.json')), false);
+    assert.doesNotThrow(() => process.kill(victim.pid, 0));
+  } finally { victim.kill(); }
+});
+
+test('stop on live instance verifies and reports stopped without stale', async () => {
+  const { root, c } = setup();
+  const s = await startServer(c, { port: 0 });
+  try {
+    assert.deepEqual(await stop({ _: [], flags: {} }, c), { stopped: true });
+    assert.equal(existsSync(join(root, '.own-it', 'serve.json')), false);
+  } finally { await s.close(); }
+});
+
+test('close leaves a serve.json that belongs to another instance', async () => {
+  const { root, c } = setup();
+  const s = await startServer(c, { port: 0 });
+  writeJson(join(root, '.own-it', 'serve.json'), { port: 1, pid: 1, token: 'other', startedAt: 'x' });
+  await s.close();
+  assert.equal(JSON.parse(readFileSync(join(root, '.own-it', 'serve.json'), 'utf8')).token, 'other');
+});
+
+test('wait ignores tmp files and retries unparsable ones', async () => {
+  const { root, c } = setup();
+  const inbox = join(root, '.own-it', 'inbox');
+  mkdirSync(inbox, { recursive: true });
+  writeFileSync(join(inbox, '1-pick.json.tmp'), '{"type":"pick"}');
+  writeFileSync(join(inbox, '2-pick.json'), '{"type":"pi');
+  assert.deepEqual(await wait({ _: [], flags: { timeout: '0' } }, c), { idle: true });
+  assert.equal(existsSync(join(inbox, '.seen')), false);
+  writeFileSync(join(inbox, '2-pick.json'), '{"type":"pick"}');
+  assert.deepEqual(await wait({ _: [], flags: { timeout: '0' } }, c), { type: 'pick', file: '2-pick.json' });
+});
+
+test('wait marks a persistently unparsable file seen as invalid', async () => {
+  const { root, c } = setup();
+  const inbox = join(root, '.own-it', 'inbox');
+  mkdirSync(inbox, { recursive: true });
+  writeFileSync(join(inbox, '2-pick.json'), 'garbage');
+  const out = await wait({ _: [], flags: { timeout: '3' } }, { ...c, invalidAfterMs: 400 });
+  assert.deepEqual(out, { type: 'invalid', file: '2-pick.json' });
+});
+
+function collectSetup() {
+  const { root, c } = setup();
+  writeJson(join(root, '.own-it', 'progress.json'), { version: 1, settings: { downloadDir: null }, zones: {}, tokens: [] });
+  writeJson(join(root, '.own-it', 'session.json'), { session: '2026-10-13T16:00:00.000Z', mode: 'practice',
+    missions: { 'trips-map-1': { zone: 'trips', rung: 'map', board: 'component', cardIds: [] } } });
+  const inbox = join(root, '.own-it', 'inbox');
+  mkdirSync(inbox, { recursive: true });
+  return { root, c, inbox };
+}
+const answer = (got, at) => ({ id: 'trips-map-1', submittedAt: at, got, of: 2, missed: [], text: {}, hintsUsed: 0 });
+
+test('collect skips stale inbox result and uses Downloads', async () => {
+  const { c, inbox } = collectSetup();
+  const dl = mkdtempSync(join(tmpdir(), 'ownit-dl-'));
+  writeFileSync(join(inbox, '2000-result.json'), JSON.stringify({ type: 'result', ...answer(0, '2020-01-01T00:00:00.000Z') }));
+  writeFileSync(join(dl, 'own-it-trips-map-1.json'), JSON.stringify(answer(2, '2026-10-13T16:05:00.000Z')));
+  const out = await collect({ _: ['trips-map-1'], flags: {} }, { ...c, env: { OWNIT_DOWNLOADS: dl } });
+  assert.equal(out.got, 2);
+});
+
+test('collect falls back to an older valid inbox result', async () => {
+  const { c, inbox } = collectSetup();
+  writeFileSync(join(inbox, '1000-result.json'), JSON.stringify({ type: 'result', ...answer(1, '2026-10-13T16:05:00.000Z') }));
+  writeFileSync(join(inbox, '2000-result.json'), JSON.stringify({ type: 'result', id: 'trips-map-1', bogus: true }));
+  writeFileSync(join(inbox, '3000-result.json'), JSON.stringify({ type: 'result', ...answer(0, '2020-01-01T00:00:00.000Z') }));
+  assert.equal((await collect({ _: ['trips-map-1'], flags: {} }, c)).got, 1);
 });
