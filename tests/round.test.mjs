@@ -5,9 +5,11 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 import { run as init } from '../own-it/scripts/lib/cmd-init.mjs';
 import { run as build } from '../own-it/scripts/lib/cmd-build-round.mjs';
+import { run as collect } from '../own-it/scripts/lib/cmd-collect.mjs';
+import { run as buildMissions } from '../own-it/scripts/lib/cmd-build-missions.mjs';
 import { run as apply } from '../own-it/scripts/lib/cmd-apply.mjs';
 import { loadModel, saveModel } from '../own-it/scripts/lib/model.mjs';
-import { loadProgress } from '../own-it/scripts/lib/progress.mjs';
+import { loadProgress, saveProgress } from '../own-it/scripts/lib/progress.mjs';
 import { readJson, writeJson } from '../own-it/scripts/lib/json.mjs';
 import core from '../own-it/scripts/lib/core.mjs';
 import { tmpProject, ctx } from './helpers.mjs';
@@ -21,8 +23,8 @@ async function setup() {
   m.zones.trips.items = [
     I({ id: 's1', k: 'surface', label: 'Trip screen' }),
     I({ id: 's2', k: 'surface', label: 'Approvals' }),
-    I({ id: 'el1', k: 'element', on: 's1', does: 'Cancel a trip', goes: 's2' }),
-    I({ id: 'el2', k: 'element', on: 's2', does: 'Approve the refund', goes: 's1' }),
+    I({ id: 'el1', k: 'element', on: 's1', does: 'f1', goes: 's2' }),
+    I({ id: 'el2', k: 'element', on: 's2', does: 'f1', goes: 's1' }),
     I({ id: 'e1', k: 'edge', from: 's1', to: 's2' }),
     I({ id: 'f1', k: 'flow', label: 'cancel', steps: [['s1'], ['s2']] }),
   ];
@@ -53,7 +55,7 @@ test('quiz round obfuscates answers', async () => {
   assert.equal(typeof r.questions[0].answer, 'string');
   assert.equal(core.decode(r.questions[2].answer), 2);
   assert.equal(r.game, 'quiz');
-  assert.deepEqual(readJson(join(root, '.own-it', 'session.json')).round, { id: 'trips-quiz-1', game: 'quiz', zone: 'trips', rung: 'words' });
+  assert.deepEqual(readJson(join(root, '.own-it', 'session.json')).rounds['trips-quiz-1'], { game: 'quiz', zone: 'trips', rung: 'words', mode: 'practice', cardIds: [] });
   assert.equal(loadProgress(root).seq, 1);
 });
 
@@ -93,7 +95,7 @@ test('quests fills expected path from element.does', async () => {
   const r = loadRound(root, out.id);
   assert.equal(r.rung, 'trace');
   const path = core.decode(r.answer);
-  assert.deepEqual(path.map((p) => p.does), ['Cancel a trip', 'Approve the refund']);
+  assert.deepEqual(path.map((p) => p.does), ['f1', 'f1']);
   assert.deepEqual(path.map((p) => p.element), ['el1', 'el2']);
 });
 
@@ -141,9 +143,77 @@ test('apply teach-back style rung none gives only curiosity xp', async () => {
   assert.ok(readdirSync(gd).includes('teach-back.meta.json'));
   const sp = join(root, '.own-it', 'session.json');
   writeJson(sp, { session: '2026-10-13T16:00:00.000Z', mode: 'practice', missions: {},
-    round: { id: 'trips-teach-back-1', game: 'teach-back', zone: 'trips', rung: 'none' } });
+    rounds: { 'trips-teach-back-1': { game: 'teach-back', zone: 'trips', rung: 'none', mode: 'practice', cardIds: [] } } });
   answered(root, 'trips-teach-back-1', { got: 1, of: 1 });
   const out = await apply({ _: ['trips-teach-back-1'], flags: { curiosity: '2' } }, ctx(root));
   assert.equal(out.xp, 10);
+  answered(root, 'trips-teach-back-1', { got: 1, of: 1 });
   assert.deepEqual(out.cleared, []);
+});
+
+test('two rounds coexist; collect and apply the first', async () => {
+  const root = await setup();
+  const a = await bld(root, 'quiz', quiz());
+  await bld(root, 'quiz', quiz({ mode: 'exam' }));
+  const sj = readJson(join(root, '.own-it', 'session.json'));
+  assert.deepEqual(Object.keys(sj.rounds), [a.id, 'trips-quiz-2']);
+  assert.equal(sj.rounds['trips-quiz-2'].mode, 'exam');
+  assert.equal(sj.mode, 'practice');
+  writeJson(join(root, '.own-it', 'inbox', '1-result.json'), { type: 'result', id: a.id, submittedAt: '2026-10-13T16:30:00.000Z', got: 5, of: 5, missed: [], text: {}, hintsUsed: 0 });
+  const col = await collect({ _: [a.id], flags: {} }, ctx(root));
+  assert.equal(col.got, 5);
+  const out = await apply({ _: [a.id], flags: {} }, ctx(root));
+  assert.deepEqual(out.cleared, ['words']);
+});
+
+test('build-missions preserves rounds', async () => {
+  const root = await setup();
+  await bld(root, 'quiz', quiz());
+  writeFileSync(join(root, 'r.json'), JSON.stringify({ mode: 'practice', missions: [{ zone: 'trips', rung: 'map', board: 'component', brief: 'b', cards: ['s1', 's2'] }] }));
+  await buildMissions({ _: [join(root, 'r.json')], flags: {} }, ctx(root));
+  assert.ok(readJson(join(root, '.own-it', 'session.json')).rounds['trips-quiz-1']);
+});
+
+const tour = (over = {}) => ({ zone: 'trips', screen: 's1', steps: [{ kind: 'find', prompt: 'Which control cancels?', element: 'el1', choices: ['el1', 'el2'], answer: 'el1' }], ...over });
+
+test('screen-tour pass counts its surfaces for map', async () => {
+  const root = await setup();
+  const p = loadProgress(root);
+  p.zones.trips.rungs.words = 'cleared'; p.zones.trips.rungs.map = 'open';
+  saveProgress(root, p);
+  const t = await bld(root, 'screen-tour', tour());
+  assert.deepEqual(readJson(join(root, '.own-it', 'session.json')).rounds[t.id].cardIds, ['s1']);
+  answered(root, t.id, { got: 1, of: 1 });
+  await apply({ _: [t.id], flags: {} }, ctx(root));
+  assert.deepEqual(loadProgress(root).zones.trips.surfacesCovered, ['s1']);
+});
+
+test('answer must be one of the choices; role choices obey identifier ban', async () => {
+  const root = await setup();
+  const bad = tour(); bad.steps[0].answer = 'zzz';
+  await assert.rejects(bld(root, 'screen-tour', bad), /answer is not one of the choices in steps\[0\]/);
+  const role = tour({ steps: [{ kind: 'role', prompt: 'Who?', choices: ['driver_role', 'Manager'], answer: 'Manager' }] });
+  await assert.rejects(bld(root, 'screen-tour', role), /identifier-only answer in steps\[0\]\.choices\[0\]; use the name a person would say/);
+  await assert.rejects(bld(root, 'guess-the-screen', { zone: 'trips', screens: [1, 2, 3].map(() => ({ screen: 's1', choices: ['s1', 's2', 'ghost', 'x'], answer: 's1' })) }), /ids not in zone "trips": ghost, x/);
+  await assert.rejects(bld(root, 'quiz', quiz({ questions: quiz().questions.map((q) => ({ ...q, answer: 4 })) })), /above 3/);
+});
+
+test('quests objectives must be non-duplicate elements of the flow', async () => {
+  const root = await setup();
+  const m = loadModel(root);
+  m.zones.trips.items.push(I({ id: 'el9', k: 'element', on: 's1', does: 'e1' }));
+  saveModel(root, m);
+  const q = (objectives) => bld(root, 'quests', { zone: 'trips', flow: 'f1', goal: 'g', start: 's1', objectives });
+  await assert.rejects(q([{ text: 'a', element: 'el1' }, { text: 'b', element: 'el9' }]), /element "el9" does not belong to flow "f1"/);
+  await assert.rejects(q([{ text: 'a', element: 'el1' }, { text: 'b', element: 'el1' }]), /duplicate objective element "el1"/);
+  await assert.rejects(q([{ text: 'a', element: 'el1' }, { text: 'b', element: 's2' }]), /objective "s2" is not an element/);
+});
+
+test('rung none ignores text grades, challenges and hints', async () => {
+  const root = await setup();
+  writeJson(join(root, '.own-it', 'session.json'), { session: '2026-10-13T16:00:00.000Z', mode: 'practice', missions: {},
+    rounds: { 'trips-teach-back-1': { game: 'teach-back', zone: 'trips', rung: 'none', mode: 'practice', cardIds: [] } } });
+  answered(root, 'trips-teach-back-1', { got: 1, of: 1, text: { t: 'solid' }, hintsUsed: 2 });
+  const out = await apply({ _: ['trips-teach-back-1'], flags: { text: '{"t":"solid"}', curiosity: '1', 'challenge-won': '2' } }, ctx(root));
+  assert.equal(out.xp, 5);
 });

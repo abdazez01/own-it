@@ -81,9 +81,9 @@ function resolveMission(root, id, model, f) {
   const sessionPath = ownItPath(root, 'session.json');
   const session = readJson(sessionPath, { mode: 'practice', missions: {} });
   const missions = session.missions || {};
-  const round = session.round && session.round.id === id ? session.round : null;
+  const round = Object.hasOwn(session.rounds || {}, id) ? session.rounds[id] : null;
   if (round || Object.hasOwn(missions, id)) {
-    const meta = round ? { zone: round.zone, rung: round.rung, game: round.game, cardIds: [], threatIds: [] } : missions[id];
+    const meta = round ? { threatIds: [], ...round } : missions[id];
     if (!RUNGS.includes(meta.rung) && !(round && meta.rung === 'none')) throw new Error(`invalid rung "${meta.rung}" for mission "${id}"`);
     if (!Object.hasOwn(model.zones, meta.zone)) throw new Error(`unknown zone "${meta.zone}" for mission "${id}"`);
     if (f.score && meta.rung !== 'map') throw new Error('--got/--of only apply to words and map missions');
@@ -109,7 +109,7 @@ function resolveMission(root, id, model, f) {
     }
     const got = f.score ? f.score.got : answer.got;
     const of = f.score ? f.score.of : answer.of;
-    return { zone: meta.zone, rung: meta.rung, game: meta.game ?? null, session: session.session ?? null, mode: session.mode || 'practice', refresh: meta.refresh === true,
+    return { zone: meta.zone, rung: meta.rung, game: meta.game ?? null, session: session.session ?? null, mode: meta.mode || session.mode || 'practice', refresh: meta.refresh === true,
       cardIds: [...(meta.cardIds || []), ...(meta.threatIds || [])], got, of,
       missed: meta.rung === 'none' ? [] : answer.missed, wrong: Array.isArray(answer.wrong) ? answer.wrong : [], answered,
       hintsUsed: answer.hintsUsed, answerText, meta };
@@ -144,8 +144,9 @@ export async function run(args, ctx) {
   const ratio = m.of ? m.got / m.of : 0;
   const teachBack = m.rung === 'none'; // no ladder rung: only Curiosity XP counts
   const passed = !teachBack && ratio >= PASS;
-  let xp = missionXp({ got: teachBack ? 0 : m.got, text: f.text, curiosity: f.curiosity, challengesWon: f.challengesWon,
-    hintsUsed: m.hintsUsed, mode: m.mode });
+  let xp = teachBack ? missionXp({ curiosity: f.curiosity, mode: m.mode })
+    : missionXp({ got: m.got, text: f.text, curiosity: f.curiosity, challengesWon: f.challengesWon,
+      hintsUsed: m.hintsUsed, mode: m.mode });
   if (m.game === 'quests') {
     xp = Math.max(0, xp - XP.wrongTurn * m.wrong.length);
     if (m.got === m.of && m.of > 0 && m.wrong.length === 0) xp += XP.cleanRun;

@@ -49,7 +49,7 @@ export async function run(args, ctx) {
   if (!arg) throw new Error('usage: collect <missionId> | collect OWNIT:<base64>');
   const session = readJson(ownItPath(ctx.root, 'session.json'));
   const missionKnown = (id) => {
-    if (!Object.hasOwn(session.missions || {}, id) && session.round?.id !== id) throw new Error(`unknown mission "${id}" in current session`);
+    if (!Object.hasOwn(session.missions || {}, id) && !Object.hasOwn(session.rounds || {}, id)) throw new Error(`unknown mission "${id}" in current session`);
   };
 
   let answer, source = null, wanted = arg;

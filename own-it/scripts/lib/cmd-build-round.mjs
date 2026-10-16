@@ -16,8 +16,8 @@ const ANSWERED = { quiz: 'questions', 'screen-tour': 'steps', 'guess-the-screen'
 const IDS = {
   quiz: () => [],
   'boss-battle': () => [],
-  'screen-tour': (r) => [r.screen, ...r.steps.map((s) => s.element)],
-  'guess-the-screen': (r) => r.screens.map((s) => s.screen),
+  'screen-tour': (r) => [r.screen, ...r.steps.map((s) => s.element), ...r.steps.filter((s) => s.kind !== 'role').flatMap((s) => s.choices || [])],
+  'guess-the-screen': (r) => r.screens.flatMap((s) => [s.screen, ...s.choices]),
   quests: (r) => [r.flow, r.start, ...r.objectives.map((o) => o.element)],
   whiteboard: (r) => r.cards,
 };
@@ -31,6 +31,44 @@ function identifierOnly(text) {
   const bare = t.replace(/[.,;:!?]+$/, '');
   if (!bare || /\s/.test(bare)) return false;
   return /[_/.]/.test(bare) || /[a-z][A-Z]/.test(bare);
+}
+
+const HINT = 'use the name a person would say';
+
+// Player-facing lists: answers must be one of the choices; free-text choices obey the identifier-only ban.
+function checkChoices(game, input, byId) {
+  const lists = game === 'screen-tour' ? ['steps', input.steps] : game === 'guess-the-screen' ? ['screens', input.screens] : null;
+  if (!lists) return;
+  lists[1].forEach((e, i) => {
+    const choices = e.choices || [];
+    const free = game === 'screen-tour' && e.kind === 'role';
+    choices.forEach((c, j) => {
+      if (!byId.has(c) && free && identifierOnly(c)) throw new Error(`identifier-only answer in ${lists[0]}[${i}].choices[${j}]; ${HINT}`);
+    });
+    if (choices.length && !choices.includes(e.answer)) throw new Error(`answer is not one of the choices in ${lists[0]}[${i}]`);
+  });
+}
+
+// Quest objectives are elements of the quest's flow, each used once.
+function checkQuest(input, byId) {
+  const flow = byId.get(input.flow);
+  if (flow.k !== 'flow') throw new Error(`"${input.flow}" is not a flow`);
+  const seen = new Set();
+  for (const o of input.objectives) {
+    const it = byId.get(o.element);
+    if (it.k !== 'element') throw new Error(`objective "${o.element}" is not an element`);
+    if (it.does !== input.flow) throw new Error(`element "${o.element}" does not belong to flow "${input.flow}"`);
+    if (seen.has(o.element)) throw new Error(`duplicate objective element "${o.element}"`);
+    seen.add(o.element);
+  }
+}
+
+// Surface ids a round shows, so a map-rung pass counts toward coverage.
+function shownCards(game, input, byId) {
+  const ids = game === 'screen-tour' ? [input.screen, ...input.steps.map((s) => s.element && byId.get(s.element)?.on)]
+    : game === 'guess-the-screen' ? input.screens.map((s) => s.screen)
+      : game === 'whiteboard' ? input.cards : [];
+  return [...new Set(ids.filter((x) => typeof x === 'string' && byId.has(x)))];
 }
 
 // Replaces every `answer` / `answers` field (at any depth) with its obfuscated form.
@@ -96,6 +134,8 @@ export async function run(args, ctx) {
   const foreign = named.filter((x) => !byId.has(x));
   if (foreign.length) throw new Error(`ids not in zone "${input.zone}": ${foreign.join(', ')}`);
 
+  checkChoices(game, input, byId);
+  if (game === 'quests') checkQuest(input, byId);
   const progress = loadProgress(ctx.root);
   const id = `${input.zone}-${game}-${progress.seq + 1}`;
   const round = { ...input };
@@ -105,8 +145,8 @@ export async function run(args, ctx) {
   // All validation done; write.
   const sessionPath = ownItPath(ctx.root, 'session.json');
   const session = readJson(sessionPath, { session: ctx.now().toISOString(), mode: 'practice', missions: {} });
-  if (input.mode) session.mode = input.mode;
-  session.round = { id, game, zone: input.zone, rung: meta.rung };
+  session.rounds = { ...(session.rounds || {}), [id]: { game, zone: input.zone, rung: meta.rung,
+    mode: input.mode || session.mode || 'practice', cardIds: shownCards(game, input, byId) } };
   const dataJs = ownItPath(ctx.root, 'data', `${id}.js`);
   writeJsVar(dataJs, 'OWNIT_ROUND', data);
   writeJson(sessionPath, session);

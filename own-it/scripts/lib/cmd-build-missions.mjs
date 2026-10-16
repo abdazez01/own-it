@@ -4,7 +4,7 @@ import { check, RECIPE } from './validate.mjs';
 import { loadModel } from './model.mjs';
 import { loadProgress, saveProgress, defaultZoneProgress, RUNGS } from './progress.mjs';
 import core from './core.mjs';
-import { writeJson, writeJsVar } from './json.mjs';
+import { readJson, writeJson, writeJsVar } from './json.mjs';
 import { ownItPath, toPosix } from './paths.mjs';
 import { estimate } from './tokens.mjs';
 
@@ -169,10 +169,11 @@ export async function run(args, ctx) {
   // All validation done; write.
   const session = ctx.now().toISOString();
   const missionIds = built.map((b) => b.mission.id);
+  const prev = readJson(ownItPath(ctx.root, 'session.json'), {});
   const out = { session, mode: recipe.mode, root: toPosix(resolve(ctx.root)), missions: built.map((b) => b.mission) };
   const missionJs = ownItPath(ctx.root, 'mission.js');
   writeJsVar(missionJs, 'OWNIT_MISSIONS', out);
-  writeJson(ownItPath(ctx.root, 'session.json'), { session, mode: recipe.mode,
+  writeJson(ownItPath(ctx.root, 'session.json'), { session, mode: recipe.mode, rounds: prev.rounds || {},
     missions: Object.fromEntries(built.map((b) => [b.mission.id, b.meta])) });
   progress.seq += built.length;
   saveProgress(ctx.root, progress);
