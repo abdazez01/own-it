@@ -1,0 +1,339 @@
+/* own-it engine components. Requires tokens.css. Spec: frontend design sections 2 and 5 to 6.
+   Animations touch only transform and opacity (plus the flap hinge filter). */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { color-scheme: dark; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; background: var(--night); color: var(--ink);
+  font: 400 var(--fs-15)/var(--lh-body) var(--f-ui);
+  font-variant-numeric: tabular-nums; overflow-x: hidden;
+}
+h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { font-weight: 600; line-height: var(--lh-display); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+code, .code { font-family: var(--f-code); font-size: .92em; }
+img, svg, canvas, iframe { max-width: 100%; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+/* Layout shell */
+.wrap {
+  position: relative; z-index: var(--z-content);
+  width: var(--content); margin: 0 auto; padding-block: var(--s-6) var(--s-12);
+  display: grid; gap: var(--s-5);
+}
+@media (min-width: 1600px) { .wrap { width: min(1440px, 100% - 64px); } }
+.prose { max-width: 65ch; }
+
+/* 5.2 Glass panel (glass-1) with sheen */
+.panel {
+  position: relative; overflow: hidden; padding: var(--s-5);
+  background: var(--glass); border: 1px solid var(--edge); border-radius: var(--r-panel);
+  -webkit-backdrop-filter: var(--bf-1); backdrop-filter: var(--bf-1);
+  box-shadow: var(--hi-1);
+}
+.panel::before {
+  content: ""; position: absolute; inset: -40% -60%; pointer-events: none;
+  background: linear-gradient(105deg, transparent 42%, var(--sheen) 50%, transparent 58%);
+  transform: translateX(-60%);
+  animation: sheen var(--t-sheen) ease-in-out infinite;
+}
+.panel:nth-of-type(3n+2)::before { animation-delay: -3s; }
+.panel:nth-of-type(3n+3)::before { animation-delay: -6s; }
+@keyframes sheen { 0%, 60% { transform: translateX(-60%); } 100% { transform: translateX(60%); } }
+.panel > h2, .panel > h3, .panel-title {
+  margin-bottom: var(--s-3); font: 600 var(--fs-13)/var(--lh-display) var(--f-ui); color: var(--ink-2);
+}
+
+/* glass-2: raised surface for hover and dialogs */
+.glass-2 {
+  background: var(--glass-hi); border: 1px solid var(--edge);
+  -webkit-backdrop-filter: var(--bf-2); backdrop-filter: var(--bf-2);
+  box-shadow: var(--hi-2), var(--shadow-2);
+}
+
+/* Inset well: one level inside a panel */
+.well {
+  background: var(--glass-deep); border-radius: var(--r-inset); padding: var(--s-3) var(--s-4);
+}
+
+/* 5.1 Flap tiles. Real text lives in aria-label on .flap; tiles are aria-hidden. */
+.flap { display: inline-flex; gap: 3px; font-size: var(--flap-size); vertical-align: middle; }
+.flap.lg { font-size: var(--flap-size-lg); }
+.flap-tile {
+  position: relative; display: grid; place-items: center; overflow: hidden;
+  width: 1.25em; height: 1.7em; border-radius: var(--r-flap);
+  background: var(--tile); color: var(--ink);
+  font: 600 1em/1 var(--f-flap); font-variant-numeric: tabular-nums;
+}
+.flap.lg .flap-tile { border-radius: var(--r-flap-lg); }
+.flap-tile::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--hinge);
+}
+.flap-tile.accent { background: var(--gold); color: var(--gold-ink); }
+.flap-tile.ok { background: var(--sage); color: var(--sage-ink); }
+.flap-tile.alert { background: var(--salmon); color: var(--gold-ink); }
+.flap-tile.flip { animation: flap-flip var(--t-flap) var(--ease-flap); }
+@keyframes flap-flip {
+  0% { transform: rotateX(0); filter: brightness(1); }
+  45% { transform: rotateX(88deg); filter: brightness(.5); }
+  100% { transform: rotateX(0); filter: brightness(1); }
+}
+.flap-label { display: grid; gap: 2px; font-size: var(--fs-12); color: var(--ink-2); }
+
+/* 5.3 Liquid toggle / segmented control */
+.toggle {
+  position: relative; isolation: isolate; display: inline-flex; padding: 4px;
+  background: var(--track); border: 1px solid var(--edge); border-radius: var(--r-pill);
+}
+.toggle button {
+  position: relative; z-index: 1; min-height: 36px; padding: 0 16px;
+  background: none; border: 0; border-radius: var(--r-pill); cursor: pointer;
+  font: 600 var(--fs-13) var(--f-ui); color: var(--ink-2); transition: color 300ms;
+}
+.toggle button[aria-checked="true"], .toggle button[aria-pressed="true"] { color: var(--ink); }
+.toggle-bubble {
+  position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: 0;
+  border-radius: var(--r-pill); background: var(--bubble-fill); box-shadow: var(--bubble-shadow);
+  -webkit-backdrop-filter: var(--bf-bubble); backdrop-filter: var(--bf-bubble);
+  transition: left var(--t-toggle) var(--ease-spring), width var(--t-toggle) var(--ease-spring);
+  will-change: transform;
+}
+.toggle-bubble.moving { animation: goo var(--t-toggle) var(--ease-flap); }
+@keyframes goo {
+  0% { transform: scale(1, 1); } 30% { transform: scale(1.18, .82); }
+  60% { transform: scale(.94, 1.06); } 100% { transform: scale(1, 1); }
+}
+
+/* Icon buttons (music, sound, help) */
+.icon-btn {
+  position: relative; overflow: hidden; display: grid; place-items: center;
+  width: 40px; height: 40px; padding: 0; cursor: pointer;
+  background: var(--track); border: 1px solid var(--edge); border-radius: 12px; color: var(--ink);
+  transition: background var(--t-hover), box-shadow var(--t-hover);
+}
+.icon-btn[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--gold); background: rgba(232,194,106,.14); }
+
+/* 5.6 Buttons */
+.btn {
+  position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center;
+  height: 40px; padding: 0 18px; border: 1px solid transparent; border-radius: var(--r-pill);
+  font: 600 var(--fs-15) var(--f-ui); white-space: nowrap; cursor: pointer; text-decoration: none;
+  transition: transform var(--t-press), box-shadow var(--t-hover), background var(--t-hover);
+}
+.btn-primary { background: var(--gold); color: var(--gold-ink); }
+.btn-primary:hover { box-shadow: 0 8px 24px -10px var(--gold-glow); }
+.btn-secondary { background: var(--glass); border-color: var(--edge); color: var(--ink); box-shadow: var(--hi-1); }
+.btn-secondary:hover { background: var(--glass-hi); }
+.btn-quiet { background: none; color: var(--ink); padding: 0 8px; }
+.btn-quiet:hover { text-decoration: underline; text-underline-offset: 3px; }
+.btn[disabled], .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: auto; }
+.btn[disabled]:hover { box-shadow: none; text-decoration: none; }
+
+/* Shared press feel */
+.btn:active, .icon-btn:active, .toggle button:active, .card-rec:active, .tile-game:active {
+  transform: scale(.965); transition: transform var(--t-press);
+}
+.ripple {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(232,194,106,.45), rgba(232,194,106,0) 70%);
+  transform: translate(-50%, -50%) scale(0); animation: ripple 500ms ease-out forwards;
+}
+@keyframes ripple { to { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
+
+/* 5.7 Recommended card */
+.recs { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); }
+.card-rec {
+  position: relative; overflow: hidden; display: grid; gap: var(--s-3); align-content: start;
+  width: 100%; padding: var(--s-4); text-align: left; cursor: pointer;
+  background: var(--glass-deep); border: 1px solid var(--edge); border-radius: var(--r-card); color: var(--ink);
+  transition: transform var(--t-hover) var(--ease-out), border-color var(--t-hover), box-shadow var(--t-hover);
+}
+.card-rec:hover, .card-rec:focus-visible {
+  transform: translateY(-2px); border-color: rgba(232,194,106,.6);
+  box-shadow: 0 0 0 1px var(--gold-glow), 0 10px 30px -12px rgba(232,194,106,.35);
+}
+.card-rec .top { display: flex; align-items: center; gap: var(--s-3); }
+.card-rec .title { font: 600 var(--fs-17)/var(--lh-display) var(--f-ui); }
+.card-rec .reason { color: var(--ink-2); font-size: var(--fs-15); }
+.logo-tile {
+  position: relative; display: grid; place-items: center; flex: none; width: 44px; height: 44px;
+  border-radius: var(--r-flap-lg); background: var(--tile); color: var(--ink);
+}
+.logo-tile::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--hinge); }
+.logo-tile svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 5.8 Library tile */
+.lib { display: grid; gap: var(--s-3); grid-template-columns: repeat(auto-fill, minmax(min(176px, 100%), 1fr)); }
+.tile-game {
+  position: relative; overflow: hidden; display: grid; gap: var(--s-2); align-content: start;
+  width: 100%; min-height: var(--hit); padding: 14px; text-align: left; cursor: pointer;
+  background: var(--glass-deep); border: 1px solid var(--edge); border-radius: var(--r-card); color: var(--ink);
+  transition: background var(--t-hover), box-shadow var(--t-hover), border-color var(--t-hover);
+}
+.tile-game:hover, .tile-game:focus-visible {
+  background: var(--glass-hi); box-shadow: 0 0 0 1px var(--gold-glow), 0 10px 30px -12px rgba(232,194,106,.35);
+}
+.tile-game .name { font: 600 var(--fs-15) var(--f-ui); }
+.tile-game .what { color: var(--ink-2); font-size: var(--fs-13); }
+.tile-game .meta { display: flex; justify-content: space-between; gap: var(--s-2); color: var(--ink-2); font: 500 var(--fs-12) var(--f-flap); }
+
+/* Chips */
+.chip {
+  display: inline-flex; align-items: center; justify-self: start; min-height: 24px; padding: 2px 8px;
+  border-radius: var(--r-inset); background: rgba(232,194,106,.16); color: var(--gold);
+  font: 600 var(--fs-12) var(--f-flap); letter-spacing: .04em; white-space: nowrap;
+}
+.chip.ok { background: rgba(143,211,168,.16); color: var(--sage); }
+.chip.alert { background: rgba(240,138,122,.16); color: var(--salmon); }
+
+/* 5.9 Departures board */
+.board { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.board-table, .board-grid { min-width: 640px; }
+.board-row {
+  display: grid; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2);
+  grid-template-columns: minmax(120px, 1.2fr) auto minmax(140px, 1.4fr) minmax(130px, 1fr);
+  padding: var(--s-3) var(--s-4); background: var(--glass-deep); border-radius: var(--r-inset);
+  color: var(--ink); text-align: left; width: 100%; border: 0; min-height: var(--hit);
+}
+button.board-row, a.board-row { cursor: pointer; transition: background var(--t-hover); }
+button.board-row:hover, a.board-row:hover { background: var(--glass-hi); }
+.board-head { color: var(--ink-2); font: 600 var(--fs-12) var(--f-ui); background: none; min-height: 0; padding-block: 0; }
+.rungs { display: inline-flex; gap: 4px; }
+.rung-cell {
+  position: relative; display: grid; place-items: center; width: 22px; height: 28px;
+  border-radius: 4px; background: var(--tile); opacity: .6;
+  font: 600 var(--fs-12) var(--f-flap); color: var(--ink-2);
+}
+.rung-cell.c { background: var(--sage); color: var(--sage-ink); opacity: 1; }
+.rung-cell.o { color: var(--ink); box-shadow: inset 0 0 0 1px var(--gold); opacity: 1; }
+.status-ok { color: var(--sage); } .status-fog { color: var(--salmon); } .status-go { color: var(--gold); }
+
+/* 5.10 Header (sticky glass-1, height <= 72px) */
+.header {
+  position: sticky; top: 0; z-index: var(--z-header);
+  display: flex; align-items: center; gap: var(--s-4); min-height: 56px; max-height: 72px;
+  padding: 8px var(--s-5); background: var(--glass); border-bottom: 1px solid var(--edge);
+  -webkit-backdrop-filter: var(--bf-1); backdrop-filter: var(--bf-1); box-shadow: var(--hi-1);
+}
+.header .grow { flex: 1; }
+.header-tools { display: flex; align-items: center; gap: var(--s-3); }
+.header .menu-btn { display: none; }
+@media (max-width: 639.98px) {
+  .header { padding-inline: var(--s-4); gap: var(--s-3); max-height: none; flex-wrap: wrap; }
+  .header .menu-btn { display: grid; }
+  .header .hide-sm { display: none; }
+  .header-tools { display: none; width: 100%; flex-wrap: wrap; padding-bottom: var(--s-2); }
+  .header[data-open="true"] .header-tools { display: flex; }
+}
+
+/* 5.11 Dialog and scrim */
+.scrim {
+  position: fixed; inset: 0; z-index: var(--z-dialog); display: grid; place-items: center;
+  padding: var(--s-4); background: var(--scrim); overflow-y: auto;
+}
+.dialog {
+  width: min(520px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: var(--s-6);
+  border-radius: var(--r-card); color: var(--ink);
+  background: var(--glass-hi); border: 1px solid var(--edge);
+  -webkit-backdrop-filter: var(--bf-2); backdrop-filter: var(--bf-2);
+  box-shadow: var(--hi-2), var(--shadow-2);
+  animation: dialog-in 260ms var(--ease-out);
+}
+.dialog > * + * { margin-top: var(--s-4); }
+.dialog .actions { display: flex; flex-wrap: wrap; gap: var(--s-3); justify-content: flex-end; }
+@keyframes dialog-in { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (max-width: 639.98px) {
+  .scrim { align-items: end; padding: 0; }
+  .dialog { width: 100%; border-radius: var(--r-card) var(--r-card) 0 0; padding: var(--s-5) var(--s-4); }
+  .dialog .actions .btn { flex: 1 1 auto; }
+}
+
+/* 5.18 Toast */
+.toast {
+  position: fixed; left: 50%; bottom: calc(var(--s-6) + env(safe-area-inset-bottom, 0px)); z-index: var(--z-toast);
+  max-width: min(480px, 100% - 32px); padding: 10px 18px; border-radius: var(--r-pill);
+  background: var(--glass-hi); border: 1px solid var(--edge); box-shadow: var(--hi-2), var(--shadow-2);
+  -webkit-backdrop-filter: var(--bf-2); backdrop-filter: var(--bf-2);
+  font: 500 var(--fs-15) var(--f-ui); color: var(--ink); text-align: center;
+  transform: translateX(-50%); animation: toast-in 220ms var(--ease-out);
+}
+@keyframes toast-in { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+/* 6.2 Game shell: play area plus side panel. Side panels stack under 1024px. */
+.shell { display: grid; gap: var(--s-5); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) { .shell { grid-template-columns: minmax(0, 1fr) 320px; } }
+@media (min-width: 1600px) { .shell { grid-template-columns: minmax(0, 1fr) 360px; } }
+.side {
+  z-index: var(--z-side); display: grid; gap: var(--s-4); padding: var(--s-5); min-width: 0;
+  background: var(--glass); border: 1px solid var(--edge); border-radius: var(--r-panel);
+  -webkit-backdrop-filter: var(--bf-1); backdrop-filter: var(--bf-1); box-shadow: var(--hi-1);
+}
+@media (min-width: 1024px) { .side { position: sticky; top: 88px; } }
+@media (max-width: 1023.98px) { .side { order: 2; } }
+
+/* Quiz answers: 2x2 on md and up, single column on phones */
+.answers { display: grid; gap: var(--s-3); grid-template-columns: 1fr; }
+@media (min-width: 640px) { .answers { grid-template-columns: 1fr 1fr; } }
+
+/* 5.15 Skeleton (building state) */
+.skeleton {
+  position: relative; overflow: hidden; min-height: 1em; border-radius: var(--r-inset);
+  background: var(--glass-deep);
+}
+.skeleton::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(245,240,230,.07) 50%, transparent 70%);
+  transform: translateX(-100%); animation: shimmer 1.6s ease-in-out infinite;
+}
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+/* Notice shown only on narrow screens (for example, a game that plays best wider) */
+.notice-narrow {
+  display: none; padding: var(--s-3) var(--s-4); border-radius: var(--r-inset);
+  background: var(--glass-deep); border: 1px solid var(--edge); color: var(--ink-2); font-size: var(--fs-15);
+}
+@media (max-width: 639.98px) { .notice-narrow { display: block; } }
+
+/* Wrong answer feedback: 6px screen shake */
+.shake { animation: shake 360ms var(--ease-out); }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); }
+}
+
+/* Touch: 44px hit targets, no hover-only effects */
+@media (pointer: coarse) {
+  .btn, .toggle button, .icon-btn, .tile-game, .chip.action { min-height: var(--hit); }
+  .icon-btn { min-width: var(--hit); }
+  .btn-quiet { padding-inline: var(--s-3); }
+}
+@media (hover: none) {
+  .card-rec:hover, .tile-game:hover, button.board-row:hover, .btn-primary:hover, .btn-secondary:hover {
+    transform: none; box-shadow: none; background: revert-layer;
+  }
+  .card-rec:hover { border-color: var(--edge); }
+  .card-rec { background: var(--glass-deep); }
+  .tile-game { background: var(--glass-deep); }
+  button.board-row { background: var(--glass-deep); }
+  .btn-primary { background: var(--gold); }
+  .btn-secondary { background: var(--glass); }
+}
+
+/* Phones: body text stays >= 15px; tighten panels */
+@media (max-width: 639.98px) {
+  .panel, .side { padding: var(--s-4); border-radius: 18px; }
+  .wrap { padding-block: var(--s-4) var(--s-8); gap: var(--s-4); }
+}
+
+/* Reduced motion: no sheen, ripple, shimmer, flip, spring, shake or entrances */
+@media (prefers-reduced-motion: reduce) {
+  .panel::before, .skeleton::after { animation: none; }
+  .ripple { display: none; }
+  .flap-tile.flip, .toggle-bubble.moving, .shake { animation: none; }
+  .toggle-bubble, .toggle button { transition: none; }
+  .dialog, .toast { animation: none; }
+  .btn, .card-rec, .tile-game, .icon-btn { transition: none; }
+  .btn:active, .icon-btn:active, .toggle button:active, .card-rec:active, .tile-game:active { transform: none; }
+  .card-rec:hover, .card-rec:focus-visible { transform: none; }
+}
