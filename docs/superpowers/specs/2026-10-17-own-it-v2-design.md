@@ -193,6 +193,16 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
           - a warm low-pass tone, a light chorus, and a tempo-synced echo,
           - played as a humanized, swung arpeggio with occasional melody phrases;
         - the organ-like pad stays as a quiet bed under the lead, because the user wants it there but not alone,
+        - **Mood: chill, not mysterious (user request).** The music stays in one key, with a lo-fi style progression:
+          - Fmaj9 → Em7 → Dm9 → Cmaj9 | Am7 → Dm9 → G9sus → Cmaj9 (all in C major).
+          - Melody and arpeggio notes come only from chord tones or the C-major pentatonic, so nothing clashes. No harmonic-minor or tense chords.
+          - The music must hold up for long listening sessions.
+        - **In tune (user playtest).**
+          - No deliberate detuning between pad voices.
+          - No random detune on notes.
+          - The chorus depth is tiny (well under 1 cent of wobble).
+          - The echo is short with low feedback, so notes from the old chord don't ring into the next one.
+          - Pitches come from equal temperament with A4 = 440 Hz.
         - **faster development**:
           - bars of 4 s,
           - a new layer every 4 bars (bars 0–3 sparse; bars 4–7 add arpeggio density and ticks),
