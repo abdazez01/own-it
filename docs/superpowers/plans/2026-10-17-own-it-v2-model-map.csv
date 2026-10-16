@@ -1,0 +1,20 @@
+task,title,implementer,reviewer,why
+1,Model schema growth,sonnet,haiku,small validator + integrity change
+2,Soft gates + claim rule,haiku,haiku,test-driven edit of two commands
+3,Game registry + build-recs,haiku,haiku,18 small JSON files + tiny command
+4,serve/wait/stop + inbox,sonnet,sonnet,security-sensitive server
+5,build-round + apply rounds,sonnet,sonnet,schemas + scoring rules
+6,build-screen sanitizer,sonnet,sonnet,security-sensitive parser
+7,Engine CSS,sonnet,haiku,design tokens + components
+8,Engine JS core,sonnet,sonnet,shared APIs every game depends on
+9,Audio + music + field,sonnet,haiku,port of approved mockup code + pure planner
+10,Dashboard + shell + logos,sonnet,sonnet,largest UI surface
+11,Quiz,haiku,haiku,simple template on engine
+12,Screen Tour + Guess the Screen,sonnet,haiku,iframe host
+13,Quests,sonnet,sonnet,multi-screen state
+14,Whiteboard + Boss Battle,sonnet,haiku,port + live grading
+15,Skill docs v2,sonnet,haiku,prose within budgets
+16,Fixture + E2E + checks,sonnet,controller,simulation run
+17,v2.1 game pack,sonnet,haiku,6 templates on frozen engine
+18,v2.2 game pack,sonnet,haiku,6 templates on frozen engine
+final,Whole-branch review,sonnet,,user asked to avoid opus
