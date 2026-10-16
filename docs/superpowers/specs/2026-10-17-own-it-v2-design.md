@@ -193,8 +193,15 @@ The user asked that the page talk to Claude directly, with no copy/paste and no 
           - a warm low-pass tone, a light chorus, and a tempo-synced echo,
           - played as a humanized, swung arpeggio with occasional melody phrases;
         - the organ-like pad stays as a quiet bed under the lead, because the user wants it there but not alone,
-        - **Mood: chill, not mysterious (user request).** The music stays in one key, with a lo-fi style progression:
-          - Fmaj9 → Em7 → Dm9 → Cmaj9 | Am7 → Dm9 → G9sus → Cmaj9 (all in C major).
+        - **Mood: chill, not mysterious, and familiar (user request).** The music stays in one key, with the familiar I–V–vi–IV progression: C → G → Am → F, one chord per 4 s bar.
+          - Melodies are original, and they are written note by note from chord tones and passing tones in C major.
+          - It never copies existing songs. The user cited a chill anime track as the vibe, so the feel is the target, not the notes.
+        - **Tight, not wobbly (user playtest).**
+          - Every note lands exactly on an eighth-note grid, with no swing and no random humanize.
+          - The melody is in quarter notes on the beat.
+          - Notes are short enough to end before the next chord starts.
+          - There is no filter sweep and no chorus modulation.
+          - The echo is synced to quarter notes and kept low.
           - Melody and arpeggio notes come only from chord tones or the C-major pentatonic, so nothing clashes. No harmonic-minor or tense chords.
           - The music must hold up for long listening sessions.
         - **In tune (user playtest).**
