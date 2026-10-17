@@ -368,7 +368,7 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .tile-game .chip { white-space: normal; }
 
 .board-row > span { min-width: 0; overflow-wrap: anywhere; }
-.board-row .flap { font-size: 15px; flex-wrap: nowrap; }
+.board-row .flap { font-size: 15px; }
 .board-head > span { padding-inline: 0; }
 .zone-detail { margin-top: var(--s-3); display: grid; gap: var(--s-2); }
 .actions.row { display: flex; flex-wrap: wrap; gap: var(--s-3); }
@@ -405,8 +405,10 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 
 /* Board columns: fixed rung column so header and rows align; flaps sized to fit */
 .board-table { min-width: 760px; }
-.board-row { grid-template-columns: minmax(110px, 1fr) 140px minmax(150px, 1.3fr) minmax(210px, 1.3fr); }
+.board-row { grid-template-columns: minmax(150px, 1.4fr) 140px minmax(150px, 1.3fr) minmax(210px, 1.3fr); }
 .board-row .flap { font-size: 13px; }
+.board-row .zone-name { min-width: 0; overflow: hidden; }
+.board-row .zone-name .flap { flex-wrap: wrap; gap: 3px; max-width: 100%; }
 .brand img { height: 40px; }
 .chip.off { background: none; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--edge); font-family: var(--f-ui); font-weight: 500; }
 @media (max-width: 639.98px) {
