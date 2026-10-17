@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { run as buildRecs } from '../own-it/scripts/lib/cmd-build-recs.mjs';
-import { listGames } from '../own-it/scripts/lib/games.mjs';
+import { listGames, GAMES_DIR } from '../own-it/scripts/lib/games.mjs';
 import { saveModel } from '../own-it/scripts/lib/model.mjs';
 import { tmpProject, ctx } from './helpers.mjs';
 
@@ -17,10 +17,12 @@ function setup(recs) {
   return root;
 }
 
-test('listGames returns 18 with unique ids', () => {
+test('listGames returns every meta file with unique ids', () => {
   const games = listGames();
-  assert.equal(games.length, 18);
-  assert.equal(new Set(games.map((g) => g.id)).size, 18);
+  const files = readdirSync(GAMES_DIR).filter((f) => f.endsWith('.meta.json'));
+  assert.ok(games.some((g) => g.id === 'case-file'));
+  assert.equal(games.length, files.length);
+  assert.equal(new Set(games.map((g) => g.id)).size, games.length);
 });
 
 test('recs rejects unknown game', async () => {

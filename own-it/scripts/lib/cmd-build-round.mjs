@@ -8,7 +8,7 @@ import core from './core.mjs';
 import { readJson, writeJson, writeJsRegistry, writeAggregate } from './json.mjs';
 import { ownItPath } from './paths.mjs';
 import { estimate } from './tokens.mjs';
-import { derive, flowSteps } from './round-derive.mjs';
+import { derive, flowSteps, scaleCase } from './round-derive.mjs';
 
 // Games whose entries carry a required answer, and the array that holds them.
 const ANSWERED = { quiz: 'questions', 'screen-tour': 'steps', 'guess-the-screen': 'screens' };
@@ -33,6 +33,7 @@ const IDS = {
   'design-duel': () => [],
   'escape-room': (r) => r.puzzles.flatMap((p) => (p.kind === 'flow' ? [p.flow] : p.kind === 'failure' ? [p.answer] : [])),
   'teach-back': (r) => [r.screen],
+  'case-file': (r) => [r.case.answer, ...r.case.suspects],
 };
 
 
@@ -259,6 +260,10 @@ export async function run(args, ctx) {
     if (flow.k !== 'flow') throw new Error(`"${input.flow}" is not a flow`);
     if (flowSteps(flow, byId).length < 2) throw new Error(`flow "${input.flow}" needs at least 2 steps in the model`);
   }
+  if (game === 'case-file') {
+    if (identifierOnly(input.case.report)) throw new Error(`identifier-only answer in case.report; ${HINT}`);
+    input.case.evidence.forEach((e, i) => { if (identifierOnly(e.text)) throw new Error(`identifier-only answer in case.evidence[${i}].text; ${HINT}`); });
+  }
   if (game === 'data-detective' && identifierOnly(input.entity)) throw new Error(`identifier-only answer in entity; ${HINT}`);
   const progress = loadProgress(ctx.root);
   const id = `${input.zone}-${game}-${progress.seq + 1}`;
@@ -282,6 +287,12 @@ export async function run(args, ctx) {
     st = { level: fl.level, levelBase: fl.base, levelAbout: typeof fl.about === 'string' ? fl.about.trim() : undefined };
   }
   const lvl = st.level ? { level: st.level, ...(st.level === 'custom' ? { about: st.levelAbout, levelBase: st.levelBase } : {}) } : {};
+  if (game === 'case-file') {
+    // The level decides how many clues and suspects the page shows; the case is checked first, so a bad case still writes nothing.
+    scaleCase(round, st.level === 'custom' ? st.levelBase : (st.level || 'medium'), byId, items);
+    labelIds.clear(); // only the suspects the page shows get a label
+    round.suspects.forEach((c) => labelIds.add(c.id));
+  }
   const data = { id, game, zone: input.zone, rung: meta.rung, ...lvl, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.
