@@ -8,9 +8,20 @@ export function openCommand(platform, file) {
   return { cmd: 'xdg-open', args: [file] };
 }
 
-export async function run(_args, ctx) {
-  const file = ownItPath(ctx.root, 'game.html');
-  if (!existsSync(file)) throw new Error('game page missing; run init first');
+// Only loopback http URLs with an explicit port: the serve origin and nothing else.
+export function isLocalUrl(u) {
+  if (typeof u !== "string" || !/^[A-Za-z0-9:/._?=%-]+$/.test(u)) return false; // no shell metacharacters
+  try {
+    const x = new URL(u);
+    return x.protocol === "http:" && (x.hostname === "127.0.0.1" || x.hostname === "localhost") && x.port !== "" && !x.username && !x.password;
+  } catch { return false; }
+}
+
+export async function run(args, ctx) {
+  const url = args._[0];
+  if (url !== undefined && !isLocalUrl(url)) throw new Error("open takes only an http://127.0.0.1:<port> or http://localhost:<port> URL");
+  const file = url !== undefined ? url : ownItPath(ctx.root, "game.html");
+  if (url === undefined && !existsSync(file)) throw new Error("game page missing; run init first");
   if (!ctx.env.OWNIT_NO_OPEN) {
     const { cmd, args } = openCommand(process.platform, file);
     // On Windows pass the command line verbatim so `start "" "<path>"` keeps its quoting.
@@ -20,5 +31,5 @@ export async function run(_args, ctx) {
     child.on('error', (e) => process.stderr.write(`own-it: could not open browser (${e.message}); open ${toPosix(file)} manually\n`));
     child.unref();
   }
-  return { opened: toPosix(file) };
+  return { opened: url !== undefined ? url : toPosix(file) };
 }

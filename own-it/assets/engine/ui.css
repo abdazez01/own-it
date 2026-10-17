@@ -563,3 +563,15 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .boss-answer[disabled] { opacity: .7; }
 @keyframes boss-pop { from { transform: translateY(8px) scale(.9); opacity: 0; } 30% { opacity: 1; } to { transform: translateY(-10px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .boss-damage .flap { animation: none; } }
+
+/* 5.14 Feedback panel: Claude's debrief slides in from the right */
+.feedback-panel {
+  position: fixed; top: 16px; right: 16px; bottom: 16px; width: min(320px, calc(100vw - 32px));
+  overflow: auto; z-index: 40; padding: 16px;
+  animation: feedback-in 320ms ease-out both;
+}
+.feedback-panel .debrief { margin: 8px 0; line-height: 1.5; }
+.feedback-panel .notes { margin: 8px 0; padding-left: 18px; }
+@keyframes feedback-in { from { transform: translateX(110%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .feedback-panel { animation: none; } }
+@media (max-width: 1023px) { .feedback-panel { top: auto; left: 16px; width: auto; max-height: 50vh; } }

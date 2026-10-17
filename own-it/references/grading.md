@@ -12,7 +12,7 @@
 
 ## Feedback file
 
-Write `.own-it/feedback.json`, run `build-feedback <roundId> .own-it/feedback.json`; the page shows it within seconds. Shape: `{grades?: {q1..q5: solid|partial|miss}, debrief?: string, notes?: {key: string}}`.
+Write `.own-it/feedback.json` (Exam: only at the report card), run `build-feedback <roundId> .own-it/feedback.json`; the page shows it within seconds. Shape: `{grades?: {q1..q5: solid|partial|miss}, debrief?: string, notes?: {key: string}}`.
 
 - Practice: `debrief` ≤120 words, missed and wrong items only, with `file:line`; notes ≤300 chars each. Never restate correct items. Mention bugs, never fix.
 - Exam: no feedback until the report card.
@@ -29,11 +29,11 @@ The page's Hint button records the cost; in chat never hint on a board. Exam: no
 
 ## Challenge
 
-`challenge <id>` is a model item id or an arrow `A->B`.
+The page sends `challenge {id, item}`: a model item id or an arrow `A->B`. In file mode the user types `challenge <id>` instead.
 
-1. Re-read the code at its `ref`.
-2. User right: write `.own-it/fix-<zone>.json` `{"zone","files":[],"items":[corrected item]}` (same id replaces), `check-refs` it, add `--challenge-won 1` to `apply`. To delete an item, list its file in `files` and include that file's other items.
-3. User wrong: show `file:line`, explain in ≤80 words.
+1. Re-read the code at the item's `ref`.
+2. User right: write `.own-it/fix-<zone>.json` `{"zone","files":[],"items":[corrected item]}` (same id replaces; one-item extraction), `check-refs` it, then add `--challenge-won 1` to `apply`. To delete an item, list its file in `files` and include that file's other items.
+3. User wrong: `build-feedback` with a note giving `file:line` evidence, ≤300 chars.
 
 Resolve before `apply`; it runs once.
 

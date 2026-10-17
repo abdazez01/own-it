@@ -27,11 +27,14 @@ Extract zones (`extraction.md`, `screens.md`). Write `.own-it/recs.json` with 3-
 
 ## 6. Live link
 
-`serve` gives `{url}`; `open` it (or give the URL). Say one line: "Dashboard is open." Run `wait` in the background; react, then wait again:
+`serve` gives `{url}`; run `open <url>` with it. Say one line: "Dashboard is open." own-it needs a desktop browser. On a remote machine, forward the port (`ssh -L <port>:127.0.0.1:<port>`) and open the url locally. Run `wait` in the background; react, then wait again:
 
-- `pick`: `build-round`, then wait.
-- `result`: `collect <round>`, grade free text, in Practice `build-feedback`, `apply`, rebuild recs, wait.
+- `pick`: `build-round`, then wait. Mode is in the event and `session.json` `rounds[id].mode`; never ask it.
+- `result`: `collect <round>`, grade free text, Practice: `build-feedback` and post the debrief in chat too; Exam: no feedback file until the report card. `apply`, rebuild recs, wait.
 - `ask`: grade, `build-feedback` with `grades`, wait.
+- `challenge {id, item}`: see `grading.md`, wait.
+- `hint {round}`: nothing to do, wait.
+- `invalid`: skip, wait.
 - `{idle:true}`: wait silently. After 6 idle waits in a row say "Still here. Click in the page or type here." and stop.
 
-Mode comes from the result; never ask it in chat. Serve fails? Use `open` plus download and "done" (`rungs.md`).
+File mode (serve fails): `open` the file page; a pasted `play <game> <zone>` is a `pick`.

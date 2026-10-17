@@ -4,7 +4,7 @@ Round data is JSON in `.own-it/`, then `build-round <game> <file>`; it writes th
 
 | Game | Stage | Fit rule and data shape |
 |---|---|---|
-| `quiz` | 2.0 | Words. `questions` x5: `q`, 4 `options` `{text, why}`, `answer` index 0-3, optional `peek`. |
+| `quiz` | 2.0 | Words. `mode` required. `questions` x5: `q`, 4 `options` `{text, why}`, `answer` index 0-3, optional `peek`. |
 | `screen-tour` | 2.0 | Screens with elements. `screen`, `steps` 1-6: `kind` chain/find/role, `prompt`, `element`, `choices`, `answer`. |
 | `guess-the-screen` | 2.0 | Zones with 3+ screens. `screens` 3-8: `screen`, 4 `choices`, `answer`. |
 | `quests` | 2.0 | A flow across screens or roles. `flow`, `goal`, `start`, `objectives` 2-8 `{text, element}`. Answers derived. |

@@ -216,6 +216,7 @@ test('hint confirm counts hintsUsed and sends a hint event in live mode', () => 
   shell.result({ got: 1, total: 5, xp: 0, payload: { id: 'trips-quiz-1' } });
   assert.equal(sent[1][0], 'result');
   assert.equal(sent[1][1].hintsUsed, 1);
+  w.OwnIt.link.stop(); // finish() now subscribes for the debrief; stop its polling
 });
 
 test('pick is not resent while that game and zone is building', () => {
