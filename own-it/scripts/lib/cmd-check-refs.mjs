@@ -6,6 +6,7 @@ import { hashesFor, lineCount } from './hash.mjs';
 import { toPosix } from './paths.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import { estimate } from './tokens.mjs';
+import { writeBugs } from './bugs.mjs';
 
 // EXTRACTION with per-item validation deferred, so bad items are dropped rather than fatal.
 const TOP_LEVEL = { ...EXTRACTION, props: { ...EXTRACTION.props, items: { type: 'array', max: EXTRACTION.props.items.max } } };
@@ -110,6 +111,7 @@ export async function run(args, ctx) {
   const stamp = firstExtraction ? [...inZone] : [...reExtracted];
   zone.files = { ...(firstExtraction ? {} : zone.files), ...hashesFor(ctx.root, stamp).hashes };
   saveModel(ctx.root, model);
+  writeBugs(ctx.root, model);
 
   const est = estimate(raw);
   const progress = loadProgress(ctx.root);

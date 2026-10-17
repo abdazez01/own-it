@@ -795,7 +795,7 @@
   function report(parent, info, revealed) {
     var box = OwnIt.el('section', { 'class': 'secret-report', 'aria-label': 'Case report' });
     box.appendChild(OwnIt.el('h3', { 'class': 'panel-title' }, revealed ? 'Case report: what Claude found' : 'Case report'));
-    [['What broke', info.text], ['Why', info.why]].forEach(function (p) {
+    [['What broke', info.text], ['Why', info.why]].concat(info.fix ? [['How to fix', info.fix]] : []).forEach(function (p) {
       var rw = OwnIt.el('p', { 'class': 'secret-row' });
       rw.appendChild(OwnIt.el('strong', null, p[0] + ': '));
       rw.appendChild(OwnIt.el('span', null, String(p[1] || '')));
