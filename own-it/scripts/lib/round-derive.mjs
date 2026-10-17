@@ -96,6 +96,21 @@ export function detectiveSteps(input, byId, items) {
 // least half of the path tiles out of place, so the round is solvable but never already solved.
 const PIPE_COLS = 4;
 const PIPE_BASE = { cap: [0], straight: [0, 2], corner: [0, 1], tee: [0, 1, 3] };
+// True when water from tile `start` reaches tile `end` across the whole grid (spare pipes included).
+function pipeReaches(tiles, cols, start, end) {
+  const open = (t) => PIPE_BASE[t.type].map((d) => (d + t.rot) % 4);
+  const at = [-cols, 1, cols, -1];
+  const seen = new Set([start]);
+  for (const i of seen) {
+    for (const d of open(tiles[i])) {
+      if ((d === 1 && i % cols === cols - 1) || (d === 3 && i % cols === 0)) continue;
+      const j = i + at[d];
+      if (j >= 0 && j < tiles.length && !seen.has(j) && open(tiles[j]).includes((d + 2) % 4)) seen.add(j);
+    }
+  }
+  return seen.has(end);
+}
+
 export function pipeLayout(flowId, byId, items) {
   const flow = byId.get(flowId);
   if (flow.k !== 'flow') throw new Error(`"${flowId}" is not a flow`);
@@ -131,22 +146,17 @@ export function pipeLayout(flowId, byId, items) {
     if (sides.length === 1) { type = 'cap'; rot = sides[0]; }
     else if ((sides[0] + 2) % 4 === sides[1]) { type = 'straight'; rot = sides[0] % 2; }
     else { type = 'corner'; rot = (sides[0] + 1) % 4 === sides[1] ? sides[0] : sides[1]; }
-    tiles[cell] = { type, id: steps[k] };
+    tiles[cell] = { type };
     solution.set(cell, rot);
   });
   const fits = (cell, rot) => (tiles[cell].type === 'straight' ? rot % 2 === solution.get(cell) % 2 : rot === solution.get(cell));
-  let turns;
-  do turns = cells.map(() => randomInt(4));
-  while (turns.filter((r, k) => !fits(cells[k], r)).length < Math.max(1, Math.floor(n / 2)));
-  cells.forEach((cell, k) => { tiles[cell].rot = turns[k]; });
-
-  const spare = shuffle(items.filter((x) => (x.k === 'surface' || x.k === 'component') && labeled(x) && !steps.includes(x.id)).map((x) => x.id));
-  tiles.forEach((t, cell) => {
-    if (t) return;
-    const type = Object.keys(PIPE_BASE)[randomInt(4)];
-    tiles[cell] = { type, rot: randomInt(4), ...(spare.length ? { id: spare.pop() } : {}) };
-  });
-  return { grid: { cols, rows }, tiles, start: cells[0], end: cells[n - 1], pathLength: n, path: steps };
+  tiles.forEach((t, cell) => { if (!t) tiles[cell] = { type: Object.keys(PIPE_BASE)[randomInt(4)] }; });
+  // Redraw every turn until at least half of the path is out of place and no route, spare pipes included, joins the ends.
+  for (;;) {
+    tiles.forEach((t) => { t.rot = randomInt(4); });
+    if (cells.filter((c, k) => !fits(c, tiles[c].rot)).length >= Math.max(1, Math.floor(n / 2)) && !pipeReaches(tiles, cols, cells[0], cells[n - 1])) break;
+  }
+  return { grid: { cols, rows }, tiles, start: cells[0], end: cells[n - 1], pathLength: n, cells, names: steps.map((id) => byId.get(id).label) };
 }
 
 // Fills in answers the model already knows, so Claude never has to write them.
@@ -191,9 +201,9 @@ export function derive(game, round, byId, items) {
   } else if (game === 'pager') {
     round.cards = pagerChoices(round, byId, items).map((x) => ({ id: x.id, label: x.label }));
   } else if (game === 'pipe-plumber') {
-    const { path, ...layout } = pipeLayout(round.flow, byId, items);
+    const { cells, names, ...layout } = pipeLayout(round.flow, byId, items);
     Object.assign(round, layout);
-    round.answer = { path };
+    round.answer = { cells, names };
   } else if (game === 'what-if') {
     // Each dial's options are permuted, so the position Claude wrote the answer at gives nothing away.
     round.dials = round.dials.map((d) => {

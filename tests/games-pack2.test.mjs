@@ -10,8 +10,9 @@ const core = require('../own-it/assets/core.js');
 const ASSETS = new URL('../own-it/assets/', import.meta.url);
 const FILES = ['z.js', 'icons.js', 'router.js', 'flap.js', 'toggle.js', 'juice.js', 'keys.js', 'link.js', 'shell.js', 'gamekit.js'];
 
+const REAL_RANDOM = Math.random;
 const live = [];
-after(() => live.forEach((f) => { try { f(); } catch { /* already cleaned */ } }));
+after(() => { live.forEach((f) => { try { f(); } catch { /* already cleaned */ } }); Math.random = REAL_RANDOM; });
 
 function boot(game, round) {
   Math.random = () => 0;
@@ -191,11 +192,11 @@ test('what-if: arrows turn the dial and wrap, a number picks, Enter locks then m
 const ppRound = () => ({
   zone: 'trips', mode: 'practice', flow: 'f1', grid: { cols: 3, rows: 2 }, start: 0, end: 5, pathLength: 4,
   tiles: [
-    { type: 'cap', rot: 0, id: 'a' }, { type: 'straight', rot: 0, id: 'b' }, { type: 'corner', rot: 0, id: 'c' },
-    { type: 'straight', rot: 1 }, { type: 'corner', rot: 3, id: 'x' }, { type: 'cap', rot: 1, id: 'd' },
+    { type: 'cap', rot: 0 }, { type: 'straight', rot: 0 }, { type: 'corner', rot: 0 },
+    { type: 'straight', rot: 1 }, { type: 'corner', rot: 3 }, { type: 'cap', rot: 1 },
   ],
-  answer: core.encode({ path: ['a', 'b', 'c', 'd'] }),
-  labels: { a: { label: 'Pay button' }, b: { label: 'Trip service' }, c: { label: 'Queue' }, d: { label: 'Database' }, x: { label: 'Cache' }, f1: { label: 'Pay out' } },
+  answer: core.encode({ cells: [0, 1, 2, 5], names: ['Pay button', 'Trip service', 'Queue', 'Database'] }),
+  labels: { f1: { label: 'Pay out' } },
 });
 const ppTiles = (t) => all(t, '.pp-tile');
 const ppTurn = (t, i, times = 1) => { for (let k = 0; k < times; k++) ppTiles(t)[i].click(); };
@@ -203,8 +204,7 @@ const ppTurn = (t, i, times = 1) => { for (let k = 0; k < times; k++) ppTiles(t)
 test('pipe-plumber: tiles turn on a tap, the water reaches the end, +10 per tile on the path', () => {
   const t = boot('pipe-plumber', ppRound());
   assert.equal(ppTiles(t).length, 6);
-  assert.match(t.root.textContent, /Pay button/);
-  assert.match(t.root.textContent, /Database/);
+  assert.ok(!/Pay button|Database|Queue/.test(t.root.textContent), 'step names stay hidden until the water flows');
   assert.ok(ppTiles(t).every((c) => !c.hasAttribute('data-id') && !c.hasAttribute('data-path')), 'no path hints in the DOM');
   assert.equal(t.decodes(), 0, 'nothing decoded before the water flows');
   ppTurn(t, 0);
@@ -219,8 +219,8 @@ test('pipe-plumber: tiles turn on a tap, the water reaches the end, +10 per tile
   assert.equal(t.finished[0].of, 4);
   assert.equal(t.results[0].xp, 40);
   assert.ok(ppTiles(t).filter((c) => c.classList.contains('wet')).length === 4, 'the water runs through the four path tiles');
-  assert.match(t.results[0].missed.map((m) => m.text).join(' ') + t.root.textContent, /Pay button.*Trip service.*Queue.*Database/);
-  assert.ok(tuples(t, 'correct').length + t.sounds.filter((s) => s === 'correct').length >= 1);
+  assert.match(t.root.querySelector('.pp-live').textContent, /Pay button.*Trip service.*Queue.*Database/);
+  assert.equal(t.sounds.filter((s) => s === 'correct').length, 1);
 });
 
 test('pipe-plumber: arrows move over the grid, R and Enter turn the focused tile', () => {
@@ -244,4 +244,37 @@ test('pipe-plumber: arrows move over the grid, R and Enter turn the focused tile
   t.key('r'); t.key(' '); t.key('r');
   assert.equal(t.finished.length, 1);
   assert.equal(t.results[0].xp, 40);
+});
+
+test('pipe-plumber: a round that arrives already connected is scrambled, never solved at the start', () => {
+  const r = ppRound();
+  r.tiles = [{ type: 'cap', rot: 1 }, { type: 'straight', rot: 1 }, { type: 'corner', rot: 2 }, { type: 'straight', rot: 1 }, { type: 'corner', rot: 3 }, { type: 'cap', rot: 0 }];
+  const t = boot('pipe-plumber', r);
+  assert.equal(t.finished.length, 0);
+  assert.equal(ppTiles(t)[5].classList.contains('reached'), false, 'the water does not reach the end at the start');
+});
+
+test('data-detective: arrows move over the status grid in two dimensions', () => {
+  const t = boot('data-detective', ddRound());
+  assert.equal(focused(t), ddCards(t)[0]);
+  t.key('ArrowDown');
+  assert.equal(focused(t), ddCards(t)[2], 'two columns, so down from the first is the third');
+  t.key('ArrowRight');
+  assert.equal(focused(t), ddCards(t)[2], 'no card to the right of the last');
+  t.key('ArrowUp');
+  assert.equal(focused(t), ddCards(t)[0]);
+  t.key('ArrowRight');
+  assert.equal(focused(t), ddCards(t)[1]);
+  t.key('ArrowRight');
+  assert.equal(focused(t), ddCards(t)[1], 'stops at the edge');
+});
+
+test('games refuse a malformed round instead of quietly dropping parts of it', () => {
+  const dd = ddRound(); dd.cards[1] = { label: 'No id' };
+  assert.throws(() => boot('data-detective', dd), /malformed|cannot be played/i);
+  const wi = wiRound(); wi.dials[1].options = ['Only one', 3];
+  assert.throws(() => boot('what-if', wi), /malformed|cannot be played/i);
+  const pp = ppRound(); pp.tiles[2] = { type: 'bend', rot: 0 };
+  assert.throws(() => boot('pipe-plumber', pp), /malformed|cannot be played/i);
+  assert.throws(() => boot('pipe-plumber', Object.assign(ppRound(), { tiles: [] })), /malformed|cannot be played/i);
 });

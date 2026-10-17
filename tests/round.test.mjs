@@ -677,37 +677,51 @@ async function pipeSetup() {
 }
 const SIDE = [-4, 1, 4, -1];
 
-test('pipe-plumber: a real path of the flow steps on the grid, solvable, never already solved, random layout, order obfuscated', async () => {
+// Independent re-implementation of the water flow, over the whole grid: does the water from start reach end?
+function reaches(r) {
+  const open = (t) => ({ cap: [0], straight: [0, 2], corner: [0, 1], tee: [0, 1, 3] }[t.type]).map((d) => (d + t.rot) % 4);
+  const { cols } = r.grid;
+  const seen = new Set([r.start]);
+  for (const i of seen) {
+    open(r.tiles[i]).forEach((d) => {
+      if ((d === 1 && i % cols === cols - 1) || (d === 3 && i % cols === 0)) return;
+      const j = i + SIDE[d];
+      if (j < 0 || j >= r.tiles.length || seen.has(j) || !open(r.tiles[j]).includes((d + 2) % 4)) return;
+      seen.add(j);
+    });
+  }
+  return seen.has(r.end);
+}
+
+test('pipe-plumber: a real path on the grid, solvable, never connected at the start (whole grid), random layout, nothing about the flow in plain data', async () => {
   const root = await pipeSetup();
   const starts = new Set(), turnSets = new Set();
-  for (let k = 0; k < 25; k++) {
+  for (let k = 0; k < 60; k++) {
     const out = await bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fp' });
     const r = loadRound(root, out.id);
     if (k === 0) assert.equal(out.id, 'trips-pipe-plumber-1');
-    assert.deepEqual(core.decode(r.answer), { path: ['s1', 'c1', 'c2'] });
+    const ans = core.decode(r.answer);
+    assert.deepEqual(ans.names, ['Trip screen', 'Trip service', 'Trip database']);
     assert.equal(r.pathLength, 3);
     assert.equal(r.tiles.length, r.grid.cols * r.grid.rows);
-    const cell = (id) => r.tiles.findIndex((t) => t.id === id);
-    const cells = ['s1', 'c1', 'c2'].map(cell);
+    r.tiles.forEach((t) => assert.deepEqual(Object.keys(t).sort(), ['rot', 'type']));
+    const plainJson = JSON.stringify({ ...r, answer: undefined });
+    for (const id of ['s1', 'c1', 'c2', 'c3', 'Trip service', 'Trip database', 'Trip screen']) assert.ok(!plainJson.includes(id), `${id} stays out of the plain data`);
+    assert.deepEqual(Object.keys(r.labels), ['fp']);
+    const cells = ans.cells;
     assert.equal(r.start, cells[0]);
     assert.equal(r.end, cells[2]);
-    let off = 0;
     cells.forEach((c, i) => {
       const dirs = [cells[i - 1], cells[i + 1]].filter((x) => x !== undefined).map((o) => SIDE.indexOf(o - c));
       assert.ok(dirs.every((d) => d >= 0), 'path cells are neighbours on the grid');
       const t = r.tiles[c];
-      const want = dirs.length === 1 ? 'cap' : (dirs[0] + 2) % 4 === dirs[1] ? 'straight' : 'corner';
-      assert.equal(t.type, want, 'the shape fits the path');
-      const open = { cap: [0], straight: [0, 2], corner: [0, 1] }[t.type].map((d) => (d + t.rot) % 4).sort().join();
-      if (open !== dirs.slice().sort().join()) off++;
+      assert.equal(t.type, dirs.length === 1 ? 'cap' : (dirs[0] + 2) % 4 === dirs[1] ? 'straight' : 'corner', 'the shape fits the path');
     });
-    assert.ok(off >= 1, 'not already solved');
+    assert.equal(reaches(r), false, 'not connected at the start, spare pipes included');
     starts.add(r.start + ':' + r.end);
     turnSets.add(r.tiles.map((t) => t.rot).join());
     r.tiles.forEach((t) => assert.ok(['cap', 'straight', 'corner', 'tee'].includes(t.type)));
-    assert.equal(r.labels.s1.label, 'Trip screen');
-    assert.equal(r.labels.c2.label, 'Trip database');
-    assert.ok(r.tiles.some((t) => t.id === 'c3'), 'spare pipes carry other parts of the app');
+    assert.equal(r.labels.fp.label, 'Cancel a trip');
   }
   assert.ok(starts.size > 1 && turnSets.size > 1, 'path and turns are random');
   assert.deepEqual(readJson(join(root, '.own-it', 'session.json')).rounds['trips-pipe-plumber-1'].cardIds.sort(), ['c1', 'c2', 's1']);
@@ -739,6 +753,6 @@ test('pipe-plumber: a 12-step flow still lays out on the grid', async () => {
   m.zones.trips.items.push(...mid, I({ id: 'fl', k: 'flow', label: 'Long', steps: [['s1'], ...mid.map((x) => [x.id]), ['c2']] }));
   saveModel(root, m);
   const r = loadRound(root, (await bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fl' })).id);
-  assert.equal(core.decode(r.answer).path.length, 12);
-  assert.equal(r.tiles.filter((t) => t.id && core.decode(r.answer).path.includes(t.id)).length, 12);
+  assert.equal(core.decode(r.answer).cells.length, 12);
+  assert.equal(new Set(core.decode(r.answer).cells).size, 12);
 });

@@ -10,14 +10,20 @@
   var XP_EACH = 10;
 
   function play(root, round, ctx) {
-    var cards = ((round && round.cards) || []).filter(function (c) { return c && typeof c.id === 'string'; });
-    var who = ((round && round.who) || []).filter(function (c) { return c && typeof c.id === 'string'; });
+    var cards = (round && round.cards) || [];
+    var who = (round && round.who) || [];
+    var valid = function (c) { return c && typeof c.id === 'string' && typeof c.label === 'string'; };
+    if (!Array.isArray(cards) || !Array.isArray(who) || cards.length < 2 || who.length < 2 || !cards.every(valid) || !who.every(valid) || typeof round.answer !== 'string') {
+      throw new Error('This round cannot be played: malformed data detective round.');
+    }
     var n = cards.length;
     var total = n ? n + n - 1 : 0;      // n stamps and n - 1 movers
     var labels = round && round.labels;
     var exam = (round && round.mode === 'exam') || OwnIt.mode === 'exam';
     var mode = exam ? 'exam' : 'practice';
-    var L = function (c) { return c.label || kit.label(c.id, labels); };
+    var L = function (c) { return c.label; };
+    var cardCols = n <= 4 ? 2 : 3;                // the status grid's columns, for the arrow keys
+    var whoCols = Math.min(who.length, 3);
     var byId = {};
     cards.forEach(function (c) { byId[c.id] = c; });
     var whoById = {};
@@ -48,9 +54,11 @@
     var line = OwnIt.el('ol', { 'class': 'dd-line', 'aria-label': 'Timeline' });
     var slots = [];
     var tray = OwnIt.el('div', { 'class': 'dd-tray', role: 'group', 'aria-label': 'Statuses' });
+    tray.style.gridTemplateColumns = 'repeat(' + cardCols + ', minmax(0, 1fr))';
     var whoBox = OwnIt.el('div', { 'class': 'dd-whos', role: 'group', 'aria-label': 'Who moved it', hidden: 'hidden' });
     var ask = OwnIt.el('p', { 'class': 'dd-ask' });
     var whoRow = OwnIt.el('div', { 'class': 'dd-who-row' });
+    whoRow.style.gridTemplateColumns = 'repeat(' + whoCols + ', minmax(0, 1fr))';
     var live = OwnIt.el('p', { 'class': 'dd-live quiz-why', 'aria-live': 'polite' }, 'Tap the status that comes first, or press 1 to 9.');
     whoBox.appendChild(ask);
     whoBox.appendChild(whoRow);
@@ -188,13 +196,12 @@
       })(d - 1);
     }
     offs = offs.concat(kit.arrowKeys(ctx, area, function (dx, dy) {
-      if (done || !total) return;
-      var step = dx + dy;
+      if (done) return;
       if (phase === 'who') {
-        curWho = Math.max(0, Math.min(who.length - 1, curWho + step));
-        if (whoEls[curWho]) whoEls[curWho].focus();
+        curWho = kit.gridMove(curWho, who.length, whoCols, dx, dy);
+        whoEls[curWho].focus();
       } else {
-        curCard = Math.max(0, Math.min(n - 1, curCard + step));
+        curCard = kit.gridMove(curCard, n, cardCols, dx, dy);
         cardEls[curCard].focus();
       }
     }));
@@ -210,13 +217,7 @@
       }
     }));
 
-    if (n >= 2 && who.length >= 2) {
-      if (cardEls[0].focus) cardEls[0].focus();
-    } else {
-      done = true;
-      shell.stopTimer();
-      live.textContent = 'This round has no timeline. Ask Claude to build a new data detective round, then pick it again from the board.';
-    }
+    if (cardEls[0].focus) cardEls[0].focus();
 
     return function () {
       done = true;

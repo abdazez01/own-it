@@ -19,19 +19,21 @@
   }
 
   function play(root, round, ctx) {
-    var cols = Math.max(1, (round && round.grid && round.grid.cols) | 0);
-    var tiles = ((round && round.tiles) || []).filter(function (t) { return t && BASE[t.type]; });
-    var rows = Math.ceil(tiles.length / cols);
-    var start = round && typeof round.start === 'number' ? round.start : 0;
-    var end = round && typeof round.end === 'number' ? round.end : tiles.length - 1;
-    var pathLen = Math.max(2, (round && round.pathLength) | 0);
+    var cols = round && round.grid && round.grid.cols;
+    var tiles = (round && round.tiles) || [];
+    var isCount = function (x) { return typeof x === 'number' && x >= 0 && x % 1 === 0; };
+    if (!isCount(cols) || cols < 2 || !Array.isArray(tiles) || tiles.length < 2 || tiles.length % cols !== 0 || !isCount(round.start) || !isCount(round.end) ||
+        round.start === round.end || round.start >= tiles.length || round.end >= tiles.length || !isCount(round.pathLength) || round.pathLength < 2 ||
+        typeof round.answer !== 'string' || !tiles.every(function (t) { return t && Object.prototype.hasOwnProperty.call(BASE, t.type) && isCount(t.rot); })) {
+      throw new Error('This round cannot be played: malformed pipe plumber round.');
+    }
+    var start = round.start, end = round.end, pathLen = round.pathLength;
     var labels = round && round.labels;
     var exam = (round && round.mode === 'exam') || OwnIt.mode === 'exam';
     var mode = exam ? 'exam' : 'practice';
-    var playable = tiles.length === cols * rows && tiles.length >= 2 && start !== end && !!tiles[start] && !!tiles[end];
 
     var done = false;
-    var cur = playable ? start : 0;
+    var cur = start;
     var turns = 0;
     var turn = tiles.map(function (t) { return ((t.rot | 0) % 4 + 4) % 4; });
     var tm = kit.timers();
@@ -42,13 +44,13 @@
     shell.startTimer();
 
     var panel = OwnIt.el('section', { 'class': 'panel pp-panel' });
-    var goal = OwnIt.el('h2', { 'class': 'quiz-q' }, 'Turn the pipes so the request from "' + (tiles[start] && tiles[start].id ? kit.label(tiles[start].id, labels) : 'the start') +
-      '" reaches "' + (tiles[end] && tiles[end].id ? kit.label(tiles[end].id, labels) : 'the end') + '".');
+    var goal = OwnIt.el('h2', { 'class': 'quiz-q' }, 'Turn the pipes so the request of "' + kit.label(round.flow, labels) + '" runs from the gold tile to the green tile.');
     var board = OwnIt.el('div', { 'class': 'pp-board', role: 'group', 'aria-label': 'Pipes' });
     var live = OwnIt.el('p', { 'class': 'pp-live quiz-why', 'aria-live': 'polite' }, 'Tap a tile or press R to turn it. Arrow keys move.');
     [goal, board, live].forEach(function (x) { panel.appendChild(x); });
     area.appendChild(panel);
     board.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+    var rows = tiles.length / cols;
     board.style.maxWidth = cols * 120 + 'px';
 
     var pipes = [];
@@ -58,7 +60,6 @@
       pipe.setAttribute('class', 'pp-pipe');
       pipes.push(pipe);
       b.appendChild(pipe);
-      b.appendChild(OwnIt.el('span', { 'class': 'pp-name' }, t.id ? kit.label(t.id, labels) : ''));
       b.addEventListener('click', function () { cur = i; rotate(i); });
       board.appendChild(b);
       return b;
@@ -71,7 +72,7 @@
     function paint(i) {
       pipes[i].style.transform = 'rotate(' + turn[i] * 90 + 'deg)';
       els[i].setAttribute('data-turn', String(turn[i]));
-      var name = tiles[i].id ? kit.label(tiles[i].id, labels) : 'Spare pipe';
+      var name = i === start ? 'Start pipe' : i === end ? 'End pipe' : 'Pipe';
       els[i].setAttribute('aria-label', name + ', open to the ' + sides(i).join(' and the ') + '. Turn with R or a tap.');
       els[i].setAttribute('tabindex', i === cur ? '0' : '-1');
     }
@@ -125,7 +126,7 @@
       var route = [];
       for (var i = end; i !== -1; i = from[i]) route.unshift(i);
       var dec = OwnItCore.decode(round.answer); // the only place the flow's order is decoded
-      var names = (dec && Array.isArray(dec.path) ? dec.path : []).map(function (id) { return kit.label(id, labels); });
+      var names = dec && Array.isArray(dec.names) ? dec.names : [];
       var reduced = OwnIt.reduced();
       route.forEach(function (idx, k) {
         var apply = function () { els[idx].classList.add('wet'); };
@@ -134,9 +135,9 @@
       OwnIt.sound('correct');
       OwnIt.juice.confetti(panel);
       live.textContent = names.length ? 'The water flows: ' + names.join(', then ') + '.' : 'The water got through.';
-      shell.setScore(route.length, Math.max(pathLen, route.length));
+      shell.setScore(pathLen, pathLen);
       var send = function () {
-        kit.finish(shell, ctx, { game: 'pipe-plumber', mode: mode, got: route.length, of: Math.max(pathLen, route.length), xp: route.length * XP_TILE,
+        kit.finish(shell, ctx, { game: 'pipe-plumber', mode: mode, got: pathLen, of: pathLen, xp: pathLen * XP_TILE,
           missed: [], review: [], extra: { turns: turns } });
       };
       if (reduced) send(); else tm.later(send, route.length * WATER_MS + WATER_TAIL);
@@ -150,29 +151,21 @@
     }
 
     var offs = kit.arrowKeys(ctx, area, function (dx, dy) {
-      if (done || !playable) return;
-      var col = cur % cols, row = Math.floor(cur / cols);
-      var nc = col + dx, nr = row + dy;
-      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) return;
-      focusTile(nr * cols + nc);
+      if (!done) focusTile(kit.gridMove(cur, tiles.length, cols, dx, dy));
     });
     ['r', 'Enter', ' '].forEach(function (k) {
       offs.push(kit.onActivate(ctx, area, k, function (e) {
         var at = kit.targetIndex(els, e);
         if (at >= 0) cur = at;
-        if (playable) rotate(cur);
+        rotate(cur);
       }));
     });
 
-    if (playable) {
-      tiles.forEach(function (t, i) { paint(i); });
-      refresh();
-      focusTile(cur);
-    } else {
-      done = true;
-      shell.stopTimer();
-      live.textContent = 'This round has no pipes. Ask Claude to build a new pipe plumber round, then pick it again from the board.';
-    }
+    // Defensive: a round that arrives already connected is turned until it is not, so it never starts solved.
+    for (var guard = 0; guard < 4 * tiles.length && Object.prototype.hasOwnProperty.call(flow(), end); guard++) turn[guard % tiles.length] = (turn[guard % tiles.length] + 1) % 4;
+    tiles.forEach(function (t, i) { paint(i); });
+    refresh();
+    focusTile(cur);
 
     return function () {
       done = true;

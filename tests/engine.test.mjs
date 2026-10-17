@@ -106,7 +106,7 @@ test('router: a game that throws in play falls back home with a toast', () => {
   OwnIt.register({ id: 'bad', play() { throw new Error('boom'); } });
   assert.equal(OwnIt.router.go({ game: 'bad', roundId: 'a-bad-1' }), false);
   assert.equal(OwnIt.router.current(), 'home');
-  assert.ok(env.document.body.textContent.includes('went wrong'));
+  assert.ok(env.document.body.textContent.includes("can't be played"));
 });
 
 test('keys ignore typing in an input, honor aliases, and pause while help is open', () => {

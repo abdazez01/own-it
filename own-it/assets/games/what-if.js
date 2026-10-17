@@ -9,7 +9,12 @@
   var XP_EACH = 10, CASCADE_MS = 220, NEEDLE_SPAN = 40;
 
   function play(root, round, ctx) {
-    var dials = ((round && round.dials) || []).filter(function (d) { return d && Array.isArray(d.options) && d.options.length >= 2; });
+    var dials = (round && round.dials) || [];
+    var validDial = function (d) {
+      return d && typeof d.label === 'string' && Array.isArray(d.options) && d.options.length >= 2 && d.options.every(function (o) { return typeof o === 'string'; }) &&
+        typeof d.answer === 'string' && typeof d.why === 'string';
+    };
+    if (!Array.isArray(dials) || !dials.length || !dials.every(validDial)) throw new Error('This round cannot be played: malformed what-if round.');
     var total = dials.length;
     var exam = (round && round.mode === 'exam') || OwnIt.mode === 'exam';
     var mode = exam ? 'exam' : 'practice';
@@ -96,7 +101,7 @@
     }
 
     function lock() {
-      if (done || locked || !total) return;
+      if (done || locked) return;
       locked = true;
       var d = dials[at];
       var truth = OwnItCore.decode(d.answer); // the only place a dial's answer is decoded
@@ -150,18 +155,11 @@
     lockBtn.addEventListener('click', lock);
     nextBtn.addEventListener('click', next);
 
-    var offs = kit.arrowKeys(ctx, area, function (dx, dy) { if (!done && total) turn(dx + dy); });
-    kit.choiceKeys(ctx, function (i) { if (!done && total) turnTo(i); }).forEach(function (off) { offs.push(off); });
+    var offs = kit.arrowKeys(ctx, area, function (dx, dy) { if (!done) turn(dx + dy); });
+    kit.choiceKeys(ctx, function (i) { if (!done) turnTo(i); }).forEach(function (off) { offs.push(off); });
     offs.push(kit.onActivate(ctx, area, 'Enter', function () { if (locked) next(); else lock(); }));
 
-    if (total) {
-      show();
-    } else {
-      done = true;
-      shell.stopTimer();
-      question.textContent = 'This round has no dials. Ask Claude to build a new what-if round, then pick it again from the board.';
-      lockBtn.setAttribute('hidden', 'hidden');
-    }
+    show();
 
     return function () {
       done = true;

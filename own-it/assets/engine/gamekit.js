@@ -1,5 +1,5 @@
 /* own-it engine: shared scaffolding for question-style game templates (quiz, screen tour, guess the screen).
-   OwnIt.kit: label, note, dots, answerButtons, targetIndex, choiceKeys, clock, onActivate, arrowKeys, timers, release, nextLabel, finish. Load after shell.js. */
+   OwnIt.kit: label, note, dots, answerButtons, targetIndex, choiceKeys, clock, onActivate, arrowKeys, gridMove, timers, release, nextLabel, finish. Load after shell.js. */
 (function () {
   'use strict';
   var OwnIt = (window.OwnIt = window.OwnIt || {});
@@ -109,6 +109,12 @@
     });
   }
 
+  // Index after moving one step over a grid laid out row by row in cols columns, or the same index at an edge (or past the last item).
+  function gridMove(i, count, cols, dx, dy) {
+    var col = (i % cols) + dx, row = Math.floor(i / cols) + dy, j = row * cols + col;
+    return col < 0 || col >= cols || row < 0 || j < 0 || j >= count ? i : j;
+  }
+
   // Pending timeouts a game owns. later(fn, ms) schedules; clear() cancels every one still waiting.
   function timers() {
     var list = [];
@@ -176,5 +182,5 @@
   }
 
   OwnIt.kit = { has: has, plural: plural, label: label, note: note, dots: dots, answerButtons: answerButtons, targetIndex: targetIndex, mine: mine,
-    choiceKeys: choiceKeys, clock: clock, onActivate: onActivate, arrowKeys: arrowKeys, timers: timers, release: release, nextLabel: nextLabel, finish: finish, modalOpen: modalOpen };
+    choiceKeys: choiceKeys, clock: clock, onActivate: onActivate, arrowKeys: arrowKeys, gridMove: gridMove, timers: timers, release: release, nextLabel: nextLabel, finish: finish, modalOpen: modalOpen };
 })();

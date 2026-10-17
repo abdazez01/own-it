@@ -75,7 +75,7 @@
     mount.textContent = '';
     state = 'home';
     if (typeof OwnIt.home === 'function') OwnIt.home(mount);
-    if (OwnIt.toast) OwnIt.toast('Something went wrong with that game');
+    if (OwnIt.toast) OwnIt.toast("This round can't be played. Ask Claude to rebuild it.");
     notify();
     return false;
   }
