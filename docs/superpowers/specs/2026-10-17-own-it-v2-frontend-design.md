@@ -210,7 +210,7 @@ All sounds are synthesized, with no files. Each one has pitch variation (±3%) a
 | `toggle` | liquid toggle moves | soft "bloop": sine 520→780 Hz glide + tiny reverb | 160 ms | toggle |
 | `correct` | right answer, objective done | 3-note rising chime (E5–A5–E6), sine, wet | 380 ms | chime |
 | `wrong` | wrong answer, wrong turn | sine 200→120 Hz "bonk" | 240 ms | bonk |
-| `combo-n` | streak step n | `correct` transposed up n semitones, max +7 | 300 ms | chime |
+| `combo` (arg n) | streak step n | `correct` transposed up n semitones, max +7 | 300 ms | chime |
 | `streak-break` | a streak ends | gentle 2-note down-step | 260 ms | chime |
 | `levelup` | rung cleared, badge, quest complete | triad arpeggio (C–E–G triangle) → sustained C–G–C sine chord + one sparkle | ≤ 1.2 s | fanfare |
 | `claim` | zone claimed | `levelup` plus a low C2 swell | ≤ 1.2 s | fanfare |
@@ -235,7 +235,7 @@ The engine is generative, synthesized, and in tune: equal temperament, A4 = 440 
   - Progression B: F → G → Em → Am.
   - Each chord lasts one bar of 4.0 s (8 eighth notes of 0.5 s).
 - **Voices.**
-  - **Pad bed** ("organ hum"): the 4 chord tones, sine plus triangle at the same pitch, attack 1.8 s, through a static 900 Hz low-pass, at gain 0.016 per voice.
+  - **Pad bed** ("organ hum"): the 4 chord tones, sine plus triangle at the same pitch, attack 1.8 s, through a static 800 Hz low-pass (as in the approved mockup), at gain 0.016 per voice.
   - **Bass:** sine root on beat 1 and beat 3, and an octave note on beat 4.
   - **Electric piano (lead):** FM (carrier = modulator frequency, index envelope 2.2f → 0.12f over 0.35 s) plus a faint ×4 bell partial, through a 3.4 kHz low-pass and a quarter-note echo (feedback 0.18, wet low).
   - **Arpeggio:** 8 eighth notes per bar on chord tones `[0,1,2,1,3,1,2,1]`. Each note lasts at most 1.8 beats, so it never rings into the next chord.
@@ -244,7 +244,7 @@ The engine is generative, synthesized, and in tune: equal temperament, A4 = 440 
     - kick (sine 110→42 Hz) on 1, the "and" of 2, and 3,
     - snare (band-passed noise + 196 Hz triangle) on 2 and 4,
     - hats on 8ths.
-- **Timing.** Every note is on the eighth-note grid: no swing, no random timing.
+- **Timing.** Every note is on the eighth-note grid, with no swing and no random timing. Two exceptions come from the approved mockup: the turnaround bell arpeggio steps in sixteenths, and arpeggio notes last 1.8 eighth notes.
 - **Arrangement loop** (4 bars per section, 32 bars per cycle, about 2 min 8 s). Each row adds or removes one layer:
 
   | Section | Progression | Layers |
