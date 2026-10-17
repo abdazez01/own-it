@@ -450,3 +450,27 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .quiz-why strong { color: var(--ink); }
 .quiz-xp { color: var(--sage); font: 600 var(--fs-15) var(--f-flap); }
 .quiz-actions { justify-content: flex-end; }
+
+/* Screen copy frame (frontend spec 6.4): the rebuilt screen sits in a sandboxed iframe scaled with transform to fit its box. */
+.screen-frame { max-width: 100%; margin-inline: auto; border: 1px solid var(--edge); border-radius: var(--r-card); overflow: hidden; background: #F4F3F0; }
+.screen-vp { position: relative; overflow: hidden; max-width: 100%; }
+.screen-iframe { display: block; border: 0; background: #F4F3F0; }
+.screen-frame.no-pointer .screen-iframe { pointer-events: none; }
+.screen-missing { padding: var(--s-6); color: #3A3733; font: 500 var(--fs-15)/1.4 var(--f-ui); }
+
+/* Screen Tour: screen on the left (60%), question panel on the right; stacked below 1024px */
+.tour-grid { display: grid; gap: var(--s-5); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) { .tour-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
+.tour-screen { min-width: 0; }
+.tour-card { display: grid; gap: var(--s-4); min-width: 0; }
+.tour-hint { margin: 0; }
+
+/* Guess the Screen: one large blurred screen, a time meter, a big buzz button, then 4 choices */
+.guess-card { max-width: 920px; margin-inline: auto; display: grid; gap: var(--s-4); }
+.guess-screen { overflow: hidden; border-radius: var(--r-card); transition: filter 220ms linear; }
+@media (prefers-reduced-motion: reduce) { .guess-screen { transition: none; } }
+.guess-meter { height: 6px; border-radius: var(--r-pill); background: var(--track); border: 1px solid var(--edge); overflow: hidden; }
+.guess-meter-fill { display: block; height: 100%; width: 100%; background: var(--gold); }
+.buzz-btn { width: 100%; min-height: 64px; font-size: var(--fs-20); }
+.buzz-key { margin-left: var(--s-2); font: 600 var(--fs-13) var(--f-flap); opacity: .8; }
+@media (hover: none) { .buzz-key { display: none; } }
