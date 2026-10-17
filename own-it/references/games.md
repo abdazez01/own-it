@@ -1,6 +1,6 @@
 # Games (18)
 
-Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page data, adds ids and answers. Fields: `zone`, optional `mode`, and the shape in `assets/games/<game>.schema.json`. Only stage 2.0 is playable; do not build the rest.
+Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page data, adds ids and answers. Fields: `zone`, optional `mode`, and the shape in `assets/games/<game>.schema.json`.
 
 | Game | Stage | Fit rule and data shape |
 |---|---|---|

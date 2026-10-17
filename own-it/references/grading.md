@@ -8,7 +8,7 @@
 - **partial**: right direction, missing the key piece.
 - **miss**: wrong, empty, or a guess.
 
-`apply <id> --text '{"s-cancel":"solid"}'` with every key graded. A round `apply` takes no `--got/--of`; those are only for words ids and map missions. Then rebuild recs. `missed` lists ids; `wrong` lists pairs.
+`apply <id> --text '{"s-cancel":"solid"}'` with every key graded. `--got/--of` are only for words ids and map-rung missions or rounds. Then rebuild recs. `missed` lists ids; `wrong` lists pairs.
 
 ## Feedback file
 
