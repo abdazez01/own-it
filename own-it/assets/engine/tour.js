@@ -39,8 +39,17 @@
     if (head && btn && head.getAttribute('data-open') !== 'true' && btn.offsetWidth !== 0) btn.click();
   }
 
+  // The tour belongs to Home: leaving Home (opening a game) closes it.
+  var watching = false;
+  function watchRoute() {
+    if (watching || !OwnIt.router || !OwnIt.router.onChange) return;
+    watching = true;
+    OwnIt.router.onChange(function (state) { if (active && state !== 'home') active.end('skip'); });
+  }
+
   function start() {
     if (active || !OwnIt.kit || !OwnIt.kit.coach) return null;
+    watchRoute();
     active = OwnIt.kit.coach(steps(), { float: true, label: 'Home tour', finishLabel: 'Done', onEnd: function () {
       active = null;
       OwnIt.kit.markSeen('home');

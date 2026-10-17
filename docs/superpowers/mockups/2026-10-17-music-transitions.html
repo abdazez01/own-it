@@ -134,6 +134,32 @@
       o.connect(g); g.connect(th.bus); o.start(t); o.stop(t + len + .2); keep(th, o);
     });
   }
+  // Music box: thin sine plus a glassy partial, very quiet, drowned in the echo. Plays a minor line that leans on the tritone.
+  function musicBox(th, t, m, vel) {
+    var f = hz(m), o = ac.createOscillator(), p = ac.createOscillator(), g = env(t, .002, .03 * vel, 1.4, th.bus), pg = env(t, .001, .012 * vel, .25, th.bus);
+    o.frequency.value = f; p.frequency.value = f * 3.01; o.connect(g); p.connect(pg);
+    var s = ac.createGain(); s.gain.value = .9; g.connect(s); s.connect(room);
+    o.start(t); p.start(t); o.stop(t + 1.6); p.stop(t + .4); keep(th, o); keep(th, p);
+  }
+  var BOX = [[84, 0, 83, 0], [80, 0, 0, 79], [77, 0, 78, 0], [79, 0, 0, 0]];   // C6 B5 / Ab5 G5 / F5 F#5 (tritone) / G5
+  // Distant metal scrape: narrow band of noise gliding down, far back in the room.
+  function scrape(th, t) {
+    var len = 2.6, b = ac.createBuffer(1, Math.ceil(ac.sampleRate * len), ac.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    var s = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain(); s.buffer = b; bp.type = 'bandpass'; bp.Q.value = 18;
+    bp.frequency.setValueAtTime(820, t); bp.frequency.exponentialRampToValueAtTime(540, t + len);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.05, t + 1.4); g.gain.exponentialRampToValueAtTime(.0001, t + len);
+    s.connect(bp); bp.connect(g); g.connect(room); s.start(t); s.stop(t + len); keep(th, s);
+  }
+  // Reverse-style swell: rises, then stops dead on the next downbeat.
+  function suck(th, t, len) {
+    var b = ac.createBuffer(1, Math.ceil(ac.sampleRate * len), ac.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    var s = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain(); s.buffer = b; lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(200, t); lp.frequency.exponentialRampToValueAtTime(2400, t + len);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.06, t + len - .02); g.gain.linearRampToValueAtTime(0, t + len);
+    s.connect(lp); lp.connect(g); g.connect(th.bus); s.start(t); s.stop(t + len); keep(th, s);
+  }
   // Dashboard at 120 bpm: one bar = 2 s, exactly half a chill bar, so downbeats line up.
   var DASH = { bpm: 120, ch: [[60, 64, 67, 74], [59, 62, 67, 71], [57, 60, 64, 67], [57, 60, 65, 69]], org: [[48, 55, 64], [43, 55, 62], [45, 57, 64], [41, 53, 60]] };
   var DARK = { bpm: 60, ch: [[48, 55, 63], [44, 51, 60], [41, 48, 56], [43, 50, 59]], org: [[36, 43, 51], [32, 44, 51], [29, 41, 48], [31, 43, 50]] };
@@ -152,7 +178,9 @@
       s.ch[i].forEach(function (m, n) { ep(th, t + n * .06, m, .75, L * .9); });
       ep(th, t + 2.5 * B, s.ch[i][2] + 12, .4, B * 2);
       kick(th, t, .95, 75); kick(th, t + .24, .55, 62);
-      if (i === 3) tension(th, t, L);
+      if (i === 3) { tension(th, t, L); suck(th, t + L - 1.6, 1.6); }
+      if (th.bar >= 2) BOX[i].forEach(function (m, k) { if (m) musicBox(th, t + k * B + (k % 2 ? .03 : 0), m, .8 + .2 * Math.random()); });   // enters after two bars, a hair off the grid
+      if (th.bar % 6 === 3) scrape(th, t + B * 1.5);
     }
     th.next += L; th.bar++;
   }
