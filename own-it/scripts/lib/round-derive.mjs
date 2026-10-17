@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto';
+import core from './core.mjs';
 
 // Fisher-Yates with a cryptographic source, so a shuffled order cannot be predicted.
 export function shuffle(list) {
@@ -196,6 +197,42 @@ export function roomPuzzles(input, byId, items) {
   }));
 }
 
+// Case file: checks the case against the zone and shapes it for the page. Evidence keeps its written order here (scaleCase shuffles it);
+// each card's relevance moves to `answer` so obfuscate() hides it, and the culprit's real file:line goes out encoded as `where`.
+const SUSPECT_KINDS = ['surface', 'component', 'element'];
+export function caseFile(input, byId) {
+  const c = input.case;
+  const relevant = c.evidence.filter((e) => e.relevant).length;
+  if (relevant !== 3) throw new Error(`case needs exactly 3 relevant evidence cards, found ${relevant}`);
+  if (new Set(c.suspects).size !== c.suspects.length) throw new Error('duplicate suspects');
+  if (!c.suspects.includes(c.answer)) throw new Error('answer is not one of the suspects');
+  for (const id of c.suspects) {
+    const it = byId.get(id);
+    if (!SUSPECT_KINDS.includes(it.k)) throw new Error(`suspect "${id}" is not a surface, component or element`);
+    if (!labeled(it)) throw new Error(`suspect "${id}" has no label in the model`);
+  }
+  const culprit = byId.get(c.answer);
+  if (typeof culprit.ref !== 'string' || !culprit.ref) throw new Error(`"${c.answer}" has no ref in the model`);
+  return { report: c.report, evidence: c.evidence.map((e) => ({ text: e.text, answer: e.relevant, why: e.why })), suspects: c.suspects,
+    answer: c.answer, why: c.why, where: core.encode(culprit.ref) };
+}
+
+// Level plan for a case: how many evidence cards (3 relevant plus herrings) and suspects the page shows.
+const CASE_PLAN = { easy: { cards: 4, suspects: 2 }, medium: { cards: 6, suspects: 4 }, hard: { cards: 6, suspects: 5 }, impossible: { cards: 6, suspects: 5 } };
+// Trims or pads a derived case to its level: fewer herrings and suspects when easy, suspects topped up with look-alikes from the zone when hard.
+// Evidence and suspects end up in random order, so the written order gives nothing away.
+export function scaleCase(round, level, byId, items) {
+  const plan = CASE_PLAN[level] || CASE_PLAN.medium;
+  const real = round.evidence.filter((e) => e.answer);
+  const herrings = shuffle(round.evidence.filter((e) => !e.answer));
+  round.evidence = shuffle([...real, ...herrings.slice(0, plan.cards - real.length)]);
+  const kind = byId.get(round.answer).k;
+  const listed = round.suspects.filter((id) => id !== round.answer);
+  const pool = items.filter((x) => x.k === kind && labeled(x) && x.id !== round.answer && !listed.includes(x.id)).map((x) => x.id);
+  const others = [...shuffle(listed), ...shuffle(pool)].slice(0, plan.suspects - 1);
+  round.suspects = shuffle([round.answer, ...others]).map((id) => ({ id, label: byId.get(id).label }));
+}
+
 // Fills in answers the model already knows, so Claude never has to write them.
 export function derive(game, round, byId, items) {
   if (game === 'quests') {
@@ -265,6 +302,9 @@ export function derive(game, round, byId, items) {
     round.who = who;
     round.answer = { order, by };
     delete round.states;
+  } else if (game === 'case-file') {
+    Object.assign(round, caseFile(round, byId));
+    delete round.case;
   }
 }
 

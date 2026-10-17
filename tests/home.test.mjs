@@ -27,11 +27,11 @@ function boot({ built = BUILT, progress = PROGRESS, recs, rounds, reduced = true
   return { env, w, stage, home: () => w.OwnIt.router.go('home') };
 }
 
-test('home renders 18 library tiles, 6 enabled', () => {
+test('home renders one library tile per game, 6 enabled', () => {
   const { stage, home } = boot();
   home();
   const tiles = Array.from(stage.querySelectorAll('.tile-game'));
-  assert.equal(tiles.length, 18);
+  assert.equal(tiles.length, listGames().length);
   assert.equal(tiles.filter((t) => !t.hasAttribute('disabled')).length, 6);
   const off = tiles.find((t) => t.hasAttribute('disabled'));
   assert.match(off.textContent, /Coming in a later update/);

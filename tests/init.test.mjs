@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run as init } from '../own-it/scripts/lib/cmd-init.mjs';
+import { listGames } from '../own-it/scripts/lib/games.mjs';
 import { loadProgress } from '../own-it/scripts/lib/progress.mjs';
 import { loadModel, saveModel } from '../own-it/scripts/lib/model.mjs';
 import { tmpProject, ctx } from './helpers.mjs';
@@ -87,7 +88,7 @@ test('init copies engine and registry', async () => {
   assert.match(reg, /^window\.OWNIT_GAMES = \[/);
   assert.match(reg, /\nwindow\.OWNIT_ROOT = "/);
   const games = JSON.parse(reg.split('\n')[0].replace(/^window\.OWNIT_GAMES = /, '').replace(/;\s*$/, ''));
-  assert.equal(games.length, 18);
+  assert.equal(games.length, listGames().length);
   assert.ok(games.every((g) => g.logo.startsWith('<svg') && g.keys));
   assert.doesNotMatch(readFileSync(join(base, 'game.html'), 'utf8'), /prefers-color-scheme/);
 });
