@@ -11,7 +11,7 @@ import { run as wait } from '../own-it/scripts/lib/cmd-wait.mjs';
 import { run as stop } from '../own-it/scripts/lib/cmd-stop.mjs';
 import { run as collect } from '../own-it/scripts/lib/cmd-collect.mjs';
 import { writeJson } from '../own-it/scripts/lib/json.mjs';
-import { tmpProject, ctx } from './helpers.mjs';
+import { tmpProject, ctx, tmpDir } from './helpers.mjs';
 
 function setup() {
   const root = tmpProject({});
@@ -251,7 +251,7 @@ const answer = (got, at) => ({ id: 'trips-map-1', submittedAt: at, got, of: 2, m
 
 test('collect skips stale inbox result and uses Downloads', async () => {
   const { c, inbox } = collectSetup();
-  const dl = mkdtempSync(join(tmpdir(), 'ownit-dl-'));
+  const dl = tmpDir('ownit-dl-');
   writeFileSync(join(inbox, '2000-result.json'), JSON.stringify({ type: 'result', ...answer(0, '2020-01-01T00:00:00.000Z') }));
   writeFileSync(join(dl, 'own-it-trips-map-1.json'), JSON.stringify(answer(2, '2026-10-13T16:05:00.000Z')));
   const out = await collect({ _: ['trips-map-1'], flags: {} }, { ...c, env: { OWNIT_DOWNLOADS: dl } });

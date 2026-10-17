@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { run as collect } from '../own-it/scripts/lib/cmd-collect.mjs';
 import { writeJson } from '../own-it/scripts/lib/json.mjs';
-import { tmpProject, ctx } from './helpers.mjs';
+import { tmpProject, ctx, tmpDir } from './helpers.mjs';
 
 function setup() {
   const root = tmpProject({});
-  const dl = mkdtempSync(join(tmpdir(), 'ownit-dl-'));
+  const dl = tmpDir('ownit-dl-');
   writeJson(join(root, '.own-it', 'progress.json'), { version: 1, settings: { downloadDir: null }, zones: {}, tokens: [] });
   writeJson(join(root, '.own-it', 'session.json'), { session: '2026-10-13T16:00:00.000Z', mode: 'practice',
     missions: { 'trips-map-1': { zone: 'trips', rung: 'map', board: 'component', cardIds: [] } } });
