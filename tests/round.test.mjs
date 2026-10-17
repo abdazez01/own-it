@@ -1010,3 +1010,13 @@ test('guess-the-screen rejects a screen with no copy and fewer than 2 labelled e
   rmSync(join(root, '.own-it', 'screens', 's1.html'));
   await assert.rejects(bld(root, 'guess-the-screen', { zone: 'trips', screens: [1, 2, 3].map(() => ({ screen: 's1', choices: ['s1', 's2', 'el1', 'el2'], answer: 's1' })) }), /no built copy and fewer than 2 labelled elements/);
 });
+
+test('guess-the-screen lists where every answer screen lives, even when it is a decoy elsewhere', async () => {
+  const root = await setup();
+  const out = await bld(root, 'guess-the-screen', { zone: 'trips', screens: [
+    { screen: 's1', choices: ['s1', 's2', 'el1', 'el2'], answer: 's1' },
+    { screen: 's2', choices: ['s1', 's2', 'el1', 'el2'], answer: 's2' },
+    { screen: 's1', choices: ['s1', 's2', 'el1', 'el2'], answer: 's1' }] });
+  const where = core.decode(loadRound(root, out.id).where).map((w) => w.label).sort();
+  assert.deepEqual(where, ['Approvals', 'Trip screen']);
+});

@@ -307,7 +307,11 @@ function checkWeakness(w, input, byId, nav) {
 // The model items whose code a round is about: the ids it names (decoy choices left out), the steps of any flow, the parts that break.
 function whereIds(game, input, round, named) {
   const ids = new Set(named);
-  const dropDecoys = (entries) => entries.forEach((e) => (e.choices || []).forEach((c) => { if (c !== e.answer) ids.delete(c); }));
+  // A decoy for one entry can be the answer of another, so answers are added back after the decoys go.
+  const dropDecoys = (entries) => {
+    entries.forEach((e) => (e.choices || []).forEach((c) => { if (c !== e.answer) ids.delete(c); }));
+    entries.forEach((e) => { if (typeof e.answer === 'string' && named.includes(e.answer)) ids.add(e.answer); });
+  };
   if (game === 'screen-tour') dropDecoys(input.steps.filter((s) => s.kind !== 'role'));
   if (game === 'guess-the-screen') dropDecoys(input.screens);
   return ids;
