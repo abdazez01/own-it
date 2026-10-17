@@ -18,7 +18,6 @@
     var L = function (c) { return c.label || kit.label(c.id, labels); };
 
     var done = false;
-    var progress = 0;       // steps lit so far
     var streak = 0;
     var wrong = [];         // [clickedId, expectedId]
     var boomed = {};        // expected id -> true after an explosion on that step
@@ -26,7 +25,7 @@
     var timers = [];
     var fuse = null;        // the kit clock
     var cur = 0;
-    var order = null;       // decoded on the first click
+    var steps = kit.stepper(kit.lazy(round && round.answer, function (dec) { return Array.isArray(dec) ? dec : []; })); // decoded on the first click
 
     var shell = OwnIt.shell(root, ctx, { zone: round && round.zone, total: total, side: false });
     var area = shell.area;
@@ -68,20 +67,13 @@
       finish();
     }
 
-    function sequence() {
-      if (order) return order;
-      var dec = OwnItCore.decode(round.answer); // the only place the order is decoded
-      order = Array.isArray(dec) ? dec : [];
-      return order;
-    }
-
     function light(i) {
       var c = cards[i];
       if (done || !c || lit[c.id]) return;
-      var expected = sequence()[progress];
-      if (c.id === expected) {
+      var expected = steps.expected();
+      if (steps.take(c.id)) {
+        var progress = steps.progress();
         lit[c.id] = true;
-        progress++;
         streak++;
         els[i].classList.add('lit');
         els[i].setAttribute('aria-disabled', 'true');
@@ -112,7 +104,7 @@
       if (done) return;
       done = true;
       if (fuse) fuse.stop();
-      var seq = sequence();
+      var seq = steps.order();
       var missedIds = seq.filter(function (id) { return !lit[id]; });
       var byId = {};
       cards.forEach(function (c) { byId[c.id] = c; });
@@ -120,7 +112,7 @@
         return { text: lead + 'Step ' + (seq.indexOf(id) + 1) + ' of ' + total + ': ' + (byId[id] ? L(byId[id]) : id) + '.' };
       };
       var review = seq.filter(function (id) { return boomed[id] || !lit[id]; }).map(function (id) { return say(id, lit[id] ? 'Lit after a retry. ' : ''); });
-      kit.finish(shell, ctx, { game: 'chain-reaction', mode: mode, got: progress, of: total, xp: progress * XP_STEP, missed: missedIds, review: review, extra: { wrong: wrong } });
+      kit.finish(shell, ctx, { game: 'chain-reaction', mode: mode, got: steps.progress(), of: total, xp: steps.progress() * XP_STEP, missed: missedIds, review: review, extra: { wrong: wrong } });
     }
 
     var offs = [];

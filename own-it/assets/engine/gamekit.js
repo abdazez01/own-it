@@ -1,5 +1,6 @@
 /* own-it engine: shared scaffolding for question-style game templates (quiz, screen tour, guess the screen).
-   OwnIt.kit: label, note, dots, answerButtons, targetIndex, choiceKeys, clock, onActivate, arrowKeys, gridMove, timers, release, nextLabel, finish. Load after shell.js. */
+   OwnIt.kit: label, note, dots, answerButtons, targetIndex, choiceKeys, clock, onActivate, arrowKeys, gridMove, timers, release, nextLabel, lazy, verdict,
+   stepper, gradeFor, asker, finish. Load after shell.js. */
 (function () {
   'use strict';
   var OwnIt = (window.OwnIt = window.OwnIt || {});
@@ -129,6 +130,91 @@
     offs.forEach(function (off) { try { off(); } catch (e) { /* gone */ } });
   }
 
+  // A getter that decodes an obfuscated answer the first time it is asked for, and never before. asValue(decoded) may reshape or validate it.
+  function lazy(enc, asValue) {
+    var got = false, value;
+    return function () {
+      if (!got) { value = OwnItCore.decode(enc); if (asValue) value = asValue(value); got = true; }
+      return value;
+    };
+  }
+
+  // Judges one allow or deny card (action, role, answer, why) against what the player said. Decodes the verdict and the reason here.
+  function verdict(card, said) {
+    var truth = OwnItCore.decode(card.answer);
+    return { ok: truth === said, truth: truth, phrase: 'A ' + card.role + ' ' + (truth === 'allow' ? 'may' : 'may not') + ': ' + card.action + '. ' + OwnItCore.decode(card.why) };
+  }
+
+  // Walks an ordered list one id at a time. getOrder() returns the right order (see lazy). take(id) is true and advances on the next right id, false otherwise.
+  function stepper(getOrder) {
+    var at = 0;
+    return {
+      order: getOrder,
+      progress: function () { return at; },
+      expected: function () { return getOrder()[at]; },
+      take: function (id) { if (id !== getOrder()[at]) return false; at++; return true; }
+    };
+  }
+
+  // 'q2', 'Q2', 2 and '2' all mean the second question. Anything else is null.
+  function qKey(q) {
+    var m = /^q?(\d{1,2})$/i.exec(String(q == null ? '' : q).trim());
+    return m ? 'q' + parseInt(m[1], 10) : null;
+  }
+
+  var GRADES = { solid: 1, partial: 1, miss: 1 };
+
+  /* Reads Claude's grade for key ('q1'..). Canonical shape: {grades: {q1: 'solid'|'partial'|'miss', ...}, notes?: {q1: '...'}}.
+     Older shapes still parse: {q, grade}, [{q, grade}] and {q1: 'solid'}. */
+  function gradeFor(fb, key) {
+    if (!fb || typeof fb !== 'object') return null;
+    var found = null;
+    function ok(g) { return has(GRADES, g) ? g : null; }
+    if (Array.isArray(fb)) {
+      fb.forEach(function (e) { if (e && qKey(e.q) === key && ok(e.grade)) found = e.grade; });
+      return found;
+    }
+    if (has(fb, 'q') && has(fb, 'grade') && qKey(fb.q) === key) return ok(fb.grade);
+    if (has(fb, 'grades')) found = gradeFor(fb.grades, key);
+    if (!found && has(fb, key) && typeof fb[key] === 'string') found = ok(fb[key]);
+    return found;
+  }
+
+  /* A typed answer sent to Claude as an `ask` event and graded in chat. h: { onGrade(key, grade), onUnsent() when the ask never left,
+     onSkip() when no grade came within skipAfter ms (default 60000), onOffline() when the link left live mode while waiting }.
+     send(key, text) returns false when there is no live link (file mode: the caller keeps the text for the result). A grade only counts when the
+     link reports changed feedback data after the ask. cancel() stops waiting; release() drops the listeners. */
+  function asker(ctx, h, skipAfter) {
+    var link = ctx.link || null, pending = null, skipTimer = null, offs = [];
+    function liveMode() { return !!link && link.mode === 'live' && typeof link.send === 'function'; }
+    function settle() { pending = null; if (skipTimer) { clearTimeout(skipTimer); skipTimer = null; } }
+    function unsent(p) { if (pending !== p) return; settle(); h.onUnsent(); }
+    function poll(info) {
+      if (!pending) return;
+      if (info && typeof info.file === 'string' && info.file.indexOf('feedback-' + ctx.roundId) < 0) return;
+      var fb = OwnIt.feedback ? OwnIt.feedback(ctx.roundId) : null;
+      var key = pending.key, g = gradeFor(fb || ctx.feedback, key);
+      if (g) { settle(); h.onGrade(key, g); }
+    }
+    if (link && link.onData) offs.push(link.onData(poll));
+    if (link && link.onMode) offs.push(link.onMode(function (m) { if (m !== 'live' && pending) { settle(); h.onOffline(); } }));
+    return {
+      send: function (key, text) {
+        if (!liveMode()) return false;
+        var p = pending = { key: key };
+        if (skipTimer) clearTimeout(skipTimer);
+        skipTimer = setTimeout(function () { skipTimer = null; if (pending === p) h.onSkip(); }, skipAfter === undefined ? 60000 : skipAfter);
+        var sent;
+        try { sent = Promise.resolve(link.send('ask', { round: ctx.roundId, q: key, text: text })); } catch (e) { sent = Promise.resolve(false); }
+        sent.then(function (okSent) { if (okSent === false) unsent(p); }, function () { unsent(p); });
+        return true;
+      },
+      waiting: function () { return !!pending; },
+      cancel: settle,
+      release: function () { settle(); release(offs); }
+    };
+  }
+
   // Sets the Next/See result caption, shows the button and moves focus to it.
   function nextLabel(btn, current, total) {
     btn.textContent = current + 1 >= total ? 'See result' : 'Next';
@@ -182,5 +268,6 @@
   }
 
   OwnIt.kit = { has: has, plural: plural, label: label, note: note, dots: dots, answerButtons: answerButtons, targetIndex: targetIndex, mine: mine,
-    choiceKeys: choiceKeys, clock: clock, onActivate: onActivate, arrowKeys: arrowKeys, gridMove: gridMove, timers: timers, release: release, nextLabel: nextLabel, finish: finish, modalOpen: modalOpen };
+    choiceKeys: choiceKeys, clock: clock, onActivate: onActivate, arrowKeys: arrowKeys, gridMove: gridMove, timers: timers, release: release, nextLabel: nextLabel, lazy: lazy, verdict: verdict, stepper: stepper,
+    gradeFor: gradeFor, asker: asker, finish: finish, modalOpen: modalOpen };
 })();

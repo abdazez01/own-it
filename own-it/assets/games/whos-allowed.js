@@ -58,13 +58,13 @@
       describe();
     }
 
-    function judge(verdict) {
+    function judge(said) {
       if (done || at >= total) return;
       var c = cards[at];
-      var truth = OwnItCore.decode(c.answer); // the only place a verdict is decoded
-      var ok = truth === verdict;
+      var judged = kit.verdict(c, said); // the only place a verdict and its reason are decoded
+      var ok = judged.ok;
       feedback.textContent = '';
-      var phrase = 'A ' + c.role + ' ' + (truth === 'allow' ? 'may' : 'may not') + ': ' + c.action + '. ' + OwnItCore.decode(c.why); // the reason is decoded here, after the call
+      var phrase = judged.phrase;
       if (ok) {
         var pts = Math.round(XP_BASE * (1 + streak / 5));
         xp += pts;

@@ -24,7 +24,7 @@
     var tried = {};         // card position -> true
     var shownLogs = 0;
     var clock = null;
-    var culprit = null;       // decoded on the first pick or at the end
+    var culpritId = kit.lazy(round && round.answer); // decoded on the first pick or at the end
 
     var shell = OwnIt.shell(root, ctx, { zone: round && round.zone, total: 1, side: false });
     var area = shell.area;
@@ -74,11 +74,6 @@
       OwnIt.juice.shake(panel);
       feedback.textContent = '';
       kit.note(feedback, 'bad', 'Not that one.', 'The log says otherwise. Read it again.');
-    }
-
-    function culpritId() {
-      if (culprit === null) culprit = OwnItCore.decode(round.answer);
-      return culprit;
     }
 
     function end(xp, got) {

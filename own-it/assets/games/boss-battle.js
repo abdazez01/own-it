@@ -23,35 +23,13 @@
 
   var own = kit.has;
 
-  // 'q2', 'Q2', 2 and '2' all mean the second question. Anything else is null.
-  function qKey(q) {
-    var m = /^q?(\d{1,2})$/i.exec(String(q == null ? '' : q).trim());
-    return m ? 'q' + parseInt(m[1], 10) : null;
-  }
-
-  /* Reads the grade for key. Canonical shape: {grades: {q1: 'solid'|'partial'|'miss', ...}, notes?: {q1: '...'}}.
-     Older shapes still parse: {q, grade}, [{q, grade}] and {q1: 'solid'}. */
-  function gradeFor(fb, key) {
-    if (!fb || typeof fb !== 'object') return null;
-    var found = null;
-    function ok(g) { return own(SCORE, g) ? g : null; }
-    if (Array.isArray(fb)) {
-      fb.forEach(function (e) { if (e && qKey(e.q) === key && ok(e.grade)) found = e.grade; });
-      return found;
-    }
-    if (own(fb, 'q') && own(fb, 'grade') && qKey(fb.q) === key) return ok(fb.grade);
-    if (own(fb, 'grades')) found = gradeFor(fb.grades, key);
-    if (!found && own(fb, key) && typeof fb[key] === 'string') found = ok(fb[key]);
-    return found;
-  }
-  OwnIt.bossGradeFor = gradeFor;
+  OwnIt.bossGradeFor = kit.gradeFor;
 
   function play(root, round, ctx) {
     var questions = ((round && round.questions) || []).filter(function (q) { return q && typeof q.q === 'string'; });
     var total = questions.length;
     var exam = (round && round.mode === 'exam') || OwnIt.mode === 'exam';
     var mode = exam ? 'exam' : 'practice';
-    var link = ctx.link || null;
 
     var qi = 0;
     var phase = 'answering';   // answering | waiting | graded
@@ -61,7 +39,7 @@
     var texts = {};            // q1.. -> typed answer
     var grades = {};           // q1.. -> solid | partial | miss
     var order = [];            // keys in the order they were answered
-    var dmgTimer = null, skipTimer = null;
+    var dmgTimer = null;
 
     var shell = OwnIt.shell(root, ctx, {
       zone: round && round.zone, total: total, side: false,
@@ -114,6 +92,12 @@
     area.appendChild(card);
 
     function qk(i) { return 'q' + (i + 1); }
+    var asker = kit.asker(ctx, {
+      onGrade: function (key, g) { if (!done && phase === 'waiting' && key === qk(qi)) applyGrade(g); },
+      onUnsent: unsend,
+      onSkip: function () { if (phase === 'waiting') skipBtn.removeAttribute('hidden'); },
+      onOffline: function () { if (!done && phase === 'waiting') settleUngraded(); }
+    }, SKIP_AFTER_MS);
     // Five tiles, one per 20 HP: full, half (10 left) or empty.
     function paintHp() {
       var glyphs = '';
@@ -155,8 +139,6 @@
       if (box.focus) box.focus();
     }
 
-    function liveMode() { return !!link && link.mode === 'live' && typeof link.send === 'function'; }
-
     function submit() {
       if (done || phase !== 'answering') return;
       var text = String(box.value || '').trim();
@@ -165,26 +147,17 @@
       texts[key] = text;
       box.setAttribute('disabled', 'disabled');
       sendBtn.setAttribute('hidden', 'hidden');
-      if (liveMode()) {
-        phase = 'waiting';
+      phase = 'waiting';
+      if (asker.send(key, text)) {
         say('', 'Sent.', 'Claude is grading your answer.');
-        var at = qi;
-        clearSkip();
-        skipTimer = setTimeout(function () { skipTimer = null; if (phase === 'waiting' && qi === at) skipBtn.removeAttribute('hidden'); }, SKIP_AFTER_MS);
-        var sent;
-        try { sent = Promise.resolve(link.send('ask', { round: ctx.roundId, q: key, text: text })); } catch (e) { sent = Promise.resolve(false); }
-        sent.then(function (okSent) { if (okSent === false) unsend(at); }, function () { unsend(at); });
       } else {
         settleUngraded();
       }
     }
 
-    function clearSkip() { if (skipTimer) { clearTimeout(skipTimer); skipTimer = null; } }
-
     // The ask never reached Claude: put the question back so the same answer can be sent again.
-    function unsend(at) {
-      if (done || phase !== 'waiting' || qi !== at) return;
-      clearSkip();
+    function unsend() {
+      if (done || phase !== 'waiting') return;
       phase = 'answering';
       box.removeAttribute('disabled');
       sendBtn.removeAttribute('hidden');
@@ -194,6 +167,7 @@
     // Waiting too long: the player moves on and the question counts as a miss.
     function skip() {
       if (done || phase !== 'waiting') return;
+      asker.cancel();
       applyGrade('miss');
     }
 
@@ -209,19 +183,8 @@
       if (nextBtn.focus) nextBtn.focus();
     }
 
-    // Called when the link reports a changed data file. A grade only counts if it arrives this way after the ask was sent,
-    // so a grade left over from an earlier attempt at the same round is never applied.
-    function pollFeedback(info) {
-      if (done || phase !== 'waiting') return;
-      if (info && typeof info.file === 'string' && info.file.indexOf('feedback-' + ctx.roundId) < 0) return;
-      var fb = OwnIt.feedback ? OwnIt.feedback(ctx.roundId) : null;
-      var g = gradeFor(fb || ctx.feedback, qk(qi));
-      if (g) applyGrade(g);
-    }
-
     function applyGrade(g) {
       var key = qk(qi);
-      clearSkip();
       skipBtn.setAttribute('hidden', 'hidden');
       phase = 'graded';
       grades[key] = g;
@@ -281,13 +244,7 @@
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); e.stopPropagation(); submit(); }
     });
 
-    var offs = [];
-    if (link && link.onData) offs.push(link.onData(function (info) { pollFeedback(info); }));
-    if (link && link.onMode) {
-      offs.push(link.onMode(function (m) {
-        if (m !== 'live' && phase === 'waiting' && !done) settleUngraded();
-      }));
-    }
+    var offs = [function () { asker.release(); }];
     offs.push(kit.onActivate(ctx, area, 'Enter', function () {
       if (phase === 'graded' && !nextBtn.hasAttribute('hidden')) next();
     }));
@@ -304,7 +261,6 @@
 
     return function () {
       done = true;
-      clearSkip();
       if (dmgTimer) { clearTimeout(dmgTimer); dmgTimer = null; }
       offs.forEach(function (off) { try { off(); } catch (e) { /* gone */ } });
       shell.destroy();
