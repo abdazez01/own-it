@@ -25,7 +25,7 @@ No `.own-it/progress.json`: `scan`, group candidates into zones (ids `a-z0-9-`, 
 
 ## 5. Customize the dashboard
 
-Extract zones (`extraction.md`, `screens.md`). Write `.own-it/recs.json` with 3-5 `{game, zone, reason}` (reason ≤120 chars), run `build-recs .own-it/recs.json`. Pre-build rounds for them with `build-round` (`games.md`).
+Extract zones + break passes (`extraction.md`, `screens.md`). Write `.own-it/recs.json` with 3-5 `{game, zone, reason}` (reason ≤120 chars), run `build-recs .own-it/recs.json`. Pre-build rounds for them with `build-round` (`games.md`).
 
 ## 6. Live link
 

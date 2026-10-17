@@ -2,12 +2,12 @@
 
 ## Words pass (no subagent)
 
-`scan --strings <zone>` gives up to 60 terms `{t, kind, n, refs}`. Pick about 10 for the quiz. Unclear names: web search, label "outside knowledge".
+`scan --strings <zone>` gives up to 60 terms `{t, kind, n, refs}`. Pick ~10 for quiz. Unclear names: web search, label "outside knowledge".
 
 
 ## Structure pass
 
-Skip if `model.json` has the zone's items and `fog` shows none `stale`. Else give the Agent tool (`sonnet`) this prompt, or extract inline.
+Skip if `model.json` has the zone's items and `fog` shows none `stale`. Else Agent (`sonnet`) with this prompt, or inline.
 
 ```
 Extract the truth model of zone "<zone>" from this repo. Read-only.
@@ -27,24 +27,29 @@ Kinds (k) and fields:
 - failure: card, threat (e.g. "Client forges role header"). Cover validation, auth, idempotency, retries, concurrency.
 - term: label. outside: true when ref is outside the zone files.
 Return JSON only, no prose:
-{"zone":"<zone>","files":[<Files>],"items":[one per line],"weaknesses":[optional, max 5]}
+{"zone":"<zone>","files":[<Files>],"items":[one per line]}
 ```
-
-## Weaknesses (optional, powers the hidden Secret level)
-
-Only when the code proves it; never invent. Fields: `id`, `kind`, `text` (≤160), `why` (≤300), `ref` (`file:line` evidence), `steps` (1-4 `{element, role?}`):
-- `role`: no permission check. Last step is a role the element's `roles` excludes.
-- `double`: double submit or race. One element.
-- `order`: a step can be skipped. Last step is a flow element after the first.
-- `input`: unvalidated input. Field, then submit.
-
-Played only on sandboxed screen copies with fake data. Report it, never fix it.
 
 ## Verify
 
-1. Save the reply as `.own-it/extract-<zone>.json`; `check-refs` it → `{kept, dropped[{id, why}], est}`. Items pointing at dropped ids drop as `dangling`.
-2. Spot-check 2-3 kept items against their `ref` line. Failure: re-extract.
+1. Save as `.own-it/extract-<zone>.json`; `check-refs` it → `{kept, dropped[{id, why}], est}`. Items pointing at dropped ids drop as `dangling`.
+2. Spot-check 2-3 kept items' `ref` lines. Failure: re-extract.
+
+## Break pass
+
+Every zone, background, after `check-refs`; ids from `model.json`. Skip if `progress.json` counts its weaknesses (even 0) and none `stale`. Agent (`sonnet`):
+
+```
+Bug review of the owner's own app, zone "<zone>", to teach them. Read-only, max 20 reads. Files: <files>.
+No exploit code.
+Only ids: elements <id|label|on|does|roles>; roles <id|label>; flows <id|steps>.
+Proven only; none is fine. Max 5: id, kind, text ≤160, why ≤300, ref "path:line", steps 1-4 {element, role?}.
+role: last step a role excluded. double: one step. order: skip; last a later flow element. input: unvalidated field, then submit.
+JSON: {"weaknesses":[...]}
+```
+
+Save `.own-it/break-<zone>.json` with `zone`, `"files":[]`, `"items":[]`; `check-refs` it.
 
 ## Partial re-extraction
 
-Same prompt, only the `stale` files. `check-refs` replaces their items.
+Rerun on `stale` files, then break pass.
