@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Music Transitions Preview</title>
+<style>
+  :root { --night: #111214; --ink: #F5F3EE; --ink-2: #CFCBC2; --gold: #E8C26A; --gold-ink: #1E1500; --sage: #8FD3A8; --salmon: #F08A7A; --edge: rgba(235,235,240,.16); }
+  html, body { margin: 0; min-height: 100%; background: var(--night); color: var(--ink); font: 400 15px/1.5 "Geist", system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 44px 16px; display: grid; gap: 20px; }
+  h1 { margin: 0; font: 600 26px/1.2 "IBM Plex Mono", Consolas, monospace; }
+  p { margin: 0; color: var(--ink-2); }
+  .scenes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .scene { display: grid; gap: 8px; padding: 16px; border-radius: 16px; border: 1px solid var(--edge); background: rgba(240,240,245,.05); }
+  .scene b { font: 600 15px inherit; }
+  .scene span { color: var(--ink-2); font-size: 13px; }
+  .scene.on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .scene.secret.on { border-color: var(--salmon); box-shadow: 0 0 0 1px var(--salmon) inset; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; }
+  button { height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--edge); background: rgba(240,240,245,.08); color: var(--ink); font: 600 14px inherit; cursor: pointer; }
+  button.g { background: var(--gold); color: var(--gold-ink); border: 0; }
+  button.ok { background: rgba(143,211,168,.16); color: var(--sage); border-color: rgba(143,211,168,.5); }
+  button.s { background: rgba(240,138,122,.16); color: var(--salmon); border-color: rgba(240,138,122,.5); }
+  .now { font: 600 13px "IBM Plex Mono", Consolas, monospace; letter-spacing: .08em; color: var(--gold); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Music transitions</h1>
+  <p>Three moods of one piece in C. The middle one is the real in-game music from <code>music.js</code>, played by the real engine.</p>
+  <div class="scenes">
+    <div class="scene" id="scDash"><b>1 · Dashboard</b><span>Upbeat and inviting, at exactly double the chill tempo, so the two lock together.</span></div>
+    <div class="scene" id="scPlay"><b>2 · Playing</b><span>The existing chill theme: calm, for thinking.</span></div>
+    <div class="scene secret" id="scSecret"><b>3 · Secret level</b><span>Tape stop, silence, then C minor dread.</span></div>
+  </div>
+  <div class="row">
+    <button class="g" id="bDash">▶ Open the dashboard</button>
+    <button class="ok" id="bPlay">Start a round</button>
+    <button id="bLeave">Leave the round</button>
+    <button class="s" id="bSecret">Enter the secret level</button>
+    <button id="bStop">Stop all</button>
+  </div>
+  <div class="now" id="now">PRESS "OPEN THE DASHBOARD"</div>
+  <p>Start a round: the dashboard waits for its next downbeat. The filter closes and a riser and bells lead in, then the chill theme lands on the same C chord.<br>
+     Leave: the chill theme fades under falling bells, then the dashboard builds back up: pad first, then hats, then the full beat.</p>
+</main>
+
+<script>window.OwnIt = window.OwnIt || {}; try { localStorage.setItem('ownit-music', 'off'); } catch (e) {}</script>
+<script src="../../../own-it/assets/engine/music.js"></script>
+<script src="../../../own-it/assets/engine/audio.js"></script>
+<script>
+(function () {
+  'use strict';
+  var OwnIt = window.OwnIt, $ = function (id) { return document.getElementById(id); };
+  var hz = function (m) { return 440 * Math.pow(2, (m - 69) / 12); };
+  var ac = null, dest = null, room = null, cur = null, mood = 'off', pending = [];
+  var CHILL_BAR = 4.0;   // music.js: one bar = 4 s
+
+  function setup() {
+    if (ac) return true;
+    if (OwnIt.audio.unlock) OwnIt.audio.unlock();
+    var g = OwnIt.audio._graph && OwnIt.audio._graph();
+    if (!g) return false;
+    ac = g.ctx; if (ac.state === 'suspended') ac.resume();
+    dest = ac.createGain(); dest.gain.value = .8; dest.connect(g.out);
+    var d = ac.createDelay(1); d.delayTime.value = .31; var fb = ac.createGain(); fb.gain.value = .45; var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500;
+    d.connect(lp); lp.connect(fb); fb.connect(d); var wet = ac.createGain(); wet.gain.value = .55; lp.connect(wet); wet.connect(dest); room = d;
+    return true;
+  }
+  function later(fn, ms) { pending.push(setTimeout(fn, ms)); }
+  function clearLater() { pending.forEach(clearTimeout); pending = []; }
+
+  /* the real chill theme */
+  function chillOn(at, fade) { OwnIt.audio.settings.music = true; OwnIt.music.start(0, { at: at, fade: fade }); }
+  function chillOff(fade) { OwnIt.music.stop({ fade: fade }); OwnIt.audio.settings.music = false; }
+
+  /* our themes: one bus each, own scheduler, can stop at a bar line */
+  function theme(kind) {
+    var bus = ac.createGain(), tone = ac.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = kind === 'secret' ? 1100 : 5200;
+    bus.connect(tone); tone.connect(dest);
+    var send = ac.createGain(); send.gain.value = kind === 'secret' ? .65 : .12; bus.connect(send); send.connect(room);
+    var th = { kind: kind, bus: bus, tone: tone, srcs: [], next: ac.currentTime + .08, bar: 0, stopAt: Infinity, build: false, timer: null };
+    th.timer = setInterval(function () { while (th.next < ac.currentTime + .4 && th.next < th.stopAt - .01) bar(th); }, 50);
+    return th;
+  }
+  function keep(th, n) { th.srcs.push(n); n.onended = function () { var i = th.srcs.indexOf(n); if (i >= 0) th.srcs.splice(i, 1); }; }
+  function env(t, a, peak, d, to) { var g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(.0001, t + a + d); g.connect(to); return g; }
+  function ep(th, t, m, vel, len, to) {
+    var f = hz(m), car = ac.createOscillator(), mod = ac.createOscillator(), mg = ac.createGain();
+    car.frequency.value = f; mod.frequency.value = f; mg.gain.setValueAtTime(f * 1.1, t); mg.gain.exponentialRampToValueAtTime(f * .15, t + .6);
+    mod.connect(mg); mg.connect(car.frequency); car.connect(env(t, .006, .07 * vel, len, to || th.bus));
+    [car, mod].forEach(function (o) { o.start(t); o.stop(t + len + .1); if (th) keep(th, o); });
+  }
+  function bell(t, m, vel) {                 // transition bells: FM with a bright x4 partial, into the room
+    var f = hz(m), o = ac.createOscillator(), b = ac.createOscillator(), g = env(t, .003, .05 * vel, 1.6, dest), bg = env(t, .002, .02 * vel, .4, dest);
+    o.frequency.value = f; b.frequency.value = f * 4; o.connect(g); b.connect(bg); g.connect(room);
+    o.start(t); b.start(t); o.stop(t + 1.8); b.stop(t + .5);
+  }
+  function riser(t0, t1, up) {               // filtered air: up into the round, down out of it
+    var len = t1 - t0, b = ac.createBuffer(1, Math.ceil(ac.sampleRate * (len + .3)), ac.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    var s = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain(); s.buffer = b; bp.type = 'bandpass'; bp.Q.value = .8;
+    bp.frequency.setValueAtTime(up ? 400 : 3000, t0); bp.frequency.exponentialRampToValueAtTime(up ? 3000 : 300, t1);
+    g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(.035, up ? t1 - .05 : t0 + len * .3); g.gain.exponentialRampToValueAtTime(.0001, up ? t1 + .15 : t1);
+    s.connect(bp); bp.connect(g); g.connect(dest); g.connect(room); s.start(t0); s.stop(t1 + .3);
+  }
+  function organ(th, t, m, len, g) {
+    [1, 2, 3].forEach(function (h, i) {
+      var o = ac.createOscillator(); o.frequency.value = hz(m) * h; var lv = g * [1, .35, .1][i];
+      var e = ac.createGain(); e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(lv, t + .5); e.gain.setValueAtTime(lv, t + len - .3); e.gain.linearRampToValueAtTime(0, t + len + .2);
+      o.connect(e); e.connect(th.bus); o.start(t); o.stop(t + len + .3); keep(th, o);
+    });
+  }
+  function kick(th, t, g, f0) {
+    var o = ac.createOscillator(); o.frequency.setValueAtTime(f0 || 110, t); o.frequency.exponentialRampToValueAtTime(40, t + .15);
+    o.connect(env(t, .002, .32 * g, .32, th.bus)); o.start(t); o.stop(t + .45); keep(th, o);
+  }
+  function hat(th, t, g) {
+    var b = ac.createBuffer(1, ac.sampleRate * .05, ac.sampleRate), dd = b.getChannelData(0); for (var i = 0; i < dd.length; i++) dd[i] = Math.random() * 2 - 1;
+    var s = ac.createBufferSource(), hp = ac.createBiquadFilter(); s.buffer = b; hp.type = 'highpass'; hp.frequency.value = 7000;
+    s.connect(hp); hp.connect(env(t, .001, .03 * g, .04, th.bus)); s.start(t); keep(th, s);
+  }
+  function drone(th, t, len) {
+    [24, 31, 36].forEach(function (m, i) {
+      var o = ac.createOscillator(); o.frequency.value = hz(m); var lv = [.11, .03, .05][i];
+      var g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(lv, t + 2); g.gain.setValueAtTime(lv, t + len - .5); g.gain.linearRampToValueAtTime(0, t + len + .6);
+      o.connect(g); g.connect(th.bus); o.start(t); o.stop(t + len + .7); keep(th, o);
+    });
+  }
+  function tension(th, t, len) {
+    [79, 80].forEach(function (m) {
+      var o = ac.createOscillator(); o.type = 'triangle'; o.frequency.value = hz(m);
+      var g = ac.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.02, t + len); g.gain.linearRampToValueAtTime(0, t + len + .15);
+      o.connect(g); g.connect(th.bus); o.start(t); o.stop(t + len + .2); keep(th, o);
+    });
+  }
+  // Dashboard at 120 bpm: one bar = 2 s, exactly half a chill bar, so downbeats line up.
+  var DASH = { bpm: 120, ch: [[60, 64, 67, 74], [59, 62, 67, 71], [57, 60, 64, 67], [57, 60, 65, 69]], org: [[48, 55, 64], [43, 55, 62], [45, 57, 64], [41, 53, 60]] };
+  var DARK = { bpm: 60, ch: [[48, 55, 63], [44, 51, 60], [41, 48, 56], [43, 50, 59]], org: [[36, 43, 51], [32, 44, 51], [29, 41, 48], [31, 43, 50]] };
+  function barLen(th) { return 4 * 60 / (th.kind === 'secret' ? DARK : DASH).bpm; }
+  function bar(th) {
+    var s = th.kind === 'secret' ? DARK : DASH, B = 60 / s.bpm, L = B * 4, t = th.next, i = th.bar % 4;
+    if (th.kind === 'dash') {
+      var drums = th.build ? th.bar : 9;     // building back up: bar 0 pad only, bar 1 hats, then the full beat
+      s.org[i].forEach(function (m) { organ(th, t, m, L, .02); });
+      [0, 1.5, 2.5].forEach(function (b, k) { s.ch[i].forEach(function (m, n) { ep(th, t + b * B + n * .012, m, k ? .6 : .9, B * 1.2); }); });
+      if (drums >= 1) for (var e = 0; e < 8; e++) hat(th, t + e * B / 2, e % 2 ? 1 : .5);
+      if (drums >= 2) { kick(th, t, 1); kick(th, t + 2 * B, .8); }
+    } else {
+      if (th.bar % 4 === 0) drone(th, t, L * 4);
+      s.org[i].forEach(function (m) { organ(th, t, m, L, .026); });
+      s.ch[i].forEach(function (m, n) { ep(th, t + n * .06, m, .75, L * .9); });
+      ep(th, t + 2.5 * B, s.ch[i][2] + 12, .4, B * 2);
+      kick(th, t, .95, 75); kick(th, t + .24, .55, 62);
+      if (i === 3) tension(th, t, L);
+    }
+    th.next += L; th.bar++;
+  }
+  function play(kind, opts) {
+    var th = theme(kind); cur = th; opts = opts || {};
+    if (opts.at) th.next = opts.at;
+    th.build = !!opts.build;
+    var t0 = th.next;
+    th.bus.gain.setValueAtTime(0, ac.currentTime); th.bus.gain.setValueAtTime(0, t0); th.bus.gain.linearRampToValueAtTime(1, t0 + (opts.fade || .3));
+    if (opts.build) {                        // filter opens over two bars as it builds
+      th.tone.frequency.setValueAtTime(700, t0); th.tone.frequency.exponentialRampToValueAtTime(5200, t0 + barLen(th) * 2);
+    }
+    return th;
+  }
+  function kill(th, after) {
+    setTimeout(function () { clearInterval(th.timer); th.srcs.slice().forEach(function (n) { try { n.stop(); } catch (e) {} }); try { th.bus.disconnect(); } catch (e) {} }, after * 1000);
+  }
+  function drop(th, how, secs) {
+    if (!th) return; var t = ac.currentTime; if (cur === th) cur = null;
+    th.stopAt = t;                           // no new bars
+    if (how === 'tape') {
+      th.tone.frequency.cancelScheduledValues(t); th.tone.frequency.setValueAtTime(th.tone.frequency.value, t); th.tone.frequency.exponentialRampToValueAtTime(110, t + .9);
+      th.srcs.forEach(function (n) { if (n.frequency) { n.frequency.cancelScheduledValues(t); n.frequency.setValueAtTime(n.frequency.value, t); n.frequency.exponentialRampToValueAtTime(Math.max(20, n.frequency.value * .33), t + .9); } });
+      th.bus.gain.cancelScheduledValues(t); th.bus.gain.setValueAtTime(th.bus.gain.value, t); th.bus.gain.linearRampToValueAtTime(0, t + .95); kill(th, 1.2);
+    } else { th.bus.gain.cancelScheduledValues(t); th.bus.gain.setValueAtTime(th.bus.gain.value, t); th.bus.gain.linearRampToValueAtTime(0, t + (secs || 2)); kill(th, (secs || 2) + .3); }
+  }
+  function show(m, label) {
+    mood = m; $('now').textContent = label;
+    $('scDash').classList.toggle('on', m === 'dash'); $('scPlay').classList.toggle('on', m === 'play'); $('scSecret').classList.toggle('on', m === 'secret');
+  }
+
+  /* dashboard -> round: wait for the next dashboard downbeat (at least 1.5 s away), close the filter, rise, bells, land on C */
+  function toRound() {
+    var th = cur, now = ac.currentTime, L = barLen(th), land = th.next;
+    while (land - now < 1.5) land += L;
+    th.stopAt = land;                        // it plays up to the downbeat and no further
+    th.tone.frequency.cancelScheduledValues(now); th.tone.frequency.setValueAtTime(th.tone.frequency.value, now); th.tone.frequency.exponentialRampToValueAtTime(500, land);
+    th.bus.gain.cancelScheduledValues(now); th.bus.gain.setValueAtTime(1, now); th.bus.gain.setValueAtTime(1, land - .4); th.bus.gain.linearRampToValueAtTime(0, land + .8);
+    kill(th, land - now + 1.2); cur = null;
+    riser(land - Math.min(L, land - now), land, true);
+    [72, 76, 79].forEach(function (m, k) { bell(land - .75 + k * .25, m, .9); });   // C E G on the last beat, then...
+    bell(land, 84, 1);                                                          // ...high C on the downbeat
+    chillOn(land, 1.2);                                                         // chill bar 0 is C: it lands on the same chord
+    later(function () { show('play', 'CHILL THEME (REAL ENGINE)'); }, (land - now) * 1000);
+    show('to-play', 'LEADING IN ON THE NEXT DOWNBEAT…');
+  }
+  /* round -> dashboard: chill fades under falling bells, dashboard builds back on a downbeat */
+  function toDash(fromSecret) {
+    var now = ac.currentTime, at = now + 1.6;
+    if (fromSecret) { drop(cur, 'fade', 1.8); at = now + 2.2; } else chillOff(1.8);
+    riser(now, now + 1.5, false);
+    [84, 79, 76, 72].forEach(function (m, k) { bell(now + .1 + k * .35, m, .8); });   // C G E C falling
+    play('dash', { at: at, fade: 1.2, build: true });
+    later(function () { show('dash', 'DASHBOARD THEME (BUILDING BACK UP)'); }, (at - now) * 1000);
+    show('to-dash', 'LEAVING…');
+  }
+
+  $('bDash').addEventListener('click', function () {
+    if (!setup()) return; clearLater();
+    if (mood === 'play' || mood === 'to-play') chillOff(1.5);
+    if (cur) drop(cur, 'fade', 1.5);
+    play('dash', { fade: 1.2, build: true }); show('dash', 'DASHBOARD THEME');
+  });
+  $('bPlay').addEventListener('click', function () {
+    if (!setup()) return;
+    if (mood !== 'dash') { if (!cur && mood !== 'play') { play('dash', { fade: .3 }); } else return; }
+    toRound();
+  });
+  $('bLeave').addEventListener('click', function () {
+    if (!setup()) return; clearLater();
+    if (mood === 'play' || mood === 'to-play') toDash(false);
+    else if (mood === 'secret') toDash(true);
+  });
+  $('bSecret').addEventListener('click', function () {
+    if (!setup() || mood === 'secret') return; clearLater();
+    var was = mood;
+    if (was === 'play' || was === 'to-play') chillOff(.8);
+    if (cur) drop(cur, 'tape');
+    show('stopping', 'TAPE STOP…');
+    later(function () { play('secret', { fade: 3 }); show('secret', 'SECRET LEVEL: C MINOR'); }, was === 'off' ? 0 : 1400);
+  });
+  $('bStop').addEventListener('click', function () {
+    if (!ac) return; clearLater();
+    chillOff(1); if (cur) drop(cur, 'fade', 1); show('off', 'STOPPED');
+  });
+})();
+</script>
+</body>
+</html>

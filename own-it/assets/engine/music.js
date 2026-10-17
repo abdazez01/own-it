@@ -232,16 +232,22 @@
   function wanted() { return !!(OwnIt.audio && OwnIt.audio.settings && OwnIt.audio.settings.music && !(OwnIt.audio.isMuted && OwnIt.audio.isMuted())); }
 
   OwnIt.music = {
-    start: function (fromBar) {
+    // opts.at: context time of the first downbeat (so a transition can land on it); opts.fade: seconds to full level.
+    start: function (fromBar, opts) {
       try {
         if (running || !wanted() || !OwnIt.audio._graph) return;
         var g = OwnIt.audio._graph();
         if (!g) return; // not unlocked yet: audio.unlock() calls start() again
         if (!graph || graph.ctx !== g.ctx) graph = build(g);
-        var R = graph;
-        R.bus.gain.cancelScheduledValues(g.ctx.currentTime);
-        R.bus.gain.setTargetAtTime(BUS_LEVEL, g.ctx.currentTime, 3);
-        var S = { R: R, bar: fromBar > 0 ? Math.floor(fromBar) : 0, next: g.ctx.currentTime + 0.1, timer: null, alive: true };
+        var R = graph, now = g.ctx.currentTime, o = opts || {};
+        var t0 = Math.max(now + 0.1, o.at || 0);
+        R.bus.gain.cancelScheduledValues(now);
+        if (o.fade > 0) {
+          R.bus.gain.setValueAtTime(R.bus.gain.value, now);
+          R.bus.gain.setValueAtTime(R.bus.gain.value, t0);
+          R.bus.gain.linearRampToValueAtTime(BUS_LEVEL, t0 + o.fade);
+        } else R.bus.gain.setTargetAtTime(BUS_LEVEL, now, 3);
+        var S = { R: R, bar: fromBar > 0 ? Math.floor(fromBar) : 0, next: t0, timer: null, alive: true };
         running = S;
         var tick = function () {
           if (!S.alive) return;
@@ -256,14 +262,15 @@
         tick();
       } catch (e) { running = null; }
     },
-    stop: function () {
+    // opts.fade: seconds to silence (default about 2.4 s).
+    stop: function (opts) {
       var S = running;
       if (!S) return;
       running = null; S.alive = false;
       clearTimeout(S.timer);
       try {
         S.R.bus.gain.cancelScheduledValues(S.R.ctx.currentTime);
-        S.R.bus.gain.setTargetAtTime(0, S.R.ctx.currentTime, 0.8);
+        S.R.bus.gain.setTargetAtTime(0, S.R.ctx.currentTime, opts && opts.fade > 0 ? opts.fade / 3 : 0.8);
       } catch (e) { /* context closed */ }
     },
     isRunning: function () { return !!running; },
