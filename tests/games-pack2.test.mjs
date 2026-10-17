@@ -183,3 +183,65 @@ test('what-if: arrows turn the dial and wrap, a number picks, Enter locks then m
   assert.equal(t.finished.length, 1);
   assert.equal(t.results[0].xp, 30);
 });
+
+// ------------------------------------------------------------------ pipe plumber
+
+// A 3 x 2 grid, cells 0 1 2 / 3 4 5. The path runs 0, 1, 2, 5. Rotations are clockwise quarter turns from the shapes
+// cap (open up), straight (up and down), corner (up and right).
+const ppRound = () => ({
+  zone: 'trips', mode: 'practice', flow: 'f1', grid: { cols: 3, rows: 2 }, start: 0, end: 5, pathLength: 4,
+  tiles: [
+    { type: 'cap', rot: 0, id: 'a' }, { type: 'straight', rot: 0, id: 'b' }, { type: 'corner', rot: 0, id: 'c' },
+    { type: 'straight', rot: 1 }, { type: 'corner', rot: 3, id: 'x' }, { type: 'cap', rot: 1, id: 'd' },
+  ],
+  answer: core.encode({ path: ['a', 'b', 'c', 'd'] }),
+  labels: { a: { label: 'Pay button' }, b: { label: 'Trip service' }, c: { label: 'Queue' }, d: { label: 'Database' }, x: { label: 'Cache' }, f1: { label: 'Pay out' } },
+});
+const ppTiles = (t) => all(t, '.pp-tile');
+const ppTurn = (t, i, times = 1) => { for (let k = 0; k < times; k++) ppTiles(t)[i].click(); };
+
+test('pipe-plumber: tiles turn on a tap, the water reaches the end, +10 per tile on the path', () => {
+  const t = boot('pipe-plumber', ppRound());
+  assert.equal(ppTiles(t).length, 6);
+  assert.match(t.root.textContent, /Pay button/);
+  assert.match(t.root.textContent, /Database/);
+  assert.ok(ppTiles(t).every((c) => !c.hasAttribute('data-id') && !c.hasAttribute('data-path')), 'no path hints in the DOM');
+  assert.equal(t.decodes(), 0, 'nothing decoded before the water flows');
+  ppTurn(t, 0);
+  assert.equal(ppTiles(t)[0].getAttribute('data-turn'), '1');
+  ppTurn(t, 1); ppTurn(t, 2, 2);
+  assert.equal(t.finished.length, 0);
+  assert.match(t.root.querySelector('.pp-live').textContent, /3 of 4/, 'live count of the tiles the water has reached');
+  ppTurn(t, 5, 3);
+  assert.equal(t.decodes(), 1);
+  assert.equal(t.finished.length, 1);
+  assert.equal(t.finished[0].got, 4);
+  assert.equal(t.finished[0].of, 4);
+  assert.equal(t.results[0].xp, 40);
+  assert.ok(ppTiles(t).filter((c) => c.classList.contains('wet')).length === 4, 'the water runs through the four path tiles');
+  assert.match(t.results[0].missed.map((m) => m.text).join(' ') + t.root.textContent, /Pay button.*Trip service.*Queue.*Database/);
+  assert.ok(tuples(t, 'correct').length + t.sounds.filter((s) => s === 'correct').length >= 1);
+});
+
+test('pipe-plumber: arrows move over the grid, R and Enter turn the focused tile', () => {
+  const t = boot('pipe-plumber', ppRound());
+  assert.equal(focused(t), ppTiles(t)[0], 'starts on the first tile of the path');
+  t.key('r');
+  assert.equal(ppTiles(t)[0].getAttribute('data-turn'), '1');
+  t.key('ArrowRight');
+  assert.equal(focused(t), ppTiles(t)[1]);
+  t.key('Enter');
+  t.key('ArrowRight');
+  t.key('R'); t.key('r');
+  t.key('ArrowLeft'); t.key('ArrowLeft'); t.key('ArrowLeft');
+  assert.equal(focused(t), ppTiles(t)[0], 'stops at the edge');
+  t.key('ArrowDown');
+  assert.equal(focused(t), ppTiles(t)[3]);
+  t.key('ArrowDown');
+  assert.equal(focused(t), ppTiles(t)[3], 'stops at the bottom');
+  t.key('ArrowRight'); t.key('ArrowRight');
+  assert.equal(focused(t), ppTiles(t)[5]);
+  t.key('r'); t.key(' '); t.key('r');
+  assert.equal(t.finished.length, 1);
+  assert.equal(t.results[0].xp, 40);
+});

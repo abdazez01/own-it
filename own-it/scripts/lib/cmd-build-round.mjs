@@ -27,6 +27,7 @@ const IDS = {
   'whos-allowed': () => [],
   'blast-radius': (r) => [r.target],
   pager: (r) => [r.answer],
+  'pipe-plumber': (r) => [r.flow],
   'what-if': () => [],
   'data-detective': (r) => r.states.map((x) => x.state),
 };
@@ -124,7 +125,7 @@ function shownCards(game, input, byId) {
   const ids = game === 'screen-tour' ? [input.screen, ...input.steps.map((s) => s.element && byId.get(s.element)?.on)]
     : game === 'guess-the-screen' ? input.screens.map((s) => s.screen)
       : game === 'whiteboard' ? input.cards
-        : game === 'chain-reaction' ? flowSteps(byId.get(input.flow), byId) : [];
+        : game === 'chain-reaction' || game === 'pipe-plumber' ? flowSteps(byId.get(input.flow), byId) : [];
   return [...new Set(ids.filter((x) => typeof x === 'string' && byId.has(x)))];
 }
 
@@ -240,6 +241,7 @@ export async function run(args, ctx) {
   for (const id of named) { const it = byId.get(id); if (it && it.k === 'element') for (const x of [it.on, it.goes]) if (typeof x === 'string') labelIds.add(x); }
   if (['chain-reaction', 'blast-radius', 'pager', 'data-detective'].includes(game)) round.cards.forEach((c) => labelIds.add(c.id));
   if (game === 'data-detective') round.who.forEach((c) => labelIds.add(c.id));
+  if (game === 'pipe-plumber') round.tiles.forEach((t) => { if (t.id) labelIds.add(t.id); });
   const nav = game === 'quests' ? navFor(input, items) : null;
   if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
   const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };

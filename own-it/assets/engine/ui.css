@@ -706,3 +706,22 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .wi-opt.fell { border-color: var(--salmon); background: var(--salmon-a16); transform: translateY(6px); }
 .wi-opt.first { border-width: 2px; }
 @media (prefers-reduced-motion: reduce) { .wi-needle, .wi-opt { transition: none; } }
+.pp-board { display: grid; gap: var(--s-2); width: 100%; margin-inline: auto; }
+.pp-tile {
+  position: relative; display: grid; place-items: center; aspect-ratio: 1; min-width: 0; min-height: 56px; padding: 0; cursor: pointer; overflow: hidden;
+  color: var(--ink-2); touch-action: manipulation; background: var(--tile-solid); border: 1px solid var(--edge); border-radius: var(--r-inset);
+  transition: border-color var(--t-hover), background var(--t-hover);
+}
+.pp-tile:hover, .pp-tile:focus-visible { border-color: var(--gold-a60); }
+.pp-pipe { grid-area: 1 / 1; width: 100%; height: 100%; padding: 12%; transform-origin: 50% 50%; transition: transform var(--t-press); }
+.pp-pipe path { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: butt; stroke-linejoin: miter; }
+.pp-name {
+  grid-area: 1 / 1; align-self: end; max-width: 100%; padding: 2px 4px; font: 500 var(--fs-13)/1.2 var(--f-ui); color: var(--ink); text-align: center;
+  overflow-wrap: anywhere; background: var(--tile-solid);
+}
+.pp-name:empty { display: none; }
+.pp-tile.source { border-color: var(--gold); }
+.pp-tile.sink { border-color: var(--sage); }
+.pp-tile.reached { color: var(--gold); background: var(--gold-a16); }
+.pp-tile.wet { color: var(--sage); background: var(--sage-a16); border-color: var(--sage); }
+@media (prefers-reduced-motion: reduce) { .pp-pipe, .pp-tile { transition: none; } }

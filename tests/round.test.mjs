@@ -666,3 +666,79 @@ test('what-if: wrong counts, bad answers, repeated options and identifier-only t
   const e = dialIn(); e.dials[1].label = 'src/api/trips.ts';
   await assert.rejects(bld(root, 'what-if', e), /identifier-only answer in dials\[1\]\.label/);
 });
+
+async function pipeSetup() {
+  const root = await setup();
+  const m = loadModel(root);
+  m.zones.trips.items.push(I({ id: 'c1', k: 'component', label: 'Trip service' }), I({ id: 'c2', k: 'component', label: 'Trip database' }),
+    I({ id: 'c3', k: 'component', label: 'Map service' }), I({ id: 'fp', k: 'flow', label: 'Cancel a trip', steps: [['s1'], ['c1'], ['c2']] }));
+  saveModel(root, m);
+  return root;
+}
+const SIDE = [-4, 1, 4, -1];
+
+test('pipe-plumber: a real path of the flow steps on the grid, solvable, never already solved, random layout, order obfuscated', async () => {
+  const root = await pipeSetup();
+  const starts = new Set(), turnSets = new Set();
+  for (let k = 0; k < 25; k++) {
+    const out = await bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fp' });
+    const r = loadRound(root, out.id);
+    if (k === 0) assert.equal(out.id, 'trips-pipe-plumber-1');
+    assert.deepEqual(core.decode(r.answer), { path: ['s1', 'c1', 'c2'] });
+    assert.equal(r.pathLength, 3);
+    assert.equal(r.tiles.length, r.grid.cols * r.grid.rows);
+    const cell = (id) => r.tiles.findIndex((t) => t.id === id);
+    const cells = ['s1', 'c1', 'c2'].map(cell);
+    assert.equal(r.start, cells[0]);
+    assert.equal(r.end, cells[2]);
+    let off = 0;
+    cells.forEach((c, i) => {
+      const dirs = [cells[i - 1], cells[i + 1]].filter((x) => x !== undefined).map((o) => SIDE.indexOf(o - c));
+      assert.ok(dirs.every((d) => d >= 0), 'path cells are neighbours on the grid');
+      const t = r.tiles[c];
+      const want = dirs.length === 1 ? 'cap' : (dirs[0] + 2) % 4 === dirs[1] ? 'straight' : 'corner';
+      assert.equal(t.type, want, 'the shape fits the path');
+      const open = { cap: [0], straight: [0, 2], corner: [0, 1] }[t.type].map((d) => (d + t.rot) % 4).sort().join();
+      if (open !== dirs.slice().sort().join()) off++;
+    });
+    assert.ok(off >= 1, 'not already solved');
+    starts.add(r.start + ':' + r.end);
+    turnSets.add(r.tiles.map((t) => t.rot).join());
+    r.tiles.forEach((t) => assert.ok(['cap', 'straight', 'corner', 'tee'].includes(t.type)));
+    assert.equal(r.labels.s1.label, 'Trip screen');
+    assert.equal(r.labels.c2.label, 'Trip database');
+    assert.ok(r.tiles.some((t) => t.id === 'c3'), 'spare pipes carry other parts of the app');
+  }
+  assert.ok(starts.size > 1 && turnSets.size > 1, 'path and turns are random');
+  assert.deepEqual(readJson(join(root, '.own-it', 'session.json')).rounds['trips-pipe-plumber-1'].cardIds.sort(), ['c1', 'c2', 's1']);
+});
+
+test('pipe-plumber: not a flow, wrong ends, one step, too many steps and unlabeled steps are refused before any write', async () => {
+  const root = await pipeSetup();
+  const m = loadModel(root);
+  const add = (...x) => { m.zones.trips.items.push(...x); saveModel(root, m); };
+  add(I({ id: 'fa', k: 'flow', label: 'Wrong end', steps: [['s1'], ['c1'], ['s2']] }), I({ id: 'fb', k: 'flow', label: 'Wrong start', steps: [['c1'], ['c2']] }),
+    I({ id: 'fc', k: 'flow', label: 'Tiny', steps: [['s1']] }));
+  await assert.rejects(bld(root, 'pipe-plumber', { zone: 'trips', flow: 's1' }), /"s1" is not a flow/);
+  await assert.rejects(bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fa' }), /must end at a component/);
+  await assert.rejects(bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fb' }), /must start at a surface/);
+  await assert.rejects(bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fc' }), /at least 2 steps/);
+  const long = Array.from({ length: 12 }, (_, i) => I({ id: `x${i}`, k: 'component', label: `Part ${i}` }));
+  add(...long, I({ id: 'fl', k: 'flow', label: 'Long', steps: [['s1'], ...long.map((x) => [x.id])] }));
+  await assert.rejects(bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fl' }), /has 13 steps; pipe plumber takes 12 at most/);
+  delete m.zones.trips.items.find((x) => x.id === 'c1').label;
+  saveModel(root, m);
+  await assert.rejects(bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fp' }), /steps without labels: c1/);
+  assert.ok(!existsSync(join(root, '.own-it', 'data')) || readdirSync(join(root, '.own-it', 'data')).length === 0, 'nothing written');
+});
+
+test('pipe-plumber: a 12-step flow still lays out on the grid', async () => {
+  const root = await pipeSetup();
+  const m = loadModel(root);
+  const mid = Array.from({ length: 10 }, (_, i) => I({ id: `x${i}`, k: 'component', label: `Part ${i}` }));
+  m.zones.trips.items.push(...mid, I({ id: 'fl', k: 'flow', label: 'Long', steps: [['s1'], ...mid.map((x) => [x.id]), ['c2']] }));
+  saveModel(root, m);
+  const r = loadRound(root, (await bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fl' })).id);
+  assert.equal(core.decode(r.answer).path.length, 12);
+  assert.equal(r.tiles.filter((t) => t.id && core.decode(r.answer).path.includes(t.id)).length, 12);
+});

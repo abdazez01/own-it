@@ -90,6 +90,65 @@ export function detectiveSteps(input, byId, items) {
   return { order, by, who };
 }
 
+// Pipe plumber: the grid for a flow's steps. The first step is the surface that starts the request, the last a component that stores it.
+// A random self-avoiding walk of one cell per step becomes the pipe path; every other cell is a spare pipe. Sides run clockwise from the
+// top (0 up, 1 right, 2 down, 3 left); a shape turned r quarter turns opens its base sides plus r. Tiles start at random turns, with at
+// least half of the path tiles out of place, so the round is solvable but never already solved.
+const PIPE_COLS = 4;
+const PIPE_BASE = { cap: [0], straight: [0, 2], corner: [0, 1], tee: [0, 1, 3] };
+export function pipeLayout(flowId, byId, items) {
+  const flow = byId.get(flowId);
+  if (flow.k !== 'flow') throw new Error(`"${flowId}" is not a flow`);
+  const steps = flowSteps(flow, byId);
+  if (steps.length < 2) throw new Error(`flow "${flowId}" needs at least 2 steps in the model`);
+  if (steps.length > 12) throw new Error(`flow "${flowId}" has ${steps.length} steps; pipe plumber takes 12 at most`);
+  if (byId.get(steps[0]).k !== 'surface') throw new Error(`flow "${flowId}" must start at a surface`);
+  if (byId.get(steps[steps.length - 1]).k !== 'component') throw new Error(`flow "${flowId}" must end at a component`);
+  const nameless = steps.filter((id) => !labeled(byId.get(id)));
+  if (nameless.length) throw new Error(`steps without labels: ${nameless.join(', ')}`);
+
+  const n = steps.length, cols = PIPE_COLS, rows = Math.max(2, Math.ceil(n / 2));
+  const stepTo = [-cols, 1, cols, -1];
+  const near = (i) => stepTo.map((d, side) => [side, i + d]).filter(([side, j]) => j >= 0 && j < cols * rows
+    && !(side === 1 && i % cols === cols - 1) && !(side === 3 && i % cols === 0));
+  const walk = (path) => {
+    if (path.length === n) return path;
+    for (const [, j] of shuffle(near(path[path.length - 1]))) {
+      if (path.includes(j)) continue;
+      const found = walk([...path, j]);
+      if (found) return found;
+    }
+    return null;
+  };
+  let cells = null;
+  for (const first of shuffle([...Array(cols * rows).keys()])) { cells = walk([first]); if (cells) break; }
+
+  const tiles = Array.from({ length: cols * rows }, () => null);
+  const solution = new Map();
+  cells.forEach((cell, k) => {
+    const sides = [k > 0 ? cells[k - 1] : null, k < n - 1 ? cells[k + 1] : null].filter((x) => x !== null).map((o) => stepTo.indexOf(o - cell));
+    let type, rot;
+    if (sides.length === 1) { type = 'cap'; rot = sides[0]; }
+    else if ((sides[0] + 2) % 4 === sides[1]) { type = 'straight'; rot = sides[0] % 2; }
+    else { type = 'corner'; rot = (sides[0] + 1) % 4 === sides[1] ? sides[0] : sides[1]; }
+    tiles[cell] = { type, id: steps[k] };
+    solution.set(cell, rot);
+  });
+  const fits = (cell, rot) => (tiles[cell].type === 'straight' ? rot % 2 === solution.get(cell) % 2 : rot === solution.get(cell));
+  let turns;
+  do turns = cells.map(() => randomInt(4));
+  while (turns.filter((r, k) => !fits(cells[k], r)).length < Math.max(1, Math.floor(n / 2)));
+  cells.forEach((cell, k) => { tiles[cell].rot = turns[k]; });
+
+  const spare = shuffle(items.filter((x) => (x.k === 'surface' || x.k === 'component') && labeled(x) && !steps.includes(x.id)).map((x) => x.id));
+  tiles.forEach((t, cell) => {
+    if (t) return;
+    const type = Object.keys(PIPE_BASE)[randomInt(4)];
+    tiles[cell] = { type, rot: randomInt(4), ...(spare.length ? { id: spare.pop() } : {}) };
+  });
+  return { grid: { cols, rows }, tiles, start: cells[0], end: cells[n - 1], pathLength: n, path: steps };
+}
+
 // Fills in answers the model already knows, so Claude never has to write them.
 export function derive(game, round, byId, items) {
   if (game === 'quests') {
@@ -131,6 +190,10 @@ export function derive(game, round, byId, items) {
     round.answer = damaged;
   } else if (game === 'pager') {
     round.cards = pagerChoices(round, byId, items).map((x) => ({ id: x.id, label: x.label }));
+  } else if (game === 'pipe-plumber') {
+    const { path, ...layout } = pipeLayout(round.flow, byId, items);
+    Object.assign(round, layout);
+    round.answer = { path };
   } else if (game === 'what-if') {
     // Each dial's options are permuted, so the position Claude wrote the answer at gives nothing away.
     round.dials = round.dials.map((d) => {
