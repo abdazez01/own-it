@@ -55,6 +55,7 @@
     fallback.setAttribute('hidden', 'hidden');
     var feedback = OwnIt.el('div', { 'class': 'panel quest-feedback quiz-feedback', 'aria-live': 'polite' });
     [bar, screenBox, fallback, feedback].forEach(function (n) { area.appendChild(n); });
+    area.classList.add('quest-area');
     area.setAttribute('tabindex', '-1');
 
     // ---- side panel: objectives
@@ -115,7 +116,7 @@
       if (host) host.destroy();
       screenId = id;
       fallback.setAttribute('hidden', 'hidden');
-      host = OwnIt.screenhost.mount(screenBox, id);
+      host = OwnIt.screenhost.mount(screenBox, id, { reserve: 185 });
       var mine = host;
       mine.onPick(function (eid) { if (mine === host) tapped(eid); });
       // No screen copy, or nothing tagged on it: offer the elements as buttons instead.

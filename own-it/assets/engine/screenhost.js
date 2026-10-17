@@ -27,7 +27,7 @@
   }
 
   /* OwnIt.screenhost.mount(container, screenId, opts) builds the framed iframe inside container.
-     opts: { width, height, maxScale, blockPointer }
+     opts: { width, height, maxScale, blockPointer, reserve (px of window height kept for the rest of the page when enlarging on wide screens) }
      Returns { ok, iframe, frame, doc, ids(), onPick(cb), highlight(id, kind), clear(), move(dir), pickCurrent(), current(), destroy() } */
   function mount(container, screenId, opts) {
     opts = opts || {};
@@ -108,7 +108,7 @@
       if (gone) return;
       var avail = container.clientWidth || (container.getBoundingClientRect && container.getBoundingClientRect().width) || W;
       var s = Math.min(maxScale, Math.max(0.2, avail / W));
-      if (s > 1 && typeof window !== 'undefined' && window.innerHeight) s = Math.max(1, Math.min(s, (window.innerHeight - 350) / H));
+      if (s > 1 && typeof window !== 'undefined' && window.innerHeight) s = Math.max(1, Math.min(s, (window.innerHeight - (opts.reserve || 350)) / H));
       vp.style.width = Math.round(W * s) + 'px';
       vp.style.height = Math.round(H * s) + 'px';
       if (api.iframe) api.iframe.style.transform = 'scale(' + s + ')';
