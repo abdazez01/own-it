@@ -115,6 +115,36 @@ test('check-refs keeps backed weaknesses, drops invented ones, and counts them f
   assert.equal(loadProgress(root).zones.trips.weaknesses, 1);
 });
 
+test('check-refs: a break pass (weaknesses only, empty files and items) leaves the structure model alone', async () => {
+  const root = await setup({ weaknesses: [W({ id: 'old' })] });
+  const before = loadModel(root).zones.trips;
+  const p = join(root, 'break.json');
+  writeFileSync(p, JSON.stringify({ zone: 'trips', files: [], items: [], weaknesses: [
+    W({ id: 'new', kind: 'double', steps: [{ element: 'el1' }] }), W({ id: 'ghost', steps: [{ element: 'zzz' }] }),
+  ] }));
+  const out = await checkRefs({ _: [p], flags: {} }, ctx(root));
+  const after = loadModel(root).zones.trips;
+  assert.deepEqual(after.items, before.items);
+  assert.deepEqual(after.files, before.files);
+  assert.deepEqual(after.weaknesses.map((w) => w.id), ['old', 'new']);
+  assert.deepEqual(out.dropped, [{ id: 'ghost', why: 'weakness' }]);
+  assert.equal(out.kept, 0);
+});
+
+test('check-refs: a break pass that finds nothing still records 0, so the zone counts as hunted', async () => {
+  const root = await setup({ weaknesses: null });
+  assert.equal(loadProgress(root).zones.trips.weaknesses, undefined);
+  const p = join(root, 'break.json');
+  writeFileSync(p, JSON.stringify({ zone: 'trips', files: [], items: [], weaknesses: [] }));
+  await checkRefs({ _: [p], flags: {} }, ctx(root));
+  assert.equal(loadProgress(root).zones.trips.weaknesses, 0);
+  // A structure extraction without a weaknesses array does not mark the zone as hunted.
+  const fresh = await setup({ weaknesses: null });
+  writeFileSync(join(fresh, 'ex.json'), JSON.stringify({ zone: 'trips', files: [], items: [] }));
+  await checkRefs({ _: [join(fresh, 'ex.json')], flags: {} }, ctx(fresh));
+  assert.equal(loadProgress(fresh).zones.trips.weaknesses, undefined);
+});
+
 // ---------------------------------------------------------------- the module
 
 function bootModule({ reduced = false } = {}) {

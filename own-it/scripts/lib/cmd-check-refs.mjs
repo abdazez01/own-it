@@ -113,8 +113,9 @@ export async function run(args, ctx) {
 
   const est = estimate(raw);
   const progress = loadProgress(ctx.root);
-  // The page learns whether the Secret level is on offer from this count.
-  if (Object.hasOwn(progress.zones, ex.zone) && (weak.size || progress.zones[ex.zone].weaknesses !== undefined)) progress.zones[ex.zone].weaknesses = weak.size;
+  // The page learns whether the Secret level is on offer from this count. A break pass (any weaknesses array) records it even
+  // when it found none, so a later startup knows the zone was already hunted.
+  if (Object.hasOwn(progress.zones, ex.zone) && (Array.isArray(ex.weaknesses) || weak.size || progress.zones[ex.zone].weaknesses !== undefined)) progress.zones[ex.zone].weaknesses = weak.size;
   progress.tokens.push({ t: ctx.now().toISOString(), kind: 'extraction', zone: ex.zone, est });
   saveProgress(ctx.root, progress);
 
