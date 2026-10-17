@@ -83,6 +83,20 @@ function obfuscate(v) {
   return v;
 }
 
+// Player-facing names for every model id a round shows, so the games never display raw ids. Not obfuscated.
+// Answer-only ids (a "find" step's target) are deliberately left out: a label there would give the answer away.
+function labelsFor(named, byId) {
+  const out = {};
+  for (const id of named) {
+    const it = byId.get(id);
+    if (!it) continue;
+    const entry = { label: typeof it.label === 'string' && it.label ? it.label : it.id };
+    if (typeof it.purpose === 'string' && it.purpose) entry.purpose = it.purpose;
+    out[id] = entry;
+  }
+  return out;
+}
+
 // Fills in answers the model already knows, so Claude never has to write them.
 function derive(game, round, byId, items) {
   if (game === 'quests') {
@@ -143,7 +157,9 @@ export async function run(args, ctx) {
   const id = `${input.zone}-${game}-${progress.seq + 1}`;
   const round = { ...input };
   derive(game, round, byId, items);
-  const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round) };
+  const labelIds = new Set(named);
+  for (const id of named) { const it = byId.get(id); if (it && it.k === 'element') for (const x of [it.on, it.goes]) if (typeof x === 'string') labelIds.add(x); }
+  const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.
   const sessionPath = ownItPath(ctx.root, 'session.json');

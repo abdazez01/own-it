@@ -453,7 +453,7 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 
 /* Screen copy frame (frontend spec 6.4): the rebuilt screen sits in a sandboxed iframe scaled with transform to fit its box. */
 .screen-frame { max-width: 100%; margin-inline: auto; border: 1px solid var(--edge); border-radius: var(--r-card); overflow: hidden; background: #F4F3F0; }
-.screen-vp { position: relative; overflow: hidden; max-width: 100%; }
+.screen-vp { position: relative; overflow: hidden; max-width: 100%; margin-inline: auto; }
 .screen-iframe { display: block; border: 0; background: #F4F3F0; }
 .screen-frame.no-pointer .screen-iframe { pointer-events: none; }
 .screen-missing { padding: var(--s-6); color: #3A3733; font: 500 var(--fs-15)/1.4 var(--f-ui); }

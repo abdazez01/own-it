@@ -24,6 +24,18 @@ function parseSel(sel) {
   return out;
 }
 
+// Stand-in for a real NodeList: length, item, forEach, indexing and iteration, but no indexOf/map/filter/find/some.
+export class FakeNodeList {
+  constructor(items) {
+    items.forEach((x, i) => { this[i] = x; });
+    Object.defineProperty(this, 'length', { value: items.length });
+    Object.defineProperty(this, '_items', { value: items });
+  }
+  item(i) { return this._items[i] || null; }
+  forEach(fn, thisArg) { this._items.forEach(fn, thisArg); }
+  [Symbol.iterator]() { return this._items[Symbol.iterator](); }
+}
+
 export class FakeElement {
   constructor(tag, doc) {
     this.tagName = String(tag).toUpperCase();
@@ -87,7 +99,7 @@ export class FakeElement {
     const out = [];
     const walk = (n) => { for (const c of n.children) { if (alts.some((a) => c.matches(a))) out.push(c); walk(c); } };
     walk(this);
-    return out;
+    return new FakeNodeList(out);
   }
   querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
 }
@@ -100,7 +112,7 @@ export function createEnv({ search = '', fetch, reduced = false } = {}) {
     _listeners: new Map(),
     createElement: (t) => new FakeElement(t, doc),
     createElementNS: (_ns, t) => new FakeElement(t, doc),
-    getElementById: (id) => doc.documentElement.querySelectorAll('div').find((e) => e.getAttribute('id') === id) || null,
+    getElementById: (id) => Array.from(doc.documentElement.querySelectorAll('div')).find((e) => e.getAttribute('id') === id) || null,
     addEventListener: FakeElement.prototype.addEventListener,
     dispatchEvent(ev) {
       if (!ev.target) ev.target = doc;

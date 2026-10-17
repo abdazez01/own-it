@@ -7,7 +7,7 @@
   var SECONDS = 12;
   var MAX_BLUR = 16;
   var PER_SCREEN = 10;
-  var LABEL = function (t) { return OwnIt.screenhost.label(t); };
+  var kit = OwnIt.kit;
 
   function guessPoints(remaining) {
     var r = Math.max(0, Math.min(SECONDS, Number(remaining) || 0));
@@ -23,6 +23,7 @@
     var screens = (round && round.screens) || [];
     var total = screens.length;
     var of = PER_SCREEN * total;
+    var L = function (id) { return kit.label(id, round && round.labels); };
     var exam = (round && round.mode === 'exam') || OwnIt.mode === 'exam';
     var mode = exam ? 'exam' : 'practice';
 
@@ -41,14 +42,9 @@
     shell.setScore(0, of);
     shell.startTimer();
 
-    var card = OwnIt.el('section', { 'class': 'panel guess-card' });
-    var dots = OwnIt.el('div', { 'class': 'qdots', role: 'img' });
-    var dotEls = [];
-    for (var d = 0; d < total; d++) {
-      var dot = OwnIt.el('span', { 'class': 'qdot' });
-      dotEls.push(dot);
-      dots.appendChild(dot);
-    }
+    var area = shell.area;
+    var card = OwnIt.el('section', { 'class': 'panel guess-card', tabindex: '-1' });
+    var dots = kit.dots(total);
     var title = OwnIt.el('h2', { 'class': 'quiz-q', 'aria-live': 'polite' });
     var stage = OwnIt.el('div', { 'class': 'guess-screen' });
     var meter = OwnIt.el('div', { 'class': 'guess-meter', 'aria-hidden': 'true' });
@@ -62,7 +58,7 @@
     var nextBtn = OwnIt.button('Next', 'primary', null, { 'class': 'btn btn-primary guess-next' });
     nextBtn.setAttribute('hidden', 'hidden');
     actions.appendChild(nextBtn);
-    [dots, title, stage, meter, buzz, choicesEl, feedback, actions].forEach(function (n) { card.appendChild(n); });
+    [dots.el, title, stage, meter, buzz, choicesEl, feedback, actions].forEach(function (n) { card.appendChild(n); });
     shell.area.appendChild(card);
 
     function stopTick() { if (tick) { clearInterval(tick); tick = null; } }
@@ -77,13 +73,7 @@
       meterFill.style.width = Math.round(100 * rem / SECONDS) + '%';
     }
 
-    function setDots() {
-      dotEls.forEach(function (el, i) {
-        var state = el.getAttribute('data-state');
-        el.className = 'qdot' + (i === si && phase !== 'locked' ? ' now' : '') + (state ? ' ' + state : '');
-      });
-      dots.setAttribute('aria-label', 'Screen ' + Math.min(si + 1, total) + ' of ' + total);
-    }
+    function setDots() { dots.paint(si, phase === 'locked', 'Screen'); }
 
     function render() {
       stopTick();
@@ -114,16 +104,12 @@
       remainingAtBuzz = rem;
       phase = 'choose';
       buzz.setAttribute('hidden', 'hidden');
-      var mine = si;
-      screens[si].choices.slice(0, 4).forEach(function (c, i) {
-        var b = OwnIt.el('button', { type: 'button', 'class': 'answer' });
-        b.appendChild(OwnIt.el('span', { 'class': 'answer-key', 'aria-hidden': 'true' }, String(i + 1)));
-        b.appendChild(OwnIt.el('span', { 'class': 'answer-text' }, LABEL(c)));
-        b.addEventListener('click', function () { choose(mine, i); });
-        choicesEl.appendChild(b);
-      });
+      var at = si;
+      kit.answerButtons(choicesEl, screens[si].choices.slice(0, 4).map(L), function (i) { choose(at, i); });
       choicesEl.removeAttribute('hidden');
       OwnIt.sound('hint');
+      // Focus moves to the card, not a choice, so the Space that buzzed cannot also press a choice on key-up.
+      if (card.focus) card.focus();
       setDots();
     }
 
@@ -134,12 +120,7 @@
       reveal(rem);
     }
 
-    function note(cls, label, text) {
-      var line = OwnIt.el('p', { 'class': 'quiz-why ' + cls });
-      line.appendChild(OwnIt.el('strong', null, label + ' '));
-      line.appendChild(OwnIt.el('span', null, text));
-      feedback.appendChild(line);
-    }
+    var note = function (cls, lead, text) { kit.note(feedback, cls, lead, text); };
 
     function choose(at, choice) {
       if (done || phase !== 'choose' || at !== si) return;
@@ -149,13 +130,13 @@
       var right = OwnItCore.decode(entry.answer); // the only place an answer is decoded
       var ok = choices[choice] === right;
       phase = 'locked';
-      var btns = choicesEl.querySelectorAll('.answer');
+      var btns = Array.from(choicesEl.querySelectorAll('.answer'));
       btns.forEach(function (b) { b.setAttribute('aria-disabled', 'true'); });
       btns[choice].classList.add('picked');
       var earned = ok ? guessPoints(remainingAtBuzz) : 0;
       points += earned;
-      if (!ok) { missed.push(String(si)); review.push({ text: 'Screen ' + (si + 1) + ': it was ' + LABEL(right) + '.' }); }
-      dotEls[si].setAttribute('data-state', exam ? 'set' : ok ? 'ok' : 'bad');
+      if (!ok) { missed.push(String(si)); review.push({ text: 'Screen ' + (si + 1) + ': it was ' + L(right) + '.' }); }
+      dots.set(si, exam ? 'set' : ok ? 'ok' : 'bad');
       stage.style.filter = 'blur(0px)'; // the picture clears for the answer
       meterFill.style.width = '0%';
       if (exam) {
@@ -167,18 +148,16 @@
           OwnIt.sound('correct');
           OwnIt.juice.confetti(card);
           feedback.appendChild(OwnIt.el('p', { 'class': 'quiz-xp' }, '+' + earned + ' points'));
-          note('good', 'Right.', LABEL(right));
+          note('good', 'Right.', L(right));
         } else {
           btns[choice].classList.add('wrong');
           OwnIt.sound('wrong');
           OwnIt.juice.shake(card);
-          note('bad', 'Not quite.', 'It was: ' + LABEL(right));
+          note('bad', 'Not quite.', 'It was: ' + L(right));
         }
       }
       shell.setScore(points, of);
-      nextBtn.textContent = si + 1 >= total ? 'See result' : 'Next';
-      nextBtn.removeAttribute('hidden');
-      nextBtn.focus();
+      kit.nextLabel(nextBtn, si, total);
       setDots();
     }
 
@@ -192,35 +171,21 @@
     function finish() {
       done = true;
       stopTick();
-      shell.stopTimer();
-      shell.setScore(points, of);
-      var xp = Math.max(0, points - shell.hintsUsed() * 15);
-      shell.result({
-        got: points, total: of, xp: xp, missed: review,
-        payload: { id: ctx.roundId, game: 'guess-the-screen', mode: mode, submittedAt: new Date().toISOString(), got: points, of: of, missed: missed }
-      });
+      kit.finish(shell, ctx, { game: 'guess-the-screen', mode: mode, got: points, of: of, xp: points, missed: missed, review: review });
     }
 
     buzz.addEventListener('click', doBuzz);
     nextBtn.addEventListener('click', function () { next(si); });
 
-    var offs = [];
-    function onKey(fn) { return function (e) { if (!document.body.querySelector('.scrim')) fn(e); }; }
-    offs.push(ctx.keys.on(' ', onKey(function (e) {
-      if (e && e.preventDefault) e.preventDefault(); // the page must not scroll, and a focused button must not also click
-      doBuzz();
-    })));
-    [['1', 0], ['2', 1], ['3', 2], ['4', 3], ['a', 0], ['b', 1], ['c', 2], ['d', 3]].forEach(function (p) {
-      offs.push(ctx.keys.on(p[0], onKey(function () { choose(si, p[1]); })));
-    });
-    offs.push(ctx.keys.on('n', onKey(function () { next(si); })));
-    offs.push(ctx.keys.on('Enter', onKey(function (e) {
-      if (e && e.preventDefault) e.preventDefault();
+    var offs = kit.choiceKeys(ctx, function (i) { choose(si, i); });
+    offs.push(kit.onActivate(ctx, area, ' ', function () { doBuzz(); }));
+    offs.push(kit.onActivate(ctx, area, 'n', function () { next(si); }));
+    offs.push(kit.onActivate(ctx, area, 'Enter', function (e) {
       if (phase === 'locked') return next(si);
       if (phase === 'blur') { if (e && e.target === buzz) doBuzz(); return; }
-      var btns = choicesEl.querySelectorAll('.answer');
-      for (var i = 0; i < btns.length; i++) if (btns[i] === (e && e.target)) return choose(si, i);
-    })));
+      var at = kit.targetIndex(choicesEl.querySelectorAll('.answer'), e);
+      if (at >= 0) choose(si, at);
+    }));
 
     if (total) render();
     else {
@@ -228,7 +193,7 @@
       shell.stopTimer();
       title.textContent = 'This round has no screens.';
       card.appendChild(OwnIt.el('p', { 'class': 'quiz-why' }, 'Ask Claude to build a new Guess the Screen round, then pick it again from the board.'));
-      [dots, meter, buzz, choicesEl].forEach(function (n) { n.setAttribute('hidden', 'hidden'); });
+      [dots.el, meter, buzz, choicesEl].forEach(function (n) { n.setAttribute('hidden', 'hidden'); });
     }
 
     return function () {

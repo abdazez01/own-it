@@ -7,7 +7,8 @@
   'use strict';
   var OwnIt = (window.OwnIt = window.OwnIt || {});
 
-  var CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:">';
+  var CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; form-action \'none\'; base-uri \'none\'; navigate-to \'none\'">';
+  var DOCTYPE = '<!doctype html>'; // first, so the copy renders in standards mode
   var OUTLINE = '[data-ownit]{cursor:pointer}'
     + '[data-ownit]:hover,[data-ownit]:focus,[data-ownit-hl="1"]{outline:2px solid #E8C26A;outline-offset:2px;border-radius:4px}'
     + '[data-ownit-hl="bad"]{outline:2px solid #E8907C;outline-offset:2px;border-radius:4px}'
@@ -35,6 +36,8 @@
     var picks = [];
     var tagged = [];     // [{id, el}] in document order, filled on load
     var cursor = -1;
+    var ready = false;
+    var readyCbs = [];
     var want = null;     // a highlight asked for before the iframe finished loading
     var gone = false;
     var onResize = null, ro = null;
@@ -48,13 +51,17 @@
       frame: frame,
       iframe: null,
       get doc() { return api.iframe ? api.iframe.contentDocument || null : null; },
+      isReady: function () { return ready; },
+      has: function (id) { return tagged.some(function (t) { return t.id === id; }); },
+      // cb runs once the iframe has loaded and its tagged elements are known (immediately if that already happened).
+      onReady: function (cb) { if (typeof cb !== 'function') return; if (ready) cb(api); else readyCbs.push(cb); },
       ids: function () { return tagged.map(function (t) { return t.id; }); },
       onPick: function (cb) { if (typeof cb === 'function') picks.push(cb); },
       // Outlines one tagged element (and clears the others unless keep is true). Also moves the keyboard cursor to it.
       highlight: function (id, kind, keep) {
         if (!tagged.length) { want = { id: id, kind: kind }; return; }
         tagged.forEach(function (t, i) {
-          if (t.id === id) { t.el.setAttribute('data-ownit-hl', kind || '1'); if (!keep) cursor = i; }
+          if (t.id === id) { t.el.setAttribute('data-ownit-hl', kind || '1'); if (!keep) cursor = i; reveal(t.el); }
           else if (!keep && t.el.getAttribute('data-ownit-hl') !== null) t.el.removeAttribute('data-ownit-hl');
         });
       },
@@ -85,6 +92,11 @@
       }
     };
 
+    // Keeps the outlined element visible when the screen copy is taller than its frame.
+    function reveal(el) {
+      if (el && typeof el.scrollIntoView === 'function') { try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { /* not scrollable */ } }
+    }
+
     function emit(entry) {
       picks.slice().forEach(function (cb) { cb(entry.id, entry.el); });
     }
@@ -99,6 +111,7 @@
     }
 
     if (!api.ok) {
+      ready = true; // nothing will ever load: callers waiting on onReady fall back at once
       vp.style.width = '100%';
       vp.appendChild(OwnIt.el('p', { 'class': 'screen-missing' }, 'This screen copy is missing. Ask Claude to rebuild it.'));
       container.appendChild(frame);
@@ -111,6 +124,7 @@
       title: 'Screen copy: ' + screenId,
       referrerpolicy: 'no-referrer'
     });
+    if (opts.blockPointer) { iframe.setAttribute('tabindex', '-1'); iframe.setAttribute('inert', ''); }
     iframe.style.width = W + 'px';
     iframe.style.height = H + 'px';
     iframe.style.transformOrigin = '0 0';
@@ -124,6 +138,19 @@
       if (gone) return;
       var doc = iframe.contentDocument;
       if (!doc) return;
+      // The copy must not navigate or re-policy itself: drop any <base> and any meta http-equiv but our own (the first),
+      // and cancel link follows and form submits in the capture phase, before any handler in the copy sees them.
+      var metas = doc.querySelectorAll('meta[http-equiv], base');
+      var keptCsp = false;
+      Array.prototype.slice.call(metas).forEach(function (m) {
+        if (String(m.tagName).toLowerCase() === 'meta' && !keptCsp) { keptCsp = true; return; }
+        if (m.remove) m.remove();
+      });
+      doc.addEventListener('click', function (e) {
+        var t = e && e.target;
+        if (t && t.closest && t.closest('a[href], area[href], button[type=submit], input[type=submit]')) e.preventDefault();
+      }, true);
+      doc.addEventListener('submit', function (e) { e.preventDefault(); }, true);
       var style = doc.createElement('style');
       style.textContent = OUTLINE;
       (doc.head || doc.documentElement).appendChild(style);
@@ -150,11 +177,15 @@
           });
         })(els[i]);
       }
+      ready = true;
       if (want) { var w = want; want = null; api.highlight(w.id, w.kind); }
     }
-    iframe.addEventListener('load', onLoad);
+    iframe.addEventListener('load', function () {
+      onLoad();
+      readyCbs.splice(0).forEach(function (cb) { cb(api); });
+    });
     // srcdoc last, so the load listener is already in place. The value is the CSP meta followed by the screen html.
-    iframe.setAttribute('srcdoc', CSP + screen.html);
+    iframe.setAttribute('srcdoc', DOCTYPE + CSP + screen.html);
 
     if (window.addEventListener) { onResize = fit; window.addEventListener('resize', onResize); }
     if (typeof window.ResizeObserver === 'function') {
@@ -163,13 +194,5 @@
     return api;
   }
 
-  // Rounds name model items by id (or give plain sentences). Ids read better as words.
-  function label(text) {
-    var t = String(text == null ? '' : text);
-    if (/\s/.test(t)) return t;
-    var spaced = t.replace(/[-_.]+/g, ' ').trim();
-    return spaced || t;
-  }
-
-  OwnIt.screenhost = { mount: mount, label: label, CSP: CSP };
+  OwnIt.screenhost = { mount: mount, CSP: CSP };
 })();

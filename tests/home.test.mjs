@@ -28,7 +28,7 @@ function boot({ built = BUILT, progress = PROGRESS, recs, rounds, reduced = true
 test('home renders 18 library tiles, 6 enabled', () => {
   const { stage, home } = boot();
   home();
-  const tiles = stage.querySelectorAll('.tile-game');
+  const tiles = Array.from(stage.querySelectorAll('.tile-game'));
   assert.equal(tiles.length, 18);
   assert.equal(tiles.filter((t) => !t.hasAttribute('disabled')).length, 6);
   const off = tiles.find((t) => t.hasAttribute('disabled'));
@@ -65,11 +65,11 @@ test('recommended cards show Ready when a round exists, else Ask Claude', () => 
 test('board lists zones with rung cells and a status', () => {
   const { stage, home } = boot();
   home();
-  const rows = stage.querySelectorAll('.board-row').filter((r) => r.hasAttribute('data-zone'));
+  const rows = Array.from(stage.querySelectorAll('.board-row')).filter((r) => r.hasAttribute('data-zone'));
   assert.equal(rows.length, 2);
   assert.equal(rows[0].querySelectorAll('.rung-cell').length, 5);
-  assert.equal(rows[0].querySelectorAll('.rung-cell').filter((c) => c.classList.contains('c')).length, 1);
-  assert.equal(rows[1].querySelectorAll('.flap').filter((f) => f.getAttribute('aria-label') === 'ON TIME').length, 1);
+  assert.equal(Array.from(rows[0].querySelectorAll('.rung-cell')).filter((c) => c.classList.contains('c')).length, 1);
+  assert.equal(Array.from(rows[1].querySelectorAll('.flap')).filter((f) => f.getAttribute('aria-label') === 'ON TIME').length, 1);
 });
 
 test('pick in file mode copies command', async () => {
@@ -77,7 +77,7 @@ test('pick in file mode copies command', async () => {
   let copied = null;
   w.navigator.clipboard.writeText = async (t) => { copied = t; };
   home();
-  stage.querySelectorAll('.tile-game').find((t) => t.getAttribute('data-game') === 'quiz').click();
+  Array.from(stage.querySelectorAll('.tile-game')).find((t) => t.getAttribute('data-game') === 'quiz').click();
   assert.equal(copied, 'play quiz trips');
   await new Promise((r) => setTimeout(r, 0));
 });
@@ -89,7 +89,7 @@ test('pick in live mode sends the event and shows the building state', () => {
   w.OwnIt.link.onData = () => () => {}; // no polling in this test
   w.OwnIt.link.send = (type, payload) => { sent.push([type, payload]); return Promise.resolve(true); };
   home();
-  stage.querySelectorAll('.tile-game').find((t) => t.getAttribute('data-game') === 'quiz').click();
+  Array.from(stage.querySelectorAll('.tile-game')).find((t) => t.getAttribute('data-game') === 'quiz').click();
   assert.deepEqual(JSON.parse(JSON.stringify(sent)), [['pick', { game: 'quiz', zone: 'trips', mode: 'practice' }]]);
   assert.equal(stage.querySelectorAll('.building').length, 1);
   w.OwnIt.stopBuilding();
@@ -107,7 +107,7 @@ test('pick with a ready round opens the game', () => {
 test('logo parser keeps safe shapes only', () => {
   const { w } = boot();
   const svg = w.OwnIt.parseSvg('<svg viewBox="0 0 24 24"><path d="M0 0" onclick="x()"/><script>bad</script><g><circle cx="1" cy="2" r="3"/></g></svg>');
-  const kids = svg.querySelectorAll('path, circle, script, g');
+  const kids = Array.from(svg.querySelectorAll('path, circle, script, g'));
   assert.equal(kids.length, 3);
   assert.equal(kids.find((k) => k.tagName === 'PATH').hasAttribute('onclick'), false);
 });
@@ -163,7 +163,7 @@ test('building state stops the idle shuffle', () => {
   w.OwnIt.link.send = () => Promise.resolve(true);
   w.OwnIt.link.onData = () => () => {};
   home();
-  stage.querySelectorAll('.tile-game').find((x) => x.getAttribute('data-game') === 'quiz').click();
+  Array.from(stage.querySelectorAll('.tile-game')).find((x) => x.getAttribute('data-game') === 'quiz').click();
   assert.equal(t.live.size, 0);
   w.OwnIt.stopBuilding();
   t.stop();
@@ -197,7 +197,7 @@ test('building fallback says Use copy and paste instead', () => {
   const { w, stage } = boot();
   w.OwnIt.link.onData = () => () => {};
   w.OwnIt.building(stage, { game: 'quiz', zone: 'trips', name: 'Quiz', onBack() {}, onCopy() {} });
-  assert.equal(stage.querySelectorAll('button').filter((b) => b.textContent === 'Use copy and paste instead').length, 1);
+  assert.equal(Array.from(stage.querySelectorAll('button')).filter((b) => b.textContent === 'Use copy and paste instead').length, 1);
   w.OwnIt.stopBuilding();
 });
 
@@ -209,8 +209,8 @@ test('hint confirm counts hintsUsed and sends a hint event in live mode', () => 
   let shell = null;
   w.OwnIt.register({ id: 'quiz', name: 'Quiz', keys: [], play(root, r, ctx) { shell = w.OwnIt.shell(root, ctx, { zone: 'trips', total: 5, hint: () => 'Think.' }); } });
   w.OwnIt.router.go({ game: 'quiz', roundId: 'trips-quiz-1' });
-  stage.querySelectorAll('button').find((b) => b.textContent === 'Hint').click();
-  w.document.body.querySelectorAll('button').find((b) => b.textContent === 'Show hint').click();
+  Array.from(stage.querySelectorAll('button')).find((b) => b.textContent === 'Hint').click();
+  Array.from(w.document.body.querySelectorAll('button')).find((b) => b.textContent === 'Show hint').click();
   assert.deepEqual(sent, [['hint', { round: 'trips-quiz-1' }]]);
   assert.equal(shell.hintsUsed(), 1);
   shell.result({ got: 1, total: 5, xp: 0, payload: { id: 'trips-quiz-1' } });

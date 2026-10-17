@@ -8,8 +8,9 @@ import { createEnv } from './fake-dom.mjs';
 const require = createRequire(import.meta.url);
 const core = require('../own-it/assets/core.js');
 const ASSETS = new URL('../own-it/assets/', import.meta.url);
-const FILES = ['z.js', 'icons.js', 'router.js', 'flap.js', 'toggle.js', 'juice.js', 'keys.js', 'link.js', 'shell.js', 'screenhost.js'];
-const CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:">';
+const FILES = ['z.js', 'icons.js', 'router.js', 'flap.js', 'toggle.js', 'juice.js', 'keys.js', 'link.js', 'shell.js', 'gamekit.js', 'screenhost.js'];
+const DOC = '<!doctype html>';
+const CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; form-action \'none\'; base-uri \'none\'; navigate-to \'none\'">';
 
 const live = [];
 after(() => live.forEach((f) => { try { f(); } catch { /* already cleaned */ } }));
@@ -70,11 +71,13 @@ function boot(game, round, { exam = false } = {}) {
   live.push(cleanup);
   const key = (k) => env.document.dispatchEvent(env.event('keydown', { key: k }));
   // Builds the tagged elements for the latest iframe and fires its load event, like the browser would after srcdoc parses.
-  const load = (screenId) => {
+  const load = (screenId, tags = TAGS[screenId] || []) => {
     const f = frames[frames.length - 1];
-    for (const id of TAGS[screenId] || []) {
+    f.scrolls = 0;
+    for (const id of tags) {
       const d = f.inner.createElement('button');
       d.setAttribute('data-ownit', id);
+      d.scrollIntoView = () => { f.scrolls++; };
       f.inner.body.appendChild(d);
     }
     f.dispatchEvent(env.event('load', { bubbles: false }));
@@ -111,7 +114,7 @@ test('screenhost srcdoc includes CSP meta', () => {
   assert.equal(f.getAttribute('sandbox'), 'allow-same-origin');
   assert.doesNotMatch(f.getAttribute('sandbox'), /allow-scripts/);
   const src = f.getAttribute('srcdoc');
-  assert.ok(src.startsWith(CSP));
+  assert.ok(src.startsWith(DOC + CSP), 'doctype first, then the CSP meta');
   assert.ok(src.endsWith(SCREENS.s1.html));
 });
 
@@ -208,6 +211,7 @@ test('screen tour: tap the element, pick the chain with a key, find by click, ro
   assert.equal(p.of, 3);
   assert.equal(JSON.stringify(p.missed), '["1","2"]');
   assert.equal(p.mode, 'practice');
+  assert.equal(p.hintsUsed, 0);
   assert.ok(t.env.document.body.querySelector('.result-card'));
 });
 
@@ -337,8 +341,132 @@ test('guess the screen: the screen copy is not interactive and cleanup unbinds S
 
 test('game page loads the new scripts and the sources avoid innerHTML', () => {
   const html = readFileSync(new URL('game.html', ASSETS), 'utf8');
-  for (const s of ['engine/screenhost.js', 'games/screen-tour.js', 'games/guess-the-screen.js']) assert.ok(html.includes(`src="${s}"`), s);
+  for (const s of ['engine/gamekit.js', 'engine/screenhost.js', 'games/screen-tour.js', 'games/guess-the-screen.js']) assert.ok(html.includes(`src="${s}"`), s);
   for (const f of ['games/screen-tour.js', 'games/guess-the-screen.js']) {
     assert.doesNotMatch(readFileSync(new URL(f, ASSETS), 'utf8'), /innerHTML|outerHTML|insertAdjacentHTML/, f);
   }
+});
+
+// ---- fix round 1
+
+test('screenhost blocks navigation: anchors and submit buttons are default-prevented, foreign meta and base are removed', () => {
+  const t = boot('screen-tour', tourRound());
+  const f = t.frames[t.frames.length - 1];
+  const inner = f.inner;
+  const mk = (tag, attrs) => { const e = inner.createElement(tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); inner.body.appendChild(e); return e; };
+  const ours = inner.createElement('meta'); ours.setAttribute('http-equiv', 'Content-Security-Policy'); inner.head.appendChild(ours);
+  const foreign = mk('meta', { 'http-equiv': 'refresh', content: '0;url=http://evil.example' });
+  const base = mk('base', { href: 'http://evil.example/' });
+  const a = mk('a', { href: 'http://evil.example/x' });
+  const submit = mk('button', { type: 'submit' });
+  const plain = mk('p', {});
+  f.dispatchEvent(t.env.event('load', { bubbles: false }));
+  assert.equal(foreign.parentNode, null);
+  assert.equal(base.parentNode, null);
+  assert.notEqual(ours.parentNode, null);
+  for (const el of [a, submit]) {
+    const ev = t.env.event('click'); el.dispatchEvent(ev);
+    assert.ok(ev.defaultPrevented, el.tagName);
+  }
+  const ev = t.env.event('click'); plain.dispatchEvent(ev);
+  assert.ok(!ev.defaultPrevented);
+});
+
+test('screenhost: a blocked-pointer frame is inert and out of the tab order; moving scrolls the target into view', () => {
+  const t = boot('guess-the-screen', guessRound());
+  const f = t.frames[0];
+  assert.equal(f.getAttribute('tabindex'), '-1');
+  assert.ok(f.hasAttribute('inert'));
+  const env = createEnv({ reduced: true });
+  env.load('z.js', 'screenhost.js');
+  env.window.OWNIT_SCREENS = SCREENS;
+  const box = env.document.createElement('div');
+  env.document.body.appendChild(box);
+  const host = env.window.OwnIt.screenhost.mount(box, 's1');
+  const fr = box.querySelector('iframe');
+  const inner = createEnv().document;
+  fr.contentDocument = inner;
+  let scrolled = 0;
+  for (const id of TAGS.s1) { const d = inner.createElement('button'); d.setAttribute('data-ownit', id); d.scrollIntoView = () => { scrolled++; }; inner.body.appendChild(d); }
+  fr.dispatchEvent(env.event('load', { bubbles: false }));
+  host.move(1);
+  assert.equal(scrolled, 1);
+});
+
+test('tour dead ends: a missing screen or an untagged element degrades to choices or a Skip button', () => {
+  // chain whose element is not tagged after load: choices open straight away
+  const t = boot('screen-tour', tourRound());
+  t.load('s1', ['btn-release']);
+  assert.equal(t.root.querySelectorAll('.answer').length, 3);
+  t.key('1'); t.key('Enter');
+  // find: always skippable, a skip scores 0 and counts as missed
+  const skip = Array.from(t.root.querySelectorAll('button')).find((b) => /Skip/.test(b.textContent));
+  assert.ok(skip && !skip.hasAttribute('hidden'));
+  skip.click();
+  assert.match(t.root.textContent, /release/);
+  t.key('Enter');
+  t.key('1'); t.key('Enter');
+  const p = t.finished[0];
+  assert.equal(p.got, 2);
+  assert.equal(JSON.stringify(p.missed), '["1"]');
+
+  // missing screen: no iframe, the chain step still works from its choices, the find step can be skipped
+  const m = boot('screen-tour', { ...tourRound(), screen: 'nope' });
+  assert.equal(m.root.querySelectorAll('iframe').length, 0);
+  assert.equal(m.root.querySelectorAll('.answer').length, 3);
+  m.key('1'); m.key('Enter');
+  Array.from(m.root.querySelectorAll('button')).find((b) => /Skip/.test(b.textContent)).click();
+  m.key('Enter');
+  m.key('1'); m.key('Enter');
+  assert.equal(m.finished[0].got, 2);
+});
+
+test('Enter and Space only act from the game area or the page, never from shell buttons', () => {
+  const press = (t, k, target) => {
+    const ev = t.env.event('keydown', { key: k });
+    ev.target = target;
+    t.env.document.dispatchEvent(ev);
+    return ev;
+  };
+  const header = (t) => t.root.querySelector('header').querySelector('button');
+  const tour = boot('screen-tour', tourRound());
+  tour.load('s1');
+  const e1 = press(tour, 'Enter', header(tour));
+  assert.ok(!e1.defaultPrevented);
+  assert.equal(tour.root.querySelectorAll('.answer').length, 0);
+  const e2 = press(tour, 'Enter', tour.env.document.body); // from the page: taps the highlighted element
+  assert.ok(e2.defaultPrevented);
+  assert.equal(tour.root.querySelectorAll('.answer').length, 3);
+
+  const guess = boot('guess-the-screen', guessRound());
+  guess.load('s1');
+  const s1 = press(guess, ' ', header(guess));
+  assert.ok(!s1.defaultPrevented);
+  assert.ok(guess.root.querySelector('.guess-choices').hasAttribute('hidden'));
+  const s2 = press(guess, ' ', guess.env.document.body);
+  assert.ok(s2.defaultPrevented);
+  assert.ok(!guess.root.querySelector('.guess-choices').hasAttribute('hidden'));
+});
+
+test('games show labels from round.labels while comparing ids', () => {
+  const g = guessRound();
+  g.labels = { alpha: { label: 'Trip list' }, beta: { label: 'Cancel trip' } };
+  const t = boot('guess-the-screen', g);
+  t.load('s1');
+  t.key(' ');
+  const text = Array.from(t.root.querySelector('.guess-choices').querySelectorAll('.answer-text')).map((x) => x.textContent);
+  assert.equal(JSON.stringify(text), '["Trip list","Cancel trip","gamma","delta"]');
+  t.key('2');
+  assert.equal(t.sounds.includes('correct'), true); // beta is the id behind "Cancel trip"
+  assert.match(t.root.textContent, /Cancel trip/);
+});
+
+test('kit: label falls back to a humanised id and ignores inherited keys', () => {
+  const env = createEnv({ reduced: true });
+  env.load('z.js', 'gamekit.js');
+  const kit = env.window.OwnIt.kit;
+  assert.equal(kit.label('btn-cancel', null), 'btn cancel');
+  assert.equal(kit.label('a', { a: { label: 'Alpha' } }), 'Alpha');
+  assert.equal(kit.label('constructor', {}), 'constructor');
+  assert.equal(kit.label('Ask the manager', {}), 'Ask the manager');
 });

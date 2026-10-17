@@ -1,15 +1,15 @@
 /* own-it game template: Screen Tour (design spec 6.2, frontend spec 6.3). One rebuilt app screen sits in a sandboxed iframe
    (OwnIt.screenhost). Steps: chain (tap an element, pick what happens), find (tap the right element), role (pick who sees it).
-   Answers arrive obfuscated and are decoded only when the player answers. Builds DOM with OwnIt.el only. */
+   Answers arrive obfuscated and are decoded only when the player answers. If the screen is missing or an element is not tagged,
+   the step falls back to its choices, or to a Skip button that scores 0. Builds DOM with OwnIt.el only. */
 (function () {
   'use strict';
   var OwnIt = window.OwnIt;
-  var LETTERS = ['A', 'B', 'C', 'D'];
+  var kit = OwnIt.kit;
   var XP_RIGHT = 10;
-  var LABEL = function (t) { return OwnIt.screenhost.label(t); };
 
   var INSTRUCTION = {
-    chain: 'Tap the highlighted spot on the screen, or use the arrow keys and Enter.',
+    chain: 'Tap the highlighted spot on the screen, or press Enter.',
     find: 'Tap the right spot on the screen, or use the arrow keys and Enter.',
     role: 'Pick one of the answers.'
   };
@@ -17,8 +17,10 @@
   function play(root, round, ctx) {
     var steps = (round && round.steps) || [];
     var total = steps.length;
+    var labels = round && round.labels;
     var exam = (round && round.mode === 'exam') || OwnIt.mode === 'exam';
     var mode = exam ? 'exam' : 'practice';
+    var L = function (id) { return kit.label(id, labels); };
 
     var si = 0;
     var phase = 'tap';     // tap (waiting for a tap on the screen), choose (answers showing), locked (answered)
@@ -28,57 +30,48 @@
     var review = [];
 
     var shell = OwnIt.shell(root, ctx, { zone: round && round.zone, total: total, side: false });
+    shell.setScore(0, total);
     shell.startTimer();
+    var area = shell.area;
 
     var grid = OwnIt.el('div', { 'class': 'tour-grid' });
     var screenBox = OwnIt.el('section', { 'class': 'tour-screen', 'aria-label': 'Screen copy' });
-    var card = OwnIt.el('section', { 'class': 'panel tour-card' });
-    var dots = OwnIt.el('div', { 'class': 'qdots', role: 'img' });
-    var dotEls = [];
-    for (var d = 0; d < total; d++) {
-      var dot = OwnIt.el('span', { 'class': 'qdot' });
-      dotEls.push(dot);
-      dots.appendChild(dot);
-    }
+    var card = OwnIt.el('section', { 'class': 'panel tour-card', tabindex: '-1' });
+    var dots = kit.dots(total);
     var prompt = OwnIt.el('h2', { 'class': 'quiz-q', 'aria-live': 'polite' });
     var hint = OwnIt.el('p', { 'class': 'quiz-why tour-hint' });
     var answersEl = OwnIt.el('div', { 'class': 'answers', role: 'group', 'aria-label': 'Answers' });
     var feedback = OwnIt.el('div', { 'class': 'quiz-feedback', 'aria-live': 'polite' });
     var actions = OwnIt.el('div', { 'class': 'actions quiz-actions' });
+    var skipBtn = OwnIt.button('Skip this one', 'quiet', null, { 'class': 'btn btn-quiet tour-skip' });
     var nextBtn = OwnIt.button('Next', 'primary', null);
     nextBtn.setAttribute('hidden', 'hidden');
+    actions.appendChild(skipBtn);
     actions.appendChild(nextBtn);
-    [dots, prompt, hint, answersEl, feedback, actions].forEach(function (n) { card.appendChild(n); });
+    [dots.el, prompt, hint, answersEl, feedback, actions].forEach(function (n) { card.appendChild(n); });
     grid.appendChild(screenBox);
     grid.appendChild(card);
-    shell.area.appendChild(grid);
+    area.appendChild(grid);
 
     var host = OwnIt.screenhost.mount(screenBox, round && round.screen);
-    if (!host.ok) hint.textContent = 'The screen copy is missing, so you can only answer from what you know.';
 
-    function setDots() {
-      dotEls.forEach(function (el, i) {
-        var state = el.getAttribute('data-state');
-        el.className = 'qdot' + (i === si && phase !== 'locked' ? ' now' : '') + (state ? ' ' + state : '');
-      });
-      dots.setAttribute('aria-label', 'Step ' + Math.min(si + 1, total) + ' of ' + total);
-    }
+    function setDots() { dots.paint(si, phase === 'locked', 'Step'); }
 
     function showChoices(step) {
       phase = 'choose';
-      answersEl.textContent = '';
+      skipBtn.setAttribute('hidden', 'hidden');
       answersEl.removeAttribute('hidden');
-      var mine = si;
-      (step.choices || []).slice(0, 4).forEach(function (c, i) {
-        var b = OwnIt.el('button', { type: 'button', 'class': 'answer' });
-        b.appendChild(OwnIt.el('span', { 'class': 'answer-key', 'aria-hidden': 'true' }, String(i + 1)));
-        b.appendChild(OwnIt.el('span', { 'class': 'answer-text' }, LABEL(c)));
-        b.addEventListener('click', function () { choose(mine, i); });
-        answersEl.appendChild(b);
-      });
+      var at = si;
+      var btns = kit.answerButtons(answersEl, (step.choices || []).slice(0, 4).map(L), function (i) { choose(at, i); });
       hint.textContent = INSTRUCTION.role;
-      var first = answersEl.querySelector('.answer');
-      if (first && first.focus) first.focus();
+      if (btns[0] && btns[0].focus) btns[0].focus();
+    }
+
+    // The tap target cannot be used (no screen, or the element is not tagged): go straight to the choices, or offer Skip.
+    function degrade(step, at) {
+      if (done || at !== si || phase !== 'tap') return;
+      if (step.kind === 'chain' && step.choices && step.choices.length) showChoices(step);
+      else hint.textContent = 'This spot is not on the screen copy. You can skip this one.';
     }
 
     function render() {
@@ -89,42 +82,43 @@
       answersEl.setAttribute('hidden', 'hidden');
       feedback.textContent = '';
       nextBtn.setAttribute('hidden', 'hidden');
+      skipBtn.removeAttribute('hidden');
       prompt.textContent = step.prompt;
       hint.textContent = INSTRUCTION[step.kind] || INSTRUCTION.find;
-      if (step.kind === 'role' || (step.kind === 'chain' && !step.element)) showChoices(step);
-      else if (step.kind === 'chain' && step.element) host.highlight(step.element, '1');
+      var at = si;
+      if (step.kind === 'role') showChoices(step);
+      else if (!host.ok) degrade(step, at);
+      else {
+        if (step.kind === 'chain' && step.element) host.highlight(step.element, '1');
+        host.onReady(function () {
+          if (step.kind === 'chain' && !(step.element && host.has(step.element))) degrade(step, at);
+          else if (step.kind === 'find' && !host.ids().length) degrade(step, at);
+        });
+      }
       setDots();
-    }
-
-    function note(cls, label, text) {
-      var line = OwnIt.el('p', { 'class': 'quiz-why ' + cls });
-      line.appendChild(OwnIt.el('strong', null, label + ' '));
-      line.appendChild(OwnIt.el('span', null, text));
-      feedback.appendChild(line);
     }
 
     function settle(ok, rightLabel) {
       var step = steps[si];
       phase = 'locked';
+      skipBtn.setAttribute('hidden', 'hidden');
       if (ok) got++; else missed.push(String(si));
       if (!ok) review.push({ text: 'Step ' + (si + 1) + ': ' + step.prompt + ' Answer: ' + rightLabel + '.' });
-      dotEls[si].setAttribute('data-state', exam ? 'set' : ok ? 'ok' : 'bad');
+      dots.set(si, exam ? 'set' : ok ? 'ok' : 'bad');
       if (exam) {
-        note('locked', 'Locked in.', 'Answers show at the end.');
+        kit.note(feedback, 'locked', 'Locked in.', 'Answers show at the end.');
       } else if (ok) {
         OwnIt.sound('correct');
         OwnIt.juice.confetti(card);
         shell.setScore(got, total);
         feedback.appendChild(OwnIt.el('p', { 'class': 'quiz-xp' }, '+' + XP_RIGHT + ' XP'));
-        note('good', 'Right.', rightLabel);
+        kit.note(feedback, 'good', 'Right.', rightLabel);
       } else {
         OwnIt.sound('wrong');
         OwnIt.juice.shake(card);
-        note('bad', 'Not quite.', 'The answer was: ' + rightLabel);
+        kit.note(feedback, 'bad', 'Not quite.', 'The answer was: ' + rightLabel);
       }
-      nextBtn.textContent = si + 1 >= total ? 'See result' : 'Next';
-      nextBtn.removeAttribute('hidden');
-      nextBtn.focus();
+      kit.nextLabel(nextBtn, si, total);
       setDots();
     }
 
@@ -135,7 +129,7 @@
       if (choice < 0 || choice >= choices.length) return;
       var right = OwnItCore.decode(step.answer); // the only place an answer is decoded
       var ok = choices[choice] === right;
-      var btns = answersEl.querySelectorAll('.answer');
+      var btns = Array.from(answersEl.querySelectorAll('.answer'));
       btns.forEach(function (b) { b.setAttribute('aria-disabled', 'true'); });
       btns[choice].classList.add('picked');
       var rightAt = choices.indexOf(right);
@@ -143,12 +137,12 @@
         if (rightAt >= 0) btns[rightAt].classList.add('right');
         if (!ok) btns[choice].classList.add('wrong');
       }
-      settle(ok, LABEL(right));
+      settle(ok, L(right));
     }
 
     function tapped(id) {
       var step = steps[si];
-      if (done || !step || phase === 'locked' || phase === 'choose') return;
+      if (done || !step || phase !== 'tap') return;
       if (step.kind === 'chain') {
         if (id !== step.element) {
           hint.textContent = 'Not that one. Tap the highlighted spot.';
@@ -162,11 +156,20 @@
         var right = OwnItCore.decode(step.answer); // the only place an answer is decoded
         var ok = id === right;
         if (ok || exam) host.highlight(exam ? id : right, exam ? '1' : 'ok');
-        if (!ok && !exam) { host.highlight(id, 'bad'); host.highlight(right, 'ok', true); }
-        settle(ok, LABEL(right));
+        else { host.highlight(id, 'bad'); host.highlight(right, 'ok', true); }
+        settle(ok, L(right));
       }
     }
     host.onPick(tapped);
+
+    function skip() {
+      var step = steps[si];
+      if (done || !step || phase !== 'tap') return;
+      var right = OwnItCore.decode(step.answer); // skipping gives the answer up, so this is an answer too
+      if (!exam) host.highlight(right, 'ok');
+      settle(false, L(right));
+    }
+    skipBtn.addEventListener('click', skip);
 
     function next(at) {
       if (done || phase !== 'locked' || at !== si) return;
@@ -177,37 +180,26 @@
 
     function finish() {
       done = true;
-      shell.stopTimer();
-      shell.setScore(got, total);
-      var xp = Math.max(0, got * XP_RIGHT - shell.hintsUsed() * 15);
-      shell.result({
-        got: got, total: total, xp: xp, missed: review,
-        payload: { id: ctx.roundId, game: 'screen-tour', mode: mode, submittedAt: new Date().toISOString(), got: got, of: total, missed: missed }
-      });
+      kit.finish(shell, ctx, { game: 'screen-tour', mode: mode, got: got, of: total, xp: got * XP_RIGHT, missed: missed, review: review });
     }
 
     nextBtn.addEventListener('click', function () { next(si); });
 
-    var offs = [];
-    function onKey(fn) { return function (e) { if (!document.body.querySelector('.scrim')) fn(e); }; }
-    [['1', 0], ['2', 1], ['3', 2], ['4', 3], ['a', 0], ['b', 1], ['c', 2], ['d', 3]].forEach(function (p) {
-      offs.push(ctx.keys.on(p[0], onKey(function () { choose(si, p[1]); })));
-    });
-    offs.push(ctx.keys.on('n', onKey(function () { next(si); })));
+    var offs = kit.choiceKeys(ctx, function (i) { choose(si, i); });
+    offs.push(kit.onActivate(ctx, area, 'n', function () { next(si); }));
     [['ArrowRight', 1], ['ArrowDown', 1], ['ArrowLeft', -1], ['ArrowUp', -1]].forEach(function (p) {
-      offs.push(ctx.keys.on(p[0], onKey(function (e) {
-        if (phase !== 'tap') return;
+      offs.push(ctx.keys.on(p[0], function (e) {
+        if (phase !== 'tap' || kit.modalOpen() || !kit.mine(e, area)) return;
         if (e && e.preventDefault) e.preventDefault();
         host.move(p[1]);
-      })));
+      }));
     });
-    offs.push(ctx.keys.on('Enter', onKey(function (e) {
-      if (e && e.preventDefault) e.preventDefault(); // stops a focused button's own click from firing a second time
+    offs.push(kit.onActivate(ctx, area, 'Enter', function (e) {
       if (phase === 'locked') return next(si);
       if (phase === 'tap') { host.pickCurrent(); return; }
-      var btns = answersEl.querySelectorAll('.answer');
-      for (var i = 0; i < btns.length; i++) if (btns[i] === (e && e.target)) return choose(si, i);
-    })));
+      var at = kit.targetIndex(answersEl.querySelectorAll('.answer'), e);
+      if (at >= 0) choose(si, at);
+    }));
 
     if (total) render();
     else {
@@ -215,7 +207,7 @@
       shell.stopTimer();
       prompt.textContent = 'This round has no steps.';
       hint.textContent = 'Ask Claude to build a new screen tour round, then pick it again from the board.';
-      dots.setAttribute('hidden', 'hidden');
+      [dots.el, skipBtn].forEach(function (n) { n.setAttribute('hidden', 'hidden'); });
     }
 
     return function () {

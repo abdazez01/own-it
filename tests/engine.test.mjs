@@ -155,7 +155,7 @@ test('link file mode: result downloads own-it-<id>.json and offers a copy', asyn
   await OwnIt.link.send('result', { id: 'trips-quiz-1', got: 3 });
   assert.equal(made.length, 1);
   assert.equal(made[0].getAttribute('download'), 'own-it-trips-quiz-1.json');
-  const btn = env.document.body.querySelectorAll('button').find((b) => b.textContent === 'Copy answer');
+  const btn = Array.from(env.document.body.querySelectorAll('button')).find((b) => b.textContent === 'Copy answer');
   assert.ok(btn);
   btn.click();
   await new Promise((r) => setTimeout(r, 5));
@@ -232,7 +232,7 @@ test('link: only safe script names are re-injected; unsubscribe works', async ()
   link.stop();
   versions = { 'progress.js': 2, '../evil.js': 1, 'a b.js': 1, 'data/x-quiz-1.js': 5 };
   await link.poll();
-  const srcs = env.document.head.querySelectorAll('script').map((s) => s.getAttribute('src')).sort();
+  const srcs = Array.from(env.document.head.querySelectorAll('script')).map((s) => s.getAttribute('src')).sort();
   assert.equal(srcs.join(), 'data/x-quiz-1.js?v=5,progress.js?v=2');
   off();
   assert.equal(link.subscriberCount(), 0);

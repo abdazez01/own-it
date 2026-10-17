@@ -8,7 +8,7 @@ import { createEnv } from './fake-dom.mjs';
 const require = createRequire(import.meta.url);
 const core = require('../own-it/assets/core.js');
 const ASSETS = new URL('../own-it/assets/', import.meta.url);
-const FILES = ['z.js', 'icons.js', 'router.js', 'flap.js', 'toggle.js', 'juice.js', 'keys.js', 'link.js', 'shell.js'];
+const FILES = ['z.js', 'icons.js', 'router.js', 'flap.js', 'toggle.js', 'juice.js', 'keys.js', 'link.js', 'shell.js', 'gamekit.js'];
 
 const live = [];
 after(() => live.forEach((f) => { try { f(); } catch { /* already cleaned */ } }));
@@ -55,7 +55,7 @@ function boot({ mode = 'practice', exam = false } = {}) {
   const cleanup = w.OwnIt.games.get('quiz').play(root, round, ctx);
   live.push(cleanup);
   const key = (k) => env.document.dispatchEvent(env.event('keydown', { key: k }));
-  const opts = () => root.querySelectorAll('.answer');
+  const opts = () => Array.from(root.querySelectorAll('.answer'));
   return { env, w, root, key, opts, sounds, finished, cleanup, round, counts: { decodes: () => decodes, shakes: () => shakes, confetti: () => confetti } };
 }
 
@@ -137,9 +137,9 @@ test('hint is confirmed and counted; exam mode has no hints and no why until the
   t.key('h');
   const dlg = t.env.document.body.querySelector('.dialog');
   assert.ok(dlg);
-  dlg.querySelectorAll('button').find((b) => /Show hint/.test(b.textContent)).click();
+  Array.from(dlg.querySelectorAll('button')).find((b) => /Show hint/.test(b.textContent)).click();
   assert.match(t.env.document.body.textContent, /src\/trips\.js:10/);
-  dlg.querySelectorAll('button').find((b) => /Got it/.test(b.textContent)).click();
+  Array.from(dlg.querySelectorAll('button')).find((b) => /Got it/.test(b.textContent)).click();
   ['1', '1', '1', '1', '1'].forEach((k) => { t.key(k); t.key('Enter'); });
   assert.equal(t.finished[0].hintsUsed, 1);
 
@@ -198,4 +198,17 @@ test('Enter on a focused answer picks it once and is not double-handled', () => 
   t.env.document.dispatchEvent(ev);
   assert.ok(ev.defaultPrevented);
   assert.ok(b.classList.contains('picked'));
+});
+
+test('Enter does not act when the target is a shell button; Enter from the page still advances', () => {
+  const t = boot();
+  t.key('2');
+  const hdr = t.root.querySelector('header').querySelector('button');
+  const ev = t.env.event('keydown', { key: 'Enter' });
+  ev.target = hdr;
+  t.env.document.dispatchEvent(ev);
+  assert.ok(!ev.defaultPrevented);
+  assert.match(t.root.textContent, /Question 0\?/); // still on question 0
+  t.key('Enter');
+  assert.match(t.root.textContent, /Question 1\?/);
 });

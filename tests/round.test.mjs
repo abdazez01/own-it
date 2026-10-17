@@ -228,3 +228,18 @@ test('screen-tour find answer must be a zone id; quest start must match first ob
   await assert.rejects(q('s2'), /start must be the screen of the first objective/);
   await assert.rejects(q('el1'), /start must be the screen of the first objective/);
 });
+
+test('rounds carry plain labels for every referenced model id, never for a find answer', async () => {
+  const root = await setup();
+  const t = tour({ steps: [{ kind: 'find', prompt: 'Which control cancels?', element: 'el1', answer: 'el2' }] });
+  const out = await bld(root, 'screen-tour', t);
+  const r = loadRound(root, out.id);
+  assert.equal(r.labels.s1.label, 'Trip screen');
+  assert.equal(r.labels.s2.label, 'Approvals'); // el1 goes to s2
+  assert.equal(r.labels.el1.label, 'el1');      // no label in the model: falls back to the id
+  assert.ok(!Object.hasOwn(r.labels, 'el2'), 'the find answer must not be labelled');
+  const g = await bld(root, 'guess-the-screen', { zone: 'trips', screens: [1, 2, 3].map(() => ({ screen: 's1', choices: ['s1', 's2', 'el1', 'el2'], answer: 's1' })) });
+  assert.equal(loadRound(root, g.id).labels.s2.label, 'Approvals');
+  const q = await bld(root, 'quiz', quiz());
+  assert.equal(JSON.stringify(loadRound(root, q.id).labels), '{}');
+});
