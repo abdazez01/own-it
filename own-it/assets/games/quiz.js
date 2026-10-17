@@ -72,12 +72,14 @@
       if (choice < 0 || choice >= q.options.length) return;
       locked = true;
       var right = OwnItCore.decode(q.answer); // the only place an answer is decoded
+      var seen = {};
+      var why = function (i) { if (!(i in seen)) seen[i] = OwnItCore.decode(q.options[i].why); return seen[i]; }; // reasons are decoded only when shown, once each
       var ok = choice === right;
       var btns = Array.from(answersEl.querySelectorAll('.answer'));
       btns.forEach(function (b) { b.setAttribute('aria-disabled', 'true'); });
       btns[choice].classList.add('picked');
       if (ok) got++; else missed.push(String(qi));
-      if (!ok) review.push({ text: 'Question ' + (qi + 1) + ': ' + q.q + ' Answer: ' + q.options[right].text + '. ' + q.options[right].why });
+      if (!ok) review.push({ text: 'Question ' + (qi + 1) + ': ' + q.q + ' Answer: ' + q.options[right].text + '. ' + why(right) });
       dots.set(qi, exam ? 'set' : ok ? 'ok' : 'bad');
 
       if (exam) {
@@ -90,13 +92,13 @@
           OwnIt.juice.confetti(card);
           shell.setScore(got, total);
           feedback.appendChild(OwnIt.el('p', { 'class': 'quiz-xp' }, '+' + XP_RIGHT + ' XP'));
-          note(feedback, 'good', 'Why:', q.options[right].why);
+          note(feedback, 'good', 'Why:', why(right));
         } else {
           btns[choice].classList.add('wrong');
           OwnIt.sound('wrong');
           OwnIt.juice.shake(card);
-          note(feedback, 'bad', 'Why not:', q.options[choice].why);
-          note(feedback, 'good', 'Why this one:', q.options[right].why);
+          note(feedback, 'bad', 'Why not:', why(choice));
+          note(feedback, 'good', 'Why this one:', why(right));
         }
       }
       OwnIt.kit.nextLabel(nextBtn, qi, total);

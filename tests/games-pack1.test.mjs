@@ -147,7 +147,7 @@ test('memory-match: cleanup stops the pending flip-back and the keys', () => {
 
 const lieRound = (over = {}) => ({
   zone: 'trips', mode: 'practice', answer: core.encode(2), labels: {},
-  statements: Array.from({ length: 5 }, (_, i) => ({ text: `Statement ${i} text`, why: `Why ${i} holds` })), ...over,
+  statements: Array.from({ length: 5 }, (_, i) => ({ text: `Statement ${i} text`, why: core.encode(`Why ${i} holds`) })), ...over,
 });
 const stmts = (t) => Array.from(t.root.querySelectorAll('.answer'));
 
@@ -157,7 +157,8 @@ test('spot-the-lie: five statements, answer decoded only on a pick', () => {
   assert.equal(t.decodes(), 0);
   assert.ok(!/Why 0 holds/.test(t.root.textContent), 'reasons wait until after');
   stmts(t)[0].click();
-  assert.equal(t.decodes(), 1);
+  assert.equal(t.decodes(), 2, 'the answer and the reason shown');
+  assert.match(t.root.textContent, /Why 0 holds/);
 });
 
 test('spot-the-lie: 10 XP on the first try', () => {
@@ -294,7 +295,7 @@ test('chain-reaction: cleanup stops the fuse', () => {
 
 const waRound = () => ({
   zone: 'trips', mode: 'practice', labels: {},
-  cards: Array.from({ length: 8 }, (_, i) => ({ action: `Do thing ${i}`, role: `role${i}`, answer: core.encode(i % 2 === 0 ? 'allow' : 'deny'), why: `Because ${i} is the rule` })),
+  cards: Array.from({ length: 8 }, (_, i) => ({ action: `Do thing ${i}`, role: `role${i}`, answer: core.encode(i % 2 === 0 ? 'allow' : 'deny'), why: core.encode(`Because ${i} is the rule`) })),
 });
 const waBtn = (t, cls) => t.root.querySelector(`.wa-btn.${cls}`);
 const waCard = (t) => t.root.querySelector('.wa-action').textContent;
@@ -305,7 +306,7 @@ test('whos-allowed: streak points 10 x (1 + streak/5), rising combo, miss breaks
   assert.equal(waCard(t), 'Do thing 0');
   assert.ok(!/Because 0/.test(t.root.textContent));
   waBtn(t, 'allow').click(); waBtn(t, 'deny').click(); waBtn(t, 'allow').click(); // 10 + 12 + 14
-  assert.equal(t.decodes(), 3);
+  assert.equal(t.decodes(), 6, 'a verdict and a reason per card');
   assert.deepEqual(tuples(t, 'combo').map((s) => s[1]), [1, 2, 3]);
   assert.match(t.root.textContent, /Because 2 is the rule/);
   waBtn(t, 'allow').click(); // card 3 is deny: miss
@@ -387,6 +388,7 @@ test('blast-radius: score is 10 x the balance of precision and recall, decoded o
   assert.equal(t.decodes(), 0);
   brDone(t).click();
   assert.equal(t.decodes(), 1);
+  assert.match(t.root.textContent, /You found 1 of 2 parts that break, with 1 false alarm./);
   assert.equal(t.finished.length, 1);
   assert.equal(t.results[0].xp, 5); // precision 1/2, recall 1/2
   assert.equal(t.finished[0].precision, 0.5);
@@ -478,7 +480,8 @@ test('pager: finding the step fast scores 20 + up to 10 for speed, a wrong pick 
   assert.equal(slip.shakes(), 1);
   pgBtns(slip)[2].click();
   assert.equal(slip.results[0].xp, 20);
-  assert.deepEqual(plain(slip.finished[0].missed), ['0']);
+  assert.deepEqual(plain(slip.finished[0].missed), []);
+  assert.deepEqual(plain(slip.finished[0].wrong), ['x1']);
   assert.ok(Array.from(slip.root.querySelectorAll('*')).every((n) => !n.hasAttribute('data-id')), 'no ids in the DOM');
 });
 
@@ -516,5 +519,36 @@ test('pager: keys 1-4 pick a card; cleanup clears the alert and stops the clock'
     assert.deepEqual(plain(u.alerts), [true, false]);
     mock.timers.tick(100000);
     assert.equal(u.finished.length, 0);
+  } finally { mock.timers.reset(); }
+});
+
+// ------------------------------------------------------------------ kit.clock
+
+test('kit.clock: drains a bar, ticks the last 5 s, reports elapsed time and ends once; stop prevents the end', () => {
+  mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+  try {
+    const t = boot('pager', pgRound());
+    t.cleanup();
+    t.sounds.length = 0;
+    const host = t.env.document.createElement('div');
+    const elapsed = [];
+    let ended = 0;
+    const c = t.w.OwnIt.kit.clock(host, 8000, { label: 'Left', onTick: (e) => elapsed.push(e), onEnd: () => { ended++; } });
+    assert.equal(host.querySelector('.cr-fuse').getAttribute('aria-label'), 'Left');
+    assert.equal(c.remaining(), 8000);
+    mock.timers.tick(2900);
+    assert.equal(tuples(t, 'tick').length, 0);
+    mock.timers.tick(200);
+    assert.deepEqual(tuples(t, 'tick').map((s) => s[1]), [5], 'first tick when 5 s are left');
+    assert.equal(c.remaining(), 4900);
+    assert.equal(elapsed[0], 100);
+    mock.timers.tick(10000);
+    assert.equal(ended, 1);
+    assert.equal(host.querySelector('.cr-fuse').getAttribute('aria-valuenow'), '0');
+    assert.equal(c.remaining(), 0);
+    const stopped = t.w.OwnIt.kit.clock(host, 3000, { onEnd: () => { ended++; } });
+    stopped.stop(); stopped.stop();
+    mock.timers.tick(5000);
+    assert.equal(ended, 1);
   } finally { mock.timers.reset(); }
 });

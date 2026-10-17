@@ -19,7 +19,7 @@ function makeRound(mode = 'practice') {
     zone: 'trips', mode,
     questions: ANSWERS.map((a, i) => ({
       q: `Question ${i}?`,
-      options: [0, 1, 2, 3].map((j) => ({ text: `Q${i} option ${j}`, why: a === j ? `Q${i} right because ${j}` : `Q${i} not ${j} because` })),
+      options: [0, 1, 2, 3].map((j) => ({ text: `Q${i} option ${j}`, why: core.encode(a === j ? `Q${i} right because ${j}` : `Q${i} not ${j} because`) })),
       answer: core.encode(a),
       ...(i === 0 ? { peek: 'src/trips.js:10' } : {}),
     })),
@@ -71,7 +71,8 @@ test('answers decode only on answer', () => {
   assert.equal(t.counts.decodes(), 0);
   assert.ok(!JSON.stringify(t.root.textContent).includes(t.round.questions[0].answer));
   t.key('2');
-  assert.equal(t.counts.decodes(), 1);
+  assert.equal(t.counts.decodes(), 2, 'the answer and the one reason shown');
+  assert.match(t.root.textContent, /Q0 right because 1/);
 });
 
 test('key 2 selects option 2', () => {

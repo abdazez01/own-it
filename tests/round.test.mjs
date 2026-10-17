@@ -520,3 +520,44 @@ test('pager: log count, unknown or unsuitable answers, too few look-alikes and i
   const code = pagerIn(); code.logs[1] = 'src/api/trips.ts';
   await assert.rejects(bld(root, 'pager', code), /identifier-only answer in logs\[1\]/);
 });
+
+// ---- fix round: reasons obfuscated, blast radius never truncates, role text checked
+
+test('reasons are obfuscated: quiz option why, spot-the-lie statement why, whos-allowed card why', async () => {
+  const root = await setup();
+  const q = await bld(root, 'quiz', quiz());
+  const rq = loadRound(root, q.id);
+  rq.questions.forEach((x) => x.options.forEach((o) => { assert.notEqual(o.why, 'Because of the product rule.'); assert.equal(core.decode(o.why), 'Because of the product rule.'); }));
+  const l = loadRound(root, (await bld(root, 'spot-the-lie', lie())).id);
+  l.statements.forEach((s, i) => { assert.ok(!/^Reason/.test(s.why)); assert.equal(core.decode(s.why), `Reason ${i} in plain words`); });
+  const w = loadRound(root, (await bld(root, 'whos-allowed', perm())).id);
+  w.cards.forEach((c) => { assert.ok(!/^Rule/.test(c.why)); assert.match(core.decode(c.why), /^Rule \d+ in plain words$/); });
+  assert.ok(!readFileSync(join(root, '.own-it', 'data', `${q.id}.js`), 'utf8').includes('product rule'));
+});
+
+test('whos-allowed: identifier-only roles are rejected too', async () => {
+  const root = await setup();
+  const code = perm(); code.cards[3].role = 'role_admin';
+  await assert.rejects(bld(root, 'whos-allowed', code), /identifier-only answer in cards\[3\]\.role/);
+});
+
+test('blast-radius: more than 8 dependents is refused, an unlabeled dependent is refused, nothing is dropped', async () => {
+  const root = await setup();
+  const m = loadModel(root);
+  const many = Array.from({ length: 9 }, (_, i) => I({ id: `d${i}`, k: 'component', label: `Dependent ${i}` }));
+  m.zones.trips.items.push(I({ id: 'core', k: 'component', label: 'Core' }), I({ id: 'free', k: 'component', label: 'Free' }), ...many,
+    ...many.map((d, i) => I({ id: `de${i}`, k: 'edge', from: d.id, to: 'core' })));
+  saveModel(root, m);
+  await assert.rejects(bld(root, 'blast-radius', { zone: 'trips', target: 'core' }), /blast radius too large \(9 parts\); pick a smaller target/);
+  const m2 = loadModel(root);
+  m2.zones.trips.items = m2.zones.trips.items.filter((x) => !['d7', 'd8', 'de7', 'de8'].includes(x.id));
+  delete m2.zones.trips.items.find((x) => x.id === 'd0').label;
+  saveModel(root, m2);
+  await assert.rejects(bld(root, 'blast-radius', { zone: 'trips', target: 'core' }), /dependents without labels: d0/);
+  assert.ok(!existsSync(join(root, '.own-it', 'data')) || !readdirSync(join(root, '.own-it', 'data')).some((f) => f.includes('blast')), 'nothing written');
+  const m3 = loadModel(root);
+  m3.zones.trips.items.find((x) => x.id === 'd0').label = 'Dependent 0';
+  saveModel(root, m3);
+  const r = loadRound(root, (await bld(root, 'blast-radius', { zone: 'trips', target: 'core' })).id);
+  assert.equal(core.decode(r.answer).length, 7, 'all seven dependents are in the damage set');
+});

@@ -95,9 +95,8 @@
       falseAlarm.forEach(function (i) { els[i].classList.add('false-alarm'); });
       OwnIt.sound(f >= 0.99 ? 'correct' : f > 0 ? 'hint' : 'wrong');
       if (f < 0.99) OwnIt.juice.shake(board); else OwnIt.juice.confetti(panel);
-      kit.note(feedback, f >= 0.99 ? 'good' : 'bad',
-        Math.round(precision * 100) + '% of your taps were right and you found ' + Math.round(recall * 100) + '% of what breaks.',
-        '+' + xp + ' XP, ten times the balance of those two numbers.');
+      kit.note(feedback, f >= 0.99 ? 'good' : 'bad', 'You found ' + hit + ' of ' + m + ' parts that break, with ' + kit.plural(falseAlarm.length, 'false alarm', 'false alarms') + '.',
+        '+' + xp + ' XP.');
       shell.setScore(hit, m);
 
       var review = notPicked.map(function (i) { return { text: L(parts[i]) + ' also breaks when ' + targetName + ' does.' }; })

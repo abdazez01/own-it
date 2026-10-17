@@ -32,7 +32,7 @@ function realQuizPayload() {
     keys: { on: (k, f) => w.OwnIt.keys.on(k, f, 'quiz') }, finish: (p) => finished.push(p) };
   w.OwnIt.keys.setScope('quiz');
   const round = { zone: 'trips', mode: 'practice', questions: [0, 1].map((i) => ({ q: `Q${i}?`,
-    options: [0, 1, 2, 3].map((j) => ({ text: `opt ${i} ${j}`, why: 'because' })), answer: core.encode(1) })) };
+    options: [0, 1, 2, 3].map((j) => ({ text: `opt ${i} ${j}`, why: core.encode('because') })), answer: core.encode(1) })) };
   const cleanup = w.OwnIt.games.get('quiz').play(root, round, ctx);
   const key = (k) => env.document.dispatchEvent(env.event('keydown', { key: k }));
   for (let i = 0; i < 2; i++) { key('2'); key('Enter'); }

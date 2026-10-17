@@ -1,5 +1,4 @@
 import { readFileSync, existsSync } from 'node:fs';
-import { randomInt } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { check, loadSchema } from './validate.mjs';
 import { getGame, GAMES_DIR } from './games.mjs';
@@ -9,6 +8,7 @@ import core from './core.mjs';
 import { readJson, writeJson, writeJsRegistry, writeAggregate } from './json.mjs';
 import { ownItPath } from './paths.mjs';
 import { estimate } from './tokens.mjs';
+import { derive, flowSteps } from './round-derive.mjs';
 
 // Games whose entries carry a required answer, and the array that holds them.
 const ANSWERED = { quiz: 'questions', 'screen-tour': 'steps', 'guess-the-screen': 'screens' };
@@ -29,14 +29,6 @@ const IDS = {
   pager: (r) => [r.answer],
 };
 
-// Fisher-Yates with a cryptographic source, so a shuffled order cannot be predicted.
-function shuffle(list) {
-  const a = list.slice();
-  for (let i = a.length - 1; i > 0; i--) { const j = randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
-  return a;
-}
-
-const cardOf = (it) => ({ id: it.id, label: it.label ?? it.id, kind: it.k, ref: it.ref, conf: it.conf });
 
 // A single code-like token (snake_case, a path, a dotted name, camelCase) or backtick-wrapped text.
 function identifierOnly(text) {
@@ -80,50 +72,10 @@ function checkPairs(input) {
 // Who's-allowed cards: a mix of verdicts (so tapping one button cannot win) and no bare identifiers in the action.
 function checkPermissions(input) {
   input.cards.forEach((c, i) => {
-    if (identifierOnly(c.action)) throw new Error(`identifier-only answer in cards[${i}].action; ${HINT}`);
+    for (const key of ['action', 'role']) if (identifierOnly(c[key])) throw new Error(`identifier-only answer in cards[${i}].${key}; ${HINT}`);
   });
   const allows = input.cards.filter((c) => c.answer === 'allow').length;
   if (allows < 2 || input.cards.length - allows < 2) throw new Error('cards need at least 2 allow and 2 deny answers');
-}
-
-const labeled = (it) => typeof it.label === 'string' && it.label.trim() !== '';
-
-// Blast radius: parts that depend on the target, directly or through others, nearest first.
-// An edge `from` -> `to` means from calls to, so the target breaking takes down everything that can reach it.
-function blastSet(input, byId, items) {
-  const target = byId.get(input.target);
-  if (target.k !== 'surface' && target.k !== 'component') throw new Error(`"${input.target}" is not a surface or component`);
-  if (!labeled(target)) throw new Error(`"${input.target}" has no label in the model`);
-  const callers = new Map();
-  for (const e of items) {
-    if (e.k !== 'edge' || typeof e.from !== 'string' || typeof e.to !== 'string') continue;
-    callers.set(e.to, [...(callers.get(e.to) || []), e.from]);
-  }
-  const seen = new Set([input.target]);
-  const order = [];
-  for (let frontier = [input.target]; frontier.length;) {
-    const next = [];
-    for (const id of frontier) for (const c of callers.get(id) || []) if (!seen.has(c)) { seen.add(c); next.push(c); order.push(c); }
-    frontier = next;
-  }
-  const shown = (id) => { const it = byId.get(id); return !!it && (it.k === 'surface' || it.k === 'component') && labeled(it); };
-  const damaged = order.filter(shown);
-  if (!damaged.length) throw new Error(`nothing depends on "${input.target}" in the model`);
-  const rest = shuffle(items.filter((x) => (x.k === 'surface' || x.k === 'component') && labeled(x) && x.id !== input.target && !seen.has(x.id)).map((x) => x.id));
-  if (!rest.length) throw new Error(`everything depends on "${input.target}"; pick a part with something independent of it`);
-  const kept = damaged.slice(0, 8);
-  return { damaged: kept, shown: [...kept, ...rest.slice(0, 12 - kept.length)] };
-}
-
-// Pager: the breaking step plus up to 3 look-alikes of the same kind, all with player-facing labels.
-function pagerChoices(input, byId, items) {
-  const answer = byId.get(input.answer);
-  if (!['element', 'surface', 'component'].includes(answer.k)) throw new Error(`"${input.answer}" is not an element, surface or component`);
-  const pool = items.filter((x) => x.k === answer.k && labeled(x));
-  if (pool.length < 3) throw new Error(`pager needs at least 3 parts of the same kind as "${input.answer}" with labels in the model`);
-  if (!labeled(answer)) throw new Error(`"${input.answer}" has no label in the model`);
-  const others = shuffle(pool.filter((x) => x.id !== answer.id)).slice(0, 2 + randomInt(2));
-  return shuffle([answer, ...others]);
 }
 
 // Quest objectives are elements of the quest's flow, each used once.
@@ -151,13 +103,6 @@ function checkQuest(input, byId) {
   });
 }
 
-// A flow's step cards in order: the groups flattened, repeats dropped, ids outside the zone ignored.
-function flowSteps(flow, byId) {
-  const seen = new Set();
-  for (const g of Array.isArray(flow.steps) ? flow.steps : []) for (const id of Array.isArray(g) ? g : []) if (typeof id === 'string' && byId.has(id)) seen.add(id);
-  return [...seen];
-}
-
 // Surface ids a round shows, so a map-rung pass counts toward coverage.
 function shownCards(game, input, byId) {
   const ids = game === 'screen-tour' ? [input.screen, ...input.steps.map((s) => s.element && byId.get(s.element)?.on)]
@@ -167,11 +112,11 @@ function shownCards(game, input, byId) {
   return [...new Set(ids.filter((x) => typeof x === 'string' && byId.has(x)))];
 }
 
-// Replaces every `answer` / `answers` field (at any depth) with its obfuscated form.
+// Replaces every `answer` / `answers` / `why` / `whys` field (at any depth) with its obfuscated form: reasons give answers away too.
 function obfuscate(v) {
   if (Array.isArray(v)) return v.map(obfuscate);
   if (v && typeof v === 'object') {
-    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === 'answer' || k === 'answers' ? core.encode(x) : obfuscate(x)]));
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === 'answer' || k === 'answers' || k === 'why' || k === 'whys' ? core.encode(x) : obfuscate(x)]));
   }
   return v;
 }
@@ -189,50 +134,6 @@ function labelsFor(named, byId) {
     out[id] = entry;
   }
   return out;
-}
-
-// Fills in answers the model already knows, so Claude never has to write them.
-function derive(game, round, byId, items) {
-  if (game === 'quests') {
-    round.answer = round.objectives.map((o) => {
-      const it = byId.get(o.element);
-      if (typeof it.does !== 'string' || !it.does) throw new Error(`element "${it.id}" has no does in the model`);
-      return { element: it.id, on: it.on, does: it.does, goes: it.goes };
-    });
-  } else if (game === 'whiteboard') {
-    if (new Set(round.cards).size !== round.cards.length) throw new Error('duplicate cards in whiteboard');
-    const set = new Set(round.cards);
-    round.cards = round.cards.map((id) => cardOf(byId.get(id)));
-    round.answer = { edges: items.filter((x) => x.k === 'edge' && set.has(x.from) && set.has(x.to)).map((x) => ({ id: x.id, from: x.from, to: x.to })) };
-  } else if (game === 'memory-match') {
-    // Terms and meanings are each randomly permuted, and no meaning sits at its own term's place or at a fixed offset from it,
-    // so the data order gives nothing away; the pairing is only in the obfuscated answer.
-    const n = round.pairs.length;
-    const p = shuffle([...Array(n).keys()]);
-    let q;
-    do q = shuffle([...Array(n).keys()]);
-    while (q.some((x, j) => x === p[j]) || [...Array(n).keys()].some((off) => q.every((x, j) => x === p[(j + off) % n])));
-    round.terms = p.map((i) => round.pairs[i].term);
-    round.meanings = q.map((i) => round.pairs[i].meaning);
-    round.answer = p.map((i) => q.indexOf(i));
-    delete round.pairs;
-  } else if (game === 'chain-reaction') {
-    const order = flowSteps(byId.get(round.flow), byId);
-    let scrambled = shuffle(order);
-    while (scrambled.every((id, i) => id === order[i])) scrambled = shuffle(order);
-    scrambled = scrambled.map((id) => cardOf(byId.get(id)));
-    round.cards = scrambled;
-    round.answer = order;
-  } else if (game === 'whos-allowed') {
-    // Shuffled so the order in the file gives nothing away; each card's verdict is obfuscated by obfuscate().
-    round.cards = shuffle(round.cards);
-  } else if (game === 'blast-radius') {
-    const { damaged, shown } = blastSet(round, byId, items);
-    round.cards = shuffle(shown).map((id) => ({ id, label: byId.get(id).label }));
-    round.answer = damaged;
-  } else if (game === 'pager') {
-    round.cards = pagerChoices(round, byId, items).map((x) => ({ id: x.id, label: x.label }));
-  }
 }
 
 // Navigation facts for a quest: every element on a screen the player can reach by following `goes` from `start` or from any objective's screen (a role switch lands there).

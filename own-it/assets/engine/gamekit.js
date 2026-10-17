@@ -1,5 +1,5 @@
 /* own-it engine: shared scaffolding for question-style game templates (quiz, screen tour, guess the screen).
-   OwnIt.kit: label, note, dots, answerButtons, targetIndex, choiceKeys, onActivate, nextLabel, finish. Load after shell.js. */
+   OwnIt.kit: label, note, dots, answerButtons, targetIndex, choiceKeys, clock, onActivate, nextLabel, finish. Load after shell.js. */
 (function () {
   'use strict';
   var OwnIt = (window.OwnIt = window.OwnIt || {});
@@ -104,6 +104,39 @@
     if (btn.focus) btn.focus();
   }
 
+  /* A countdown with a draining bar, appended to parent. ms is the total. Plays a tick each second left inside the last
+     tickFrom ms (default 5000). o: { label, spark, tickFrom, onTick(elapsedMs) every 100 ms, onEnd() when it runs out }.
+     Returns { el, stop(), remaining() in ms }. stop() is safe to call twice and keeps onEnd from firing. */
+  function clock(parent, ms, o) {
+    o = o || {};
+    var step = 100, tickFrom = o.tickFrom === undefined ? 5000 : o.tickFrom;
+    var secsTotal = Math.ceil(ms / 1000), secsShown = secsTotal, elapsed = 0, timer = null;
+    var bar = OwnIt.el('div', { 'class': 'cr-fuse', role: 'progressbar', 'aria-label': o.label || 'Seconds left', 'aria-valuemin': '0', 'aria-valuemax': String(secsTotal), 'aria-valuenow': String(secsTotal) });
+    var line = OwnIt.el('div', { 'class': 'cr-fuse-line' });
+    if (o.spark) line.appendChild(OwnIt.el('span', { 'class': 'cr-spark', 'aria-hidden': 'true' }));
+    bar.appendChild(line);
+    parent.appendChild(bar);
+    function paint() {
+      var left = Math.max(0, ms - elapsed);
+      line.style.width = Math.round(left / ms * 1000) / 10 + '%';
+      var secs = Math.ceil(left / 1000);
+      if (secs !== secsShown) {
+        secsShown = secs;
+        bar.setAttribute('aria-valuenow', String(secs));
+        if (secs >= 1 && secs * 1000 <= tickFrom) OwnIt.sound('tick', secs);
+      }
+    }
+    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+    paint();
+    timer = setInterval(function () {
+      elapsed += step;
+      paint();
+      if (o.onTick) o.onTick(elapsed);
+      if (timer && elapsed >= ms) { stop(); if (o.onEnd) o.onEnd(); }
+    }, step);
+    return { el: bar, stop: stop, remaining: function () { return Math.max(0, ms - elapsed); } };
+  }
+
   /* Ends a round: stops the timer, shows the score and opens the result card with the payload.
      o: { game, mode, got, of, xp, missed: [string], review: [{text}], extra: {…merged into the payload} }. */
   function finish(shell, ctx, o) {
@@ -117,5 +150,5 @@
   }
 
   OwnIt.kit = { has: has, plural: plural, label: label, note: note, dots: dots, answerButtons: answerButtons, targetIndex: targetIndex, mine: mine,
-    choiceKeys: choiceKeys, onActivate: onActivate, nextLabel: nextLabel, finish: finish, modalOpen: modalOpen };
+    choiceKeys: choiceKeys, clock: clock, onActivate: onActivate, nextLabel: nextLabel, finish: finish, modalOpen: modalOpen };
 })();

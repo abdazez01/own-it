@@ -1,7 +1,7 @@
 /* own-it game template: Spot the Lie (design spec 5d, frontend spec 6.3). Five statements about one zone, one of them false. The player
    picks the false one: 10 XP when it is the first pick, nothing after a miss, but the lie must still be found. Every pick shows
-   its reason after it is made. In exam mode the first pick is final and reasons wait for the result. The index of the lie arrives
-   obfuscated and is decoded only when the player picks. Builds DOM with OwnIt.el only. */
+   its reason after it is made. In exam mode the first pick is final and reasons wait for the result. The index of the lie and every reason arrive
+   obfuscated and are decoded only when the player picks. Builds DOM with OwnIt.el only. */
 (function () {
   'use strict';
   var OwnIt = window.OwnIt;
@@ -36,6 +36,7 @@
     area.appendChild(card);
 
     var btns = [];
+    function why(i) { return OwnItCore.decode(statements[i].why); } // reasons are decoded only when shown
     function pickAt(e) { return kit.targetIndex(btns, e); }
 
     function pick(i) {
@@ -58,14 +59,14 @@
         OwnIt.juice.confetti(card);
         shell.setScore(tries === 0 ? 1 : 0, 1);
         if (tries === 0) feedback.appendChild(OwnIt.el('p', { 'class': 'quiz-xp' }, '+' + XP_FIRST + ' XP'));
-        kit.note(feedback, 'good', 'That is the false one.', statements[i].why);
+        kit.note(feedback, 'good', 'That is the false one.', why(i));
         reveal();
       } else {
         tries++;
         btns[i].classList.add('wrong');
         OwnIt.sound('wrong');
         OwnIt.juice.shake(card);
-        kit.note(feedback, 'bad', 'Not the lie.', statements[i].why);
+        kit.note(feedback, 'bad', 'Not the lie.', why(i));
         btns.forEach(function (b, k) { if (!tried[k]) b.removeAttribute('aria-disabled'); });
       }
     }
@@ -78,7 +79,7 @@
       if (done || !found) return;
       done = true;
       var first = tries === 0;
-      var review = first ? [] : [{ text: 'The false statement was: ' + statements[lieAt].text + ' ' + statements[lieAt].why }];
+      var review = first ? [] : [{ text: 'The false statement was: ' + statements[lieAt].text + ' ' + why(lieAt) }];
       kit.finish(shell, ctx, { game: 'spot-the-lie', mode: mode, got: first ? 1 : 0, of: 1, xp: first ? XP_FIRST : 0, missed: first ? [] : ['0'], review: review });
     }
 

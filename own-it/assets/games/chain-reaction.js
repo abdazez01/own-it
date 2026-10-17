@@ -7,7 +7,7 @@
   'use strict';
   var OwnIt = window.OwnIt;
   var kit = OwnIt.kit;
-  var XP_STEP = 10, FUSE_MS = 30000, STEP_MS = 100, TICKS_FROM = 5, BOOM_MS = 420;
+  var XP_STEP = 10, FUSE_MS = 30000, BOOM_MS = 420;
 
   function play(root, round, ctx) {
     var cards = ((round && round.cards) || []).filter(function (c) { return c && typeof c.id === 'string'; });
@@ -23,10 +23,8 @@
     var wrong = [];         // [clickedId, expectedId]
     var boomed = {};        // expected id -> true after an explosion on that step
     var lit = {};           // id -> true
-    var elapsed = 0;
-    var secsShown = Math.ceil(FUSE_MS / 1000);
     var timers = [];
-    var fuseTimer = null;
+    var fuse = null;        // the kit clock
     var cur = 0;
     var order = null;       // decoded on the first click
 
@@ -37,14 +35,11 @@
 
     var panel = OwnIt.el('section', { 'class': 'panel cr-panel' });
     var goal = OwnIt.el('h2', { 'class': 'quiz-q' }, 'Light the steps of "' + kit.label(round && round.flow, labels) + '" in order before the fuse burns out.');
-    var fuse = OwnIt.el('div', { 'class': 'cr-fuse', role: 'progressbar', 'aria-label': 'Seconds left on the fuse', 'aria-valuemin': '0', 'aria-valuemax': String(FUSE_MS / 1000), 'aria-valuenow': String(secsShown) });
-    var line = OwnIt.el('div', { 'class': 'cr-fuse-line' });
-    var spark = OwnIt.el('span', { 'class': 'cr-spark', 'aria-hidden': 'true' });
-    line.appendChild(spark);
-    fuse.appendChild(line);
     var board = OwnIt.el('div', { 'class': 'cr-board', role: 'group', 'aria-label': 'Steps' });
     var live = OwnIt.el('p', { 'class': 'cr-live quiz-why', 'aria-live': 'polite' }, 'Tap the step that happens first, or press 1 to 9.');
-    [goal, fuse, board, live].forEach(function (n) { panel.appendChild(n); });
+    panel.appendChild(goal);
+    if (total) fuse = kit.clock(panel, FUSE_MS, { label: 'Seconds left on the fuse', spark: true, onEnd: burnOut });
+    [board, live].forEach(function (n) { panel.appendChild(n); });
     area.appendChild(panel);
 
     var nums = [];
@@ -65,30 +60,12 @@
       return t;
     }
 
-    function stopFuse() { if (fuseTimer) { clearInterval(fuseTimer); fuseTimer = null; } }
-
-    function paintFuse() {
-      var left = Math.max(0, FUSE_MS - elapsed);
-      var pct = Math.round(left / FUSE_MS * 1000) / 10;
-      line.style.width = pct + '%';
-      var secs = Math.ceil(left / 1000);
-      if (secs !== secsShown) {
-        secsShown = secs;
-        fuse.setAttribute('aria-valuenow', String(secs));
-        if (secs >= 1 && secs <= TICKS_FROM) OwnIt.sound('tick', secs);
-      }
-    }
-
-    function burn() {
+    function burnOut() {
       if (done) return;
-      elapsed += STEP_MS;
-      paintFuse();
-      if (elapsed >= FUSE_MS) {
-        OwnIt.sound('wrong');
-        OwnIt.juice.shake(board);
-        live.textContent = 'The fuse burned out.';
-        finish();
-      }
+      OwnIt.sound('wrong');
+      OwnIt.juice.shake(board);
+      live.textContent = 'The fuse burned out.';
+      finish();
     }
 
     function sequence() {
@@ -134,7 +111,7 @@
     function finish() {
       if (done) return;
       done = true;
-      stopFuse();
+      if (fuse) fuse.stop();
       var seq = sequence();
       var missedIds = seq.filter(function (id) { return !lit[id]; });
       var byId = {};
@@ -172,8 +149,6 @@
     }));
 
     if (total) {
-      paintFuse();
-      fuseTimer = setInterval(burn, STEP_MS);
       if (els[0].focus) els[0].focus();
     } else {
       done = true;
@@ -183,7 +158,7 @@
 
     return function () {
       done = true;
-      stopFuse();
+      if (fuse) fuse.stop();
       timers.forEach(function (t) { clearTimeout(t); });
       offs.forEach(function (off) { try { off(); } catch (e) { /* gone */ } });
       shell.destroy();
