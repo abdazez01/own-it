@@ -2,3 +2,5 @@
 node_modules/
 .own-it/
 *.tmp
+playground/
+docs/superpowers/gallery/
