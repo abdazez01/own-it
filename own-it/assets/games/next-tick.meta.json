@@ -1,0 +1,12 @@
+{
+  "id": "next-tick",
+  "name": "Next Tick",
+  "rung": "trace",
+  "minutes": 4,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.0",
+  "line": "One frozen moment of your app. You predict what happens next, tick by tick.",
+  "keys": "1-4, Enter",
+  "logo": "<svg viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"5\" width=\"12\" height=\"14\" rx=\"2\"/><path d=\"M3 12h12\"/><path stroke=\"#E8C26A\" d=\"M18 8l3 4-3 4\"/></svg>"
+}

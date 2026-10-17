@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto';
+import core from './core.mjs';
 
 // Fisher-Yates with a cryptographic source, so a shuffled order cannot be predicted.
 export function shuffle(list) {
@@ -260,5 +261,64 @@ export function derive(game, round, byId, items) {
     round.answer = { order, by };
     delete round.states;
   }
+}
+
+// Next tick: the state before each tick, with that tick's changes applied.
+export function tickStates(start, ticks) {
+  const states = [];
+  let cur = { ...start.fields };
+  for (const t of ticks) { states.push(cur); cur = { ...cur, ...t.changes }; }
+  return states;
+}
+
+const isNum = (v) => typeof v === 'number';
+
+// Three wrong values for one changed field: numbers near the truth, or other values seen in the round. Null when there are not three.
+function valueDistractors(field, from, to, states) {
+  const pool = [];
+  if (isNum(to)) {
+    const d = Math.max(1, Math.abs(to - from));
+    for (const c of [from, to + d, to - d, to + 2 * d, to * 2, to + 1, to - 1, to + 10, to + 5]) if (c !== to && (to < 0 || from < 0 || c >= 0)) pool.push(c);
+  } else {
+    const seen = states.flatMap((s) => Object.entries(s));
+    for (const [, v] of [...seen.filter(([f]) => f === field), ...seen.filter(([f]) => f !== field)]) if (!isNum(v)) pool.push(v);
+  }
+  const out = [];
+  for (const c of pool) if (c !== to && !out.includes(c) && out.length < 3) out.push(c);
+  return out.length === 3 ? out : null;
+}
+
+// Turns validated next-tick input (each tick carries its plain `ref`) into the round the page plays. level: easy, medium, hard or impossible.
+// Option order is shuffled, easy drops one wrong option and names the changed fields, impossible adds one exact-value question,
+// and the changes and the code line are obfuscated. `answer` and `why` are obfuscated later by the caller.
+export function nextTickRound(round, level) {
+  const states = tickStates(round.start, round.ticks);
+  const asValue = (i) => {
+    const t = round.ticks[i], fields = Object.keys(t.changes);
+    const field = fields.find((f) => isNum(t.changes[f])) ?? fields[0];
+    const wrong = valueDistractors(field, states[i][field], t.changes[field], states);
+    if (!wrong) return null;
+    const perm = shuffle([t.changes[field], ...wrong]);
+    return { field, options: perm.map(String), answer: perm.indexOf(t.changes[field]) };
+  };
+  const latest = round.ticks.map((_, i) => i).reverse();
+  const tryOrder = [...latest.filter((i) => Object.values(round.ticks[i].changes).some(isNum)), ...latest];
+  let valueAt = -1, value = null;
+  if (level === 'impossible') for (const i of tryOrder) { value = asValue(i); if (value) { valueAt = i; break; } }
+  round.ticks = round.ticks.map((t, i) => {
+    let opts = t.options.map((o, j) => ({ ...o, right: j === t.answer }));
+    if (level === 'easy') {
+      const wrong = opts.map((o, j) => (o.right ? -1 : j)).filter((j) => j >= 0);
+      const drop = shuffle(wrong)[0];
+      opts = opts.filter((_, j) => j !== drop);
+    }
+    opts = shuffle(opts);
+    const tick = { options: opts.map(({ text, why }) => ({ text, why })), answer: opts.findIndex((o) => o.right),
+      changes: core.encode(t.changes), ref: core.encode(t.ref), step: t.step };
+    if (level === 'easy') tick.hl = Object.keys(t.changes);
+    if (i === valueAt) tick.value = value;
+    return tick;
+  });
+  return round;
 }
 

@@ -794,3 +794,46 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
   .quest-screen { display: grid; justify-items: center; }
   .quest-screen .screen-frame { width: fit-content; }
 }
+
+/* Next Tick: a state table of split-flap values on the left, the prediction on the right from 1100px. Fluid from 360px to 2560px; no horizontal scroll. */
+.nt-panel { max-width: 920px; margin-inline: auto; display: grid; gap: var(--s-5); min-width: 0; }
+.nt-col { display: grid; gap: var(--s-4); min-width: 0; align-content: start; }
+.nt-flow, .nt-howto { margin: 0; }
+.nt-table { display: grid; gap: var(--s-2); padding: var(--s-3); background: var(--glass-deep); border: 1px solid var(--edge); border-radius: var(--r-inset); }
+.nt-row {
+  display: grid; grid-template-columns: minmax(80px, 2fr) minmax(0, 5fr); gap: var(--s-3); align-items: center; min-width: 0;
+  padding: var(--s-2) var(--s-3); border: 1px solid transparent; border-radius: var(--r-flap);
+  transition: background var(--t-hover), border-color var(--t-hover);
+}
+.nt-field { color: var(--ink-2); font: 600 var(--fs-13) var(--f-flap); letter-spacing: .04em; text-transform: uppercase; overflow-wrap: anywhere; }
+.nt-val { min-width: 0; }
+.nt-val .flap { flex-wrap: wrap; row-gap: 3px; }
+.nt-row.hl { border-color: var(--gold-a60); background: var(--gold-a14); }
+.nt-row.changed { border-color: var(--sage); background: var(--sage-a16); }
+.nt-q { margin: 0; font: 600 var(--fs-17)/1.4 var(--f-ui); color: var(--ink); overflow-wrap: anywhere; }
+.nt-clock:empty { display: none; }
+.nt-answers { grid-template-columns: 1fr; }
+.nt-code { font: 500 var(--fs-13) var(--f-code); color: var(--gold); overflow-wrap: anywhere; }
+.nt-explain { display: grid; gap: var(--s-3); justify-items: start; }
+.nt-explain[hidden] { display: none; }
+.nt-sent:empty { display: none; }
+.nt-end { max-width: 920px; }
+.nt-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.nt-step { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-3); padding: var(--s-3) var(--s-4); background: var(--tile-solid); border: 1px solid var(--edge); border-radius: var(--r-inset); }
+.nt-step.ok { border-color: var(--sage); background: var(--sage-a16); }
+.nt-step.bad { border-color: var(--salmon); background: var(--salmon-a16); }
+.nt-step-n { font: 600 var(--fs-15) var(--f-flap); color: var(--gold); }
+.nt-step-body { display: grid; gap: var(--s-1); min-width: 0; }
+.nt-step-body p { margin: 0; overflow-wrap: anywhere; }
+.nt-step-what { font: 600 var(--fs-15)/1.4 var(--f-ui); color: var(--ink); }
+@media (min-width: 1100px) {
+  .nt-panel { max-width: min(1280px, 100%); grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); column-gap: var(--s-8); }
+  .nt-end { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1600px) {
+  .nt-panel { max-width: var(--panel-w); width: 100%; }
+  .nt-q { font-size: var(--fs-20); }
+  .nt-answers .answer { min-height: 56px; font-size: var(--fs-17); }
+  .nt-flow, .nt-howto, .nt-step-why { max-width: 75ch; }
+}
+@media (prefers-reduced-motion: reduce) { .nt-row { transition: none; } }

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
+import { GAMES_DIR } from '../own-it/scripts/lib/games.mjs';
 import { join } from 'node:path';
 import { run as init } from '../own-it/scripts/lib/cmd-init.mjs';
 import { loadProgress } from '../own-it/scripts/lib/progress.mjs';
@@ -87,7 +88,7 @@ test('init copies engine and registry', async () => {
   assert.match(reg, /^window\.OWNIT_GAMES = \[/);
   assert.match(reg, /\nwindow\.OWNIT_ROOT = "/);
   const games = JSON.parse(reg.split('\n')[0].replace(/^window\.OWNIT_GAMES = /, '').replace(/;\s*$/, ''));
-  assert.equal(games.length, 18);
+  assert.equal(games.length, readdirSync(GAMES_DIR).filter((f) => f.endsWith('.meta.json')).length);
   assert.ok(games.every((g) => g.logo.startsWith('<svg') && g.keys));
   assert.doesNotMatch(readFileSync(join(base, 'game.html'), 'utf8'), /prefers-color-scheme/);
 });
