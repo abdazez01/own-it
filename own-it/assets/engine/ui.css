@@ -501,3 +501,68 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .quest-summary p { margin: 0; font-size: var(--fs-15); }
 @keyframes quest-flash { from { box-shadow: 0 0 0 4px var(--sage); } to { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .quest-row[data-state="done"] { animation: none; } }
+
+/* Whiteboard Map: cards laid out in layers on a board, arrows in an SVG layer under the cards. The board's height is set by the script. */
+.wb-intro { margin: 0 0 var(--s-3); color: var(--ink-2); font-size: var(--fs-15); overflow-wrap: anywhere; }
+.wb-live { margin: 0 0 var(--s-3); min-height: 1.4em; color: var(--ink); font-size: var(--fs-15); overflow-wrap: anywhere; }
+.wb-board {
+  position: relative; width: 100%; min-height: 240px; overflow: hidden;
+  border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--glass-deep);
+}
+.wb-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.wb-card {
+  position: absolute; z-index: 2; box-sizing: border-box; display: grid; place-items: center; padding: 6px 10px;
+  min-height: var(--hit); border: 1px solid var(--edge); border-radius: var(--r-inset);
+  background: var(--glass-hi-solid); color: var(--ink); font: 500 var(--fs-13)/1.25 var(--f-ui);
+  text-align: center; overflow-wrap: anywhere; cursor: pointer; touch-action: manipulation;
+}
+.wb-card:hover, .wb-card:focus-visible { border-color: var(--gold-a60); }
+.wb-card.picked { border-color: var(--gold); background: var(--gold-a16); box-shadow: 0 0 0 2px var(--gold-a45); }
+.wb-card[aria-disabled="true"] { cursor: default; }
+.wb-edge { pointer-events: auto; cursor: pointer; outline: none; }
+.wb-hit { fill: none; stroke: transparent; stroke-width: 22; }
+.wb-line { fill: none; stroke: var(--gold); stroke-width: 2.25; stroke-linecap: round; }
+.wb-edge:hover .wb-line, .wb-edge:focus-visible .wb-line, .wb-edge.sel .wb-line { stroke-width: 4; }
+.wb-edge.sel .wb-line { stroke: var(--ink); }
+.wb-edge.good .wb-line { stroke: var(--sage); }
+.wb-edge.wrong .wb-line, .wb-edge.ghost .wb-line { stroke: var(--salmon); }
+.wb-edge.ghost .wb-line { stroke-dasharray: 7 6; }
+.wb-edge.good, .wb-edge.wrong, .wb-edge.ghost { cursor: default; }
+.wb-cross path { fill: none; stroke: var(--salmon); stroke-width: 3; stroke-linecap: round; }
+.wb-head-gold path { fill: var(--gold); }
+.wb-head-good path { fill: var(--sage); }
+.wb-head-bad path { fill: var(--salmon); }
+.wb-actions { margin-top: var(--s-4); justify-content: flex-end; }
+.wb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.wb-row, .wb-empty { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); border: 1px solid var(--edge); border-radius: var(--r-inset); background: var(--glass-deep); min-width: 0; font-size: var(--fs-15); }
+.wb-row.sel { border-color: var(--gold); }
+.wb-row-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.wb-empty { color: var(--ink-2); }
+.wb-legend { margin-top: var(--s-4); display: grid; gap: var(--s-2); }
+.wb-key { margin: 0; display: flex; align-items: center; gap: var(--s-3); font-size: var(--fs-15); }
+.wb-swatch { flex: none; width: 28px; height: 0; border-top: 3px solid var(--gold); }
+.wb-swatch.good { border-color: var(--sage); }
+.wb-swatch.wrong { border-color: var(--salmon); }
+.wb-swatch.ghost { border-color: var(--salmon); border-top-style: dashed; }
+
+/* Boss Battle: boss HP as a flap row with a bar, three flag lives, one question card with a typed answer box */
+.boss-top { max-width: 920px; margin: 0 auto var(--s-4); display: grid; gap: var(--s-3); }
+.boss-hp-row, .boss-lives-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); position: relative; }
+.boss-damage { display: inline-flex; min-width: 1px; }
+.boss-damage .flap { animation: boss-pop 900ms var(--ease-out) both; }
+.boss-bar { height: 10px; border-radius: var(--r-pill); background: var(--track); border: 1px solid var(--edge); overflow: hidden; }
+.boss-fill { height: 100%; background: var(--salmon); transition: width 420ms var(--ease-out); }
+.boss-lives { display: inline-flex; gap: var(--s-2); }
+.boss-life { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-flap); background: var(--gold); color: var(--gold-ink); transition: opacity 300ms var(--ease-out); }
+.boss-life.lost { background: var(--glass-hi-solid); color: var(--ink-2); opacity: .5; }
+.boss-card { max-width: 920px; margin-inline: auto; display: grid; gap: var(--s-4); min-width: 0; }
+.boss-kind { margin: 0; color: var(--gold); font: 600 var(--fs-13) var(--f-flap); }
+.boss-answer {
+  width: 100%; box-sizing: border-box; min-height: 112px; resize: vertical; padding: var(--s-3);
+  border: 1px solid var(--edge); border-radius: var(--r-inset); background: var(--glass-deep); color: var(--ink);
+  font: 400 var(--fs-15)/var(--lh-body) var(--f-ui);
+}
+.boss-answer:focus-visible { border-color: var(--gold); outline: none; box-shadow: 0 0 0 2px var(--gold-a45); }
+.boss-answer[disabled] { opacity: .7; }
+@keyframes boss-pop { from { transform: translateY(8px) scale(.9); opacity: 0; } 30% { opacity: 1; } to { transform: translateY(-10px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .boss-fill { transition: none; } .boss-damage .flap { animation: none; } }
