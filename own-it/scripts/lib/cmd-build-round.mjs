@@ -5,7 +5,7 @@ import { getGame, GAMES_DIR } from './games.mjs';
 import { loadModel } from './model.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import core from './core.mjs';
-import { readJson, writeJson, writeJsVar } from './json.mjs';
+import { readJson, writeJson, writeJsRegistry } from './json.mjs';
 import { ownItPath } from './paths.mjs';
 import { estimate } from './tokens.mjs';
 
@@ -151,7 +151,7 @@ export async function run(args, ctx) {
   session.rounds = { ...(session.rounds || {}), [id]: { game, zone: input.zone, rung: meta.rung,
     mode: input.mode || session.mode || 'practice', cardIds: shownCards(game, input, byId) } };
   const dataJs = ownItPath(ctx.root, 'data', `${id}.js`);
-  writeJsVar(dataJs, 'OWNIT_ROUND', data);
+  writeJsRegistry(dataJs, 'OWNIT_ROUNDS', id, data);
   writeJson(sessionPath, session);
   progress.seq += 1;
   saveProgress(ctx.root, progress);

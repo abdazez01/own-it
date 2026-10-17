@@ -11,7 +11,14 @@
     ['?', 'Key help and sound test'], ['M', 'Mute or unmute everything']
   ];
 
-  function norm(k) { return k.length === 1 ? k.toLowerCase() : k; }
+  var ALIAS = { esc: 'Escape', escape: 'Escape', space: ' ', spacebar: ' ', del: 'Delete', 'delete': 'Delete',
+    left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' };
+  function norm(k) {
+    k = String(k);
+    var a = ALIAS[k.toLowerCase()];
+    if (a) return a;
+    return k.length === 1 ? k.toLowerCase() : k;
+  }
 
   function typing(t) {
     if (!t || !t.tagName) return false;
@@ -20,9 +27,11 @@
   }
 
   function dispatch(e) {
-    if (e.ctrlKey || e.metaKey || e.altKey || !e.key) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || !e.key || e.defaultPrevented) return;
     if (typing(e.target) && e.key !== 'Escape') return;
     var key = norm(e.key);
+    // While the help dialog is open, game keys pause. Only close keys get through.
+    if (helpEl && key !== 'Escape' && key !== '?') return;
     // The current game's handlers win over globals for the same key.
     var order = scope === 'global' ? ['global'] : [scope, 'global'];
     for (var s = 0; s < order.length; s++) {
@@ -99,7 +108,10 @@
     });
     dlg.appendChild(strip);
     var vol = OwnIt.el('label', { 'class': 'flap-label' }, 'Volume');
-    var slider = OwnIt.el('input', { type: 'range', min: '0', max: '100', value: '100', 'aria-label': 'Volume' });
+    var now = 1;
+    try { if (OwnIt.audio && OwnIt.audio.getVolume) now = Number(OwnIt.audio.getVolume()); } catch (e) { now = 1; }
+    if (!(now >= 0 && now <= 1)) now = 1;
+    var slider = OwnIt.el('input', { type: 'range', min: '0', max: '100', value: String(Math.round(now * 100)), 'aria-label': 'Volume' });
     slider.addEventListener('input', function () {
       try {
         if (OwnIt.audio && OwnIt.audio.setVolume) OwnIt.audio.setVolume(Number(slider.value) / 100);

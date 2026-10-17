@@ -20,3 +20,10 @@ export function writeJsVar(path, name, data) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `window.${name} = ${JSON.stringify(data)};\n`);
 }
+
+// Registry form: window.<name>=window.<name>||{};window.<name>[<key>]=<json>; so several data files can coexist.
+export function writeJsRegistry(path, name, key, data) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `window.${name}=window.${name}||{};window.${name}[${JSON.stringify(key)}]=${JSON.stringify(data)};
+`);
+}

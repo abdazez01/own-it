@@ -123,25 +123,40 @@
     if (!running) { running = true; last = now; window.requestAnimationFrame(frame); }
   };
 
-  /* Toast: bottom-center pill, 3.2 s, doubles as the polite live region. Optional action buttons. */
+  /* Toast: bottom-center pill, 3.2 s. One persistent aria-live region, reused so announcements are reliable. */
   var toastEl = null, toastTimer = null;
+  function region() {
+    if (!toastEl) {
+      toastEl = OwnIt.el('div', { 'class': 'toast', role: 'status', 'aria-live': 'polite' });
+      toastEl.style.opacity = '0';
+      toastEl.style.pointerEvents = 'none';
+      document.body.appendChild(toastEl);
+    } else if (!toastEl.parentNode) document.body.appendChild(toastEl);
+    return toastEl;
+  }
   OwnIt.toast = function (message, opts) {
     opts = opts || {};
-    if (toastEl && toastEl.remove) toastEl.remove();
+    var node = region();
     clearTimeout(toastTimer);
-    toastEl = OwnIt.el('div', { 'class': 'toast', role: 'status', 'aria-live': 'polite' });
-    toastEl.appendChild(OwnIt.el('span', null, message));
+    node.textContent = '';
+    node.appendChild(OwnIt.el('span', null, message));
     (opts.actions || []).forEach(function (a) {
       var b = OwnIt.el('button', { type: 'button', 'class': 'btn btn-quiet' }, a.label);
       b.addEventListener('click', function () { a.run(); });
-      toastEl.appendChild(b);
+      node.appendChild(b);
     });
-    document.body.appendChild(toastEl);
-    var node = toastEl;
-    toastTimer = setTimeout(function () { if (node.remove) node.remove(); if (toastEl === node) toastEl = null; },
-      opts.actions && opts.actions.length ? 9000 : 3200);
+    node.style.opacity = '1';
+    node.style.pointerEvents = 'auto';
+    toastTimer = setTimeout(function () {
+      node.textContent = '';
+      node.style.opacity = '0';
+      node.style.pointerEvents = 'none';
+    }, opts.actions && opts.actions.length ? 9000 : 3200);
     return node;
   };
+  // Create the region early so the first message is announced.
+  if (document.body) region();
+  else document.addEventListener('DOMContentLoaded', region);
 
   /* Global press feel for every button: ripple + sound on pointerdown, sound on Enter/Space. */
   function soundFor(btn) {

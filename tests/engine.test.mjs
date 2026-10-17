@@ -43,13 +43,16 @@ test('register + router.go builds game root', () => {
   let seen = null;
   OwnIt.register({ id: 'quiz', name: 'Quiz', minutes: 5, keys: [], play(root, round, ctx) { seen = { root, round, ctx }; } });
   assert.ok(OwnIt.games.has('quiz'));
-  env.window.OWNIT_ROUNDS = { 'quiz-r1': { q: 1 } };
-  assert.equal(OwnIt.router.go({ game: 'quiz', roundId: 'r1' }), true);
+  env.window.OWNIT_ROUNDS = { 'trips-quiz-1': { q: 1 } };
+  env.window.OWNIT_FEEDBACK = { 'trips-quiz-1': { note: 'n' } };
+  assert.equal(OwnIt.router.go({ game: 'quiz', roundId: 'trips-quiz-1' }), true);
   assert.equal(OwnIt.router.current().game, 'quiz');
   assert.equal(stage.children.length, 1);
   assert.equal(stage.children[0].getAttribute('data-game'), 'quiz');
   assert.equal(seen.root, stage.children[0]);
   assert.equal(seen.round.q, 1);
+  assert.equal(seen.ctx.feedback.note, 'n');
+  assert.equal(OwnIt.feedback('nope'), null);
   OwnIt.router.go('home');
   assert.equal(OwnIt.router.current(), 'home');
   assert.equal(stage.children.length, 0);
@@ -72,6 +75,185 @@ test('toggle arrow keys change aria-checked', () => {
   radios[2].click();
   assert.equal(radios[2].getAttribute('aria-checked'), 'true');
   assert.equal(changes.join(','), 'b,a,c');
+});
+
+test('router navigation clears key handlers and calls game cleanup', () => {
+  const env = boot();
+  const { OwnIt } = env.window;
+  const hits = [];
+  let cleaned = 0;
+  OwnIt.register({ id: 'quiz', play(root, round, ctx) {
+    ctx.keys.on('n', () => hits.push('n'));
+    ctx.link.onData(() => {});
+    return () => { cleaned++; };
+  } });
+  OwnIt.router.go({ game: 'quiz', roundId: 'trips-quiz-1' });
+  env.document.dispatchEvent(env.event('keydown', { key: 'n', target: env.document.body }));
+  assert.equal(hits.length, 1);
+  assert.equal(OwnIt.link.subscriberCount(), 1);
+  OwnIt.router.go('home');
+  assert.equal(cleaned, 1);
+  env.document.dispatchEvent(env.event('keydown', { key: 'n', target: env.document.body }));
+  assert.equal(hits.length, 1);
+  assert.equal(OwnIt.link.subscriberCount(), 0);
+  OwnIt.link.stop();
+});
+
+test('router: a game that throws in play falls back home with a toast', () => {
+  const env = boot();
+  const { OwnIt } = env.window;
+  env.window.console = { error() {} };
+  OwnIt.register({ id: 'bad', play() { throw new Error('boom'); } });
+  assert.equal(OwnIt.router.go({ game: 'bad', roundId: 'a-bad-1' }), false);
+  assert.equal(OwnIt.router.current(), 'home');
+  assert.ok(env.document.body.textContent.includes('went wrong'));
+});
+
+test('keys ignore typing in an input, honor aliases, and pause while help is open', () => {
+  const env = boot();
+  const { OwnIt } = env.window;
+  const hits = [];
+  OwnIt.keys.on('Esc', () => hits.push('esc'));
+  OwnIt.keys.on('Space', () => hits.push('space'));
+  OwnIt.keys.on('n', () => hits.push('n'));
+  const input = env.document.createElement('input');
+  env.document.body.appendChild(input);
+  env.document.dispatchEvent(env.event('keydown', { key: 'n', target: input }));
+  assert.equal(hits.length, 0);
+  env.document.dispatchEvent(env.event('keydown', { key: ' ', target: env.document.body }));
+  assert.equal(hits.join(), 'space');
+  env.document.dispatchEvent(env.event('keydown', { key: 'n', target: env.document.body, defaultPrevented: true }));
+  assert.equal(hits.length, 1);
+  env.document.dispatchEvent(env.event('keydown', { key: '?', target: env.document.body }));
+  env.document.dispatchEvent(env.event('keydown', { key: 'n', target: env.document.body }));
+  assert.equal(hits.length, 1, 'game keys pause while help is open');
+});
+
+test('toggle adds no per-toggle window listeners; set() is silent', () => {
+  const env = boot();
+  const { OwnIt } = env.window;
+  const sounds = [];
+  OwnIt.audio = { play: (n) => sounds.push(n) };
+  let adds = 0;
+  env.window.addEventListener = () => { adds++; };
+  const mk = () => OwnIt.toggle(env.document.createElement('div'), [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], 'a');
+  const t = mk(); mk(); mk();
+  assert.ok(adds <= 1, 'adds=' + adds);
+  t.set('b');
+  assert.equal(t.get(), 'b');
+  assert.equal(sounds.length, 0);
+});
+
+test('link file mode: result downloads own-it-<id>.json and offers a copy', async () => {
+  const env = boot({ search: '' });
+  const { OwnIt } = env.window;
+  const made = [];
+  const orig = env.document.createElement;
+  env.document.createElement = (t) => { const e = orig(t); if (t === 'a') made.push(e); return e; };
+  let copied = null;
+  env.window.navigator.clipboard.writeText = async (t) => { copied = t; };
+  await OwnIt.link.send('result', { id: 'trips-quiz-1', got: 3 });
+  assert.equal(made.length, 1);
+  assert.equal(made[0].getAttribute('download'), 'own-it-trips-quiz-1.json');
+  const btn = env.document.body.querySelectorAll('button').find((b) => b.textContent === 'Copy answer');
+  assert.ok(btn);
+  btn.click();
+  await new Promise((r) => setTimeout(r, 5));
+  assert.ok(copied.startsWith('OWNIT:'));
+  assert.equal(JSON.parse(Buffer.from(copied.slice(6), 'base64').toString()).got, 3);
+});
+
+test('link: failed live result POST falls back to the file download', async () => {
+  const made = [];
+  let post = false;
+  const fetch = async (url, init) => {
+    if (init && init.method === 'POST') { post = true; throw new Error('down'); }
+    return { ok: true, json: async () => ({ versions: {} }) };
+  };
+  const env = boot({ search: '?t=k', fetch });
+  const orig = env.document.createElement;
+  env.document.createElement = (t) => { const e = orig(t); if (t === 'a') made.push(e); return e; };
+  await env.window.OwnIt.link.ready;
+  await env.window.OwnIt.link.send('result', { id: 'a-quiz-1' });
+  assert.ok(post);
+  assert.equal(made.length, 1);
+});
+
+test('link: lost dialog slows polling to 10 s and hides on recovery', async () => {
+  let fail = false;
+  const fetch = async () => {
+    if (fail) throw new Error('down');
+    return { ok: true, json: async () => ({ versions: {} }) };
+  };
+  const env = boot({ search: '?t=z', fetch });
+  const { link } = env.window.OwnIt;
+  await link.ready;
+  assert.equal(link.nextDelay(), 2000);
+  fail = true;
+  for (let i = 0; i < 3; i++) await link.poll();
+  assert.equal(link.lost, true);
+  assert.equal(link.nextDelay(), 10000);
+  const title = env.document.body.querySelector('h2');
+  assert.equal(title.getAttribute('role'), null, 'role=img must not sit on the heading');
+  fail = false;
+  await link.poll();
+  assert.equal(link.lost, false);
+  assert.equal(link.nextDelay(), 2000);
+  assert.ok(!env.document.body.textContent.includes("can't reach"));
+});
+
+test('link: a hung poll is aborted and counts as a failure; polls do not overlap', async () => {
+  let calls = 0, sawSignal = false;
+  const fetch = (url, init) => {
+    calls++;
+    if (calls === 1) return Promise.resolve({ ok: true, json: async () => ({ versions: {} }) });
+    sawSignal = !!(init && init.signal);
+    return new Promise((_res, rej) => init.signal.addEventListener('abort', () => rej(new Error('abort'))));
+  };
+  const env = boot({ search: '?t=h', fetch });
+  const { link } = env.window.OwnIt;
+  await link.ready;
+  const p1 = link.poll(), p2 = link.poll();
+  assert.equal(p1, p2);
+  assert.equal(calls, 2);
+  assert.ok(sawSignal);
+  link.abortInflight();
+  await p1;
+  assert.equal(link.failures(), 1);
+});
+
+test('link: only safe script names are re-injected; unsubscribe works', async () => {
+  let versions = { 'progress.js': 1 };
+  const fetch = async () => ({ ok: true, json: async () => ({ versions }) });
+  const env = boot({ search: '?t=s', fetch });
+  const { link } = env.window.OwnIt;
+  await link.ready;
+  const off = link.onData(() => {});
+  link.stop();
+  versions = { 'progress.js': 2, '../evil.js': 1, 'a b.js': 1, 'data/x-quiz-1.js': 5 };
+  await link.poll();
+  const srcs = env.document.head.querySelectorAll('script').map((s) => s.getAttribute('src')).sort();
+  assert.equal(srcs.join(), 'data/x-quiz-1.js?v=5,progress.js?v=2');
+  off();
+  assert.equal(link.subscriberCount(), 0);
+});
+
+test('link: initial probe retries before settling on file mode', async () => {
+  let n = 0;
+  const fetch = async () => { n++; if (n < 3) throw new Error('boot'); return { ok: true, json: async () => ({ versions: {} }) }; };
+  const env = boot({ search: '?t=r', fetch });
+  assert.equal(await env.window.OwnIt.link.ready, 'live');
+  assert.equal(n, 3);
+});
+
+test('toast uses one persistent live region', () => {
+  const env = boot();
+  const { OwnIt } = env.window;
+  OwnIt.toast('Copied');
+  OwnIt.toast('Sound off');
+  const regions = env.document.body.querySelectorAll('[aria-live]');
+  assert.equal(regions.length, 1);
+  assert.equal(regions[0].textContent, 'Sound off');
 });
 
 test('link file mode when no token', async () => {

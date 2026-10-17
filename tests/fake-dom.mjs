@@ -123,7 +123,7 @@ export function createEnv({ search = '', fetch, reduced = false } = {}) {
   win.window = win;
   const ctx = vm.createContext(Object.assign(win, {
     console, setTimeout, clearTimeout, setInterval, clearInterval, Promise, Map, Set, Array, Object, JSON, Math,
-    Date, Error, String, Number, TextEncoder, btoa, URL, Blob,
+    Date, Error, String, Number, TextEncoder, btoa, URL, Blob, AbortController,
   }));
   env.window = win;
   env.ctx = ctx;

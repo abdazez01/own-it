@@ -18,23 +18,47 @@
     return (document.getElementById && document.getElementById('stage')) || document.body;
   }
 
+  var offs = []; // unsubscribe fns for link listeners a game registered
+
   function leave() {
     if (typeof cleanup === 'function') {
       try { cleanup(); } catch (e) { /* a game's cleanup must not trap the router */ }
     }
     cleanup = null;
+    offs.splice(0).forEach(function (off) { try { off(); } catch (e) { /* already gone */ } });
     if (typeof state === 'object' && OwnIt.keys && OwnIt.keys.clearScope) OwnIt.keys.clearScope(state.game);
     if (OwnIt.keys && OwnIt.keys.setScope) OwnIt.keys.setScope('global');
   }
 
-  // Round data files set window globals. Default lookup: window.OWNIT_ROUNDS['<game>-<roundId>'].
-  function resolveRound(game, roundId) {
-    var all = window.OWNIT_ROUNDS;
-    var key = game + '-' + roundId;
-    return all && Object.prototype.hasOwnProperty.call(all, key) ? all[key] : null;
+  // Round ids are '<zone>-<game>-<n>'. Data files register themselves: window.OWNIT_ROUNDS[roundId] = {...}.
+  function lookup(table, id) {
+    var all = window[table];
+    return all && id != null && Object.prototype.hasOwnProperty.call(all, id) ? all[id] : null;
+  }
+  function resolveRound(roundId) { return lookup('OWNIT_ROUNDS', roundId); }
+  OwnIt.feedback = function (roundId) { return lookup('OWNIT_FEEDBACK', roundId); };
+
+  function scopedLink() {
+    if (!OwnIt.link) return null;
+    var l = Object.create(OwnIt.link); // reads (mode, lost) and send fall through to the shared link
+    ['onData', 'onMode'].forEach(function (name) {
+      l[name] = function (cb) { var off = OwnIt.link[name](cb); offs.push(off); return off; };
+    });
+    return l;
   }
 
   function notify() { listeners.forEach(function (f) { f(state); }); }
+
+  function fail() {
+    leave();
+    var mount = mountPoint();
+    mount.textContent = '';
+    state = 'home';
+    if (typeof OwnIt.home === 'function') OwnIt.home(mount);
+    if (OwnIt.toast) OwnIt.toast('Something went wrong with that game');
+    notify();
+    return false;
+  }
 
   function go(target) {
     var mount = mountPoint();
@@ -59,12 +83,18 @@
     mount.appendChild(root);
     if (OwnIt.keys && OwnIt.keys.setScope) OwnIt.keys.setScope(def.id);
     var ctx = {
-      game: def.id, roundId: target.roundId, root: root, router: OwnIt.router, link: OwnIt.link, toast: OwnIt.toast,
+      game: def.id, roundId: target.roundId, root: root, router: OwnIt.router, toast: OwnIt.toast,
+      link: scopedLink(), feedback: OwnIt.feedback(target.roundId),
       keys: { on: function (key, fn) { return OwnIt.keys.on(key, fn, def.id); } },
       finish: function (payload) { return OwnIt.link ? OwnIt.link.send('result', payload) : false; }
     };
-    var out = def.play(root, OwnIt.router.resolveRound(def.id, target.roundId), ctx);
-    if (typeof out === 'function') cleanup = out;
+    try {
+      var out = def.play(root, OwnIt.router.resolveRound(target.roundId), ctx);
+      if (typeof out === 'function') cleanup = out;
+    } catch (e) {
+      if (typeof console !== 'undefined' && console.error) console.error(e);
+      return fail();
+    }
     notify();
     return true;
   }

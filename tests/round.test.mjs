@@ -43,7 +43,8 @@ const bld = (root, game, obj) => build({ _: [game, put(root, obj)], flags: {} },
 const loadRound = (root, id) => {
   const sb = { window: {} };
   vm.runInNewContext(readFileSync(join(root, '.own-it', 'data', `${id}.js`), 'utf8'), sb);
-  return JSON.parse(JSON.stringify(sb.window.OWNIT_ROUND));
+  assert.ok(Object.hasOwn(sb.window.OWNIT_ROUNDS, id));
+  return JSON.parse(JSON.stringify(sb.window.OWNIT_ROUNDS[id]));
 };
 
 test('quiz round obfuscates answers', async () => {

@@ -3,6 +3,28 @@
   'use strict';
   var OwnIt = (window.OwnIt = window.OwnIt || {});
 
+  // One shared resize listener. A toggle that was attached and later detached is dropped from the registry.
+  var registry = [];
+  var listening = false;
+  function attached(el) {
+    if (typeof el.isConnected === 'boolean') return el.isConnected;
+    for (var n = el; n; n = n.parentNode) if (n === document.documentElement) return true;
+    return false;
+  }
+  function onResize() {
+    registry = registry.filter(function (r) {
+      var now = attached(r.el);
+      if (now) r.seen = true;
+      if (!now && r.seen) return false;
+      r.place(false);
+      return true;
+    });
+  }
+  function track(el, place) {
+    registry.push({ el: el, place: place, seen: false });
+    if (!listening && window.addEventListener) { listening = true; window.addEventListener('resize', onResize); }
+  }
+
   function toggle(el, options, value, onChange) {
     el.textContent = '';
     el.classList.add('toggle');
@@ -42,7 +64,7 @@
       paint();
       place(true);
       if (focus) buttons[indexOf(id)].focus();
-      OwnIt.sound('toggle');
+      if (!silent) OwnIt.sound('toggle');
       if (!silent && onChange) onChange(id);
     }
     function indexOf(id) {
@@ -68,7 +90,7 @@
     paint();
     var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 0); };
     raf(function () { place(false); });
-    if (window.addEventListener) window.addEventListener('resize', function () { place(false); });
+    track(el, place);
     try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { place(false); }); } catch (e) { /* optional */ }
 
     return {
