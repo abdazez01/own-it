@@ -299,6 +299,7 @@
     var mode = OwnIt.el('div', { 'aria-label': 'Mode' });
     OwnIt.toggle(mode, [{ id: 'practice', label: 'Practice' }, { id: 'exam', label: 'Exam' }], OwnIt.mode, function (id) { OwnIt.mode = id; OwnIt.modeChosen = true; });
     tools.appendChild(mode);
+    if (OwnIt.tour) tools.appendChild(OwnIt.tour.modeInfo());
     var a = OwnIt.audio;
     var st = (a && a.settings) || { sfx: true, music: true };
     tools.appendChild(iconToggle('music', 'music', !!st.music && !(a && a.isMuted && a.isMuted()), function (v) {
@@ -551,6 +552,7 @@
     if (selectedZone) detailSlot.appendChild(zoneDetail(selectedZone));
     mount.appendChild(wrap);
     entered = true;
+    if (OwnIt.tour) OwnIt.tour.auto();
     return wrap;
   };
 

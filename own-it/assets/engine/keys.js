@@ -123,6 +123,11 @@
     var actions = OwnIt.el('div', { 'class': 'actions' });
     var close = OwnIt.el('button', { type: 'button', 'class': 'btn btn-primary' }, 'Close');
     close.addEventListener('click', closeHelp);
+    if (OwnIt.tour && OwnIt.tour.start && scope === 'global') {
+      var around = OwnIt.el('button', { type: 'button', 'class': 'btn btn-secondary' }, 'Show me around');
+      around.addEventListener('click', function () { closeHelp(); OwnIt.tour.start(); });
+      actions.appendChild(around);
+    }
     actions.appendChild(close);
     dlg.appendChild(actions);
 

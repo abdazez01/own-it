@@ -842,3 +842,9 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .where-lives { display: grid; gap: var(--s-2); }
 .where-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-3); margin: 0; }
 .where-row code { font-family: var(--f-code); font-size: var(--fs-13); color: var(--gold); }
+.mode-info { position: relative; display: inline-flex; align-items: center; }
+.mode-info-btn { font: 700 var(--fs-13) var(--f-flap); }
+.mode-pop { position: absolute; top: calc(100% + var(--s-2)); right: 0; z-index: var(--z-pop); width: min(340px, calc(100vw - 32px)); padding: var(--s-3) var(--s-4); display: grid; gap: var(--s-2); }
+.mode-pop[hidden] { display: none; }
+.mode-pop p { margin: 0; font: 500 var(--fs-13)/1.45 var(--f-ui); color: var(--ink); }
+@media (min-width: 1920px) { .mode-pop { width: 400px; } .mode-pop p { font-size: var(--fs-15); } }
