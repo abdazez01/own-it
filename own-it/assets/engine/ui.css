@@ -931,7 +931,8 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .secret-opt .secret-desc { opacity: 0; transition: opacity 200ms; }
 .secret-opt.revealed { box-shadow: 0 0 0 1px var(--salmon); background: var(--salmon-a16); }
 .secret-opt.revealed .secret-desc { opacity: 1; }
-.secret-tiles { display: inline-block; }
+.secret-tiles { display: inline-flex; gap: 3px; vertical-align: middle; }
+.secret-opt { display: grid; gap: var(--s-1); justify-items: start; }
 .secret-appear { animation: secret-glitch 520ms steps(6, end); }
 @keyframes secret-glitch {
   0% { transform: translateX(0); opacity: 0; } 20% { transform: translateX(-5px); opacity: 1; } 40% { transform: translateX(6px) skewX(8deg); }
