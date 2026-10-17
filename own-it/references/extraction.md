@@ -40,10 +40,10 @@ Return JSON only, no prose:
 Every zone, background, after `check-refs`; ids from `model.json`. Skip if `progress.json` counts its weaknesses (even 0) and none `stale`. Agent (`sonnet`):
 
 ```
-Bug review of the owner's own app, zone "<zone>", to teach them. Read-only, max 20 reads. Files: <files>.
+Bug review of the owner's app, zone "<zone>", to teach them. Read-only, max 20 reads. Files: <files>.
 No exploit code.
 Only ids: elements <id|label|on|does|roles>; roles <id|label>; flows <id|steps>.
-Proven only; none is fine. Max 5: id, kind, text ≤160, why ≤300, ref "path:line", steps 1-4 {element, role?}.
+Proven only; none is fine. Max 5: id, kind, text ≤160, why ≤300, fix ≤200, ref "path:line", steps 1-4 {element, role?}.
 role: last step a role excluded. double: one step. order: skip; last a later flow element. input: unvalidated field, then submit.
 JSON: {"weaknesses":[...]}
 ```
@@ -52,4 +52,4 @@ Save `.own-it/break-<zone>.json` with `zone`, `"files":[]`, `"items":[]`; `check
 
 ## Partial re-extraction
 
-Rerun on `stale` files, then break pass.
+`stale` files only, then break pass.

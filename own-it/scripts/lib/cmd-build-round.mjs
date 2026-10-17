@@ -415,7 +415,7 @@ export async function run(args, ctx) {
     checkWeakness(w, input, byId, nav);
     delete round.weakness;
     round.goal = SECRET_GOAL;
-    round.secret = { kind: w.kind, answer: { steps: w.steps, text: w.text, why: w.why, ref: w.ref } };
+    round.secret = { kind: w.kind, answer: { steps: w.steps, text: w.text, why: w.why, ref: w.ref, ...(w.fix ? { fix: w.fix } : {}) } };
     for (const s of w.steps) if (s.role) labelIds.add(s.role);
   } else if (input.weakness !== undefined) throw new Error('weakness needs --level secret');
   if (game === 'case-file') {

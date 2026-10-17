@@ -145,6 +145,38 @@ test('check-refs: a break pass that finds nothing still records 0, so the zone c
   assert.equal(loadProgress(fresh).zones.trips.weaknesses, undefined);
 });
 
+test('bugs.md: check-refs lists every kept weakness across zones with what, why, where and how to fix', async () => {
+  const root = await setup({ weaknesses: null });
+  const p = join(root, 'break.json');
+  writeFileSync(p, JSON.stringify({ zone: 'trips', files: [], items: [], weaknesses: [
+    W({ id: 'a', fix: "Add requireRole('manager') to the approve route." }), W({ id: 'b', kind: 'double', steps: [{ element: 'el1' }], text: 'Two\nrefunds.' }),
+    W({ id: 'long', fix: 'x'.repeat(201) }),
+  ] }));
+  const out = await checkRefs({ _: [p], flags: {} }, ctx(root));
+  assert.deepEqual(out.dropped, [{ id: 'long', why: 'weakness' }], 'fix over 200 chars is invalid');
+  const md = readFileSync(join(root, '.own-it', 'bugs.md'), 'utf8');
+  assert.match(md, /^# Bugs own-it found/);
+  assert.match(md, /## Trips/);
+  assert.match(md, /### 1\. A driver can approve a cancel\./);
+  assert.match(md, /\*\*Where:\*\* `api\/t\.ts:2`/);
+  assert.match(md, /\*\*How to fix:\*\* Add requireRole\('manager'\) to the approve route\./);
+  assert.match(md, /### 2\. Two refunds\./, 'newlines in agent text are flattened');
+  assert.equal((md.match(/How to fix/g) || []).length, 1, 'no fix line when the weakness has none');
+  // Dropping every weakness removes the file, so it never lists stale bugs.
+  writeFileSync(p, JSON.stringify({ zone: 'trips', files: ['api/t.ts'], items: [], weaknesses: [] }));
+  await checkRefs({ _: [p], flags: {} }, ctx(root));
+  assert.throws(() => readFileSync(join(root, '.own-it', 'bugs.md')), /ENOENT/);
+});
+
+test('secret round carries the fix to the page only when the weakness has one', async () => {
+  let root = await setup({ weaknesses: [W({ fix: 'Check the role.' })] });
+  let r = loadRound(root, (await bld(root, 'quests', quest())).id);
+  assert.equal(core.decode(r.secret.answer).fix, 'Check the role.');
+  root = await setup();
+  r = loadRound(root, (await bld(root, 'quests', quest())).id);
+  assert.equal('fix' in core.decode(r.secret.answer), false);
+});
+
 // ---------------------------------------------------------------- the module
 
 function bootModule({ reduced = false } = {}) {
@@ -422,8 +454,15 @@ test('Reveal gives up: not found, the case report appears, no XP', () => {
   assert.equal(t.finished[0].got, 0);
   assert.equal(t.finished[0].wrong.length, 1);
   assert.match(t.root.querySelector('.secret-report').textContent, /api\/t\.ts:2/);
+  assert.doesNotMatch(t.root.querySelector('.secret-report').textContent, /How to fix/);
   t.press('See result');
   assert.equal(t.results[0].xp, 0);
+});
+
+test('case report shows How to fix when the weakness has one', () => {
+  const { S, env } = bootModule();
+  const box = S.report(env.document.body, { text: 'T', why: 'W', ref: 'api/t.ts:2', fix: 'Add a role check.' }, true);
+  assert.match(box.textContent, /How to fix: Add a role check\./);
 });
 
 test('a find scores 40 plus a time bonus, minus wrong turns', () => {
