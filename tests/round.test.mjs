@@ -308,3 +308,84 @@ test('build-round regenerates rounds.js with every round', async () => {
   assert.deepEqual(Object.keys(sb.window.OWNIT_ROUNDS).sort(), [a.id, b.id]);
   assert.ok(existsSync(join(root, '.own-it', 'data', `${a.id}.js`)), 'per-id files are kept');
 });
+
+// ---- v2.1 pack 1: memory-match, spot-the-lie, chain-reaction
+
+const pairs = (n = 4) => Array.from({ length: n }, (_, i) => ({ term: `Term number ${i}`, meaning: `What term ${i} means for a rider` }));
+const lie = (over = {}) => ({ zone: 'trips', statements: Array.from({ length: 5 }, (_, i) => ({ text: `Statement ${i} about trips`, why: `Reason ${i} in plain words` })), answer: 2, ...over });
+
+test('memory-match: shuffled meanings, pairing obfuscated, ids absent', async () => {
+  const root = await setup();
+  const out = await bld(root, 'memory-match', { zone: 'trips', pairs: pairs(5) });
+  assert.equal(out.id, 'trips-memory-match-1');
+  const r = loadRound(root, out.id);
+  assert.equal(r.pairs, undefined);
+  assert.equal(r.terms.length, 5);
+  assert.equal(r.meanings.length, 5);
+  assert.equal(typeof r.answer, 'string');
+  const map = core.decode(r.answer);
+  r.terms.forEach((t, i) => assert.equal(r.meanings[map[i]], `What term ${t.split(' ')[2]} means for a rider`));
+  assert.notDeepEqual(map, [0, 1, 2, 3, 4], 'meanings are not in term order');
+  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds[out.id].rung, 'words');
+});
+
+test('memory-match: 3 or 9 pairs, duplicates and identifier-only text are rejected', async () => {
+  const root = await setup();
+  await assert.rejects(bld(root, 'memory-match', { zone: 'trips', pairs: pairs(3) }), /at least 4/);
+  await assert.rejects(bld(root, 'memory-match', { zone: 'trips', pairs: pairs(9) }), /at most 8/);
+  const dup = pairs(4); dup[1].term = dup[0].term;
+  await assert.rejects(bld(root, 'memory-match', { zone: 'trips', pairs: dup }), /duplicate term/);
+  const same = pairs(4); same[2].meaning = same[0].meaning;
+  await assert.rejects(bld(root, 'memory-match', { zone: 'trips', pairs: same }), /duplicate meaning/);
+  const code = pairs(4); code[0].term = 'cancel_trip';
+  await assert.rejects(bld(root, 'memory-match', { zone: 'trips', pairs: code }), /identifier-only answer in pairs\[0\]\.term/);
+  const code2 = pairs(4); code2[3].meaning = 'src/api/trips.ts';
+  await assert.rejects(bld(root, 'memory-match', { zone: 'trips', pairs: code2 }), /identifier-only answer in pairs\[3\]\.meaning/);
+  await assert.rejects(bld(root, 'memory-match', { zone: 'nope', pairs: pairs(4) }), /unknown zone/);
+});
+
+test('spot-the-lie: answer obfuscated, needs 5 statements and an index', async () => {
+  const root = await setup();
+  const out = await bld(root, 'spot-the-lie', lie());
+  const r = loadRound(root, out.id);
+  assert.equal(typeof r.answer, 'string');
+  assert.equal(core.decode(r.answer), 2);
+  assert.equal(r.statements.length, 5);
+  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds[out.id].rung, 'words');
+  await assert.rejects(bld(root, 'spot-the-lie', lie({ statements: lie().statements.slice(0, 4) })), /at least 5/);
+  await assert.rejects(bld(root, 'spot-the-lie', lie({ answer: 5 })), /above 4/);
+  await assert.rejects(bld(root, 'spot-the-lie', lie({ answer: undefined })), /answer: required/);
+  const bad = lie(); bad.statements[1].text = 'cancel_trip';
+  await assert.rejects(bld(root, 'spot-the-lie', bad), /identifier-only answer in statements\[1\]\.text/);
+});
+
+async function chainSetup() {
+  const root = await setup();
+  const m = loadModel(root);
+  m.zones.trips.items.push(I({ id: 'c1', k: 'component', label: 'Trip service' }), I({ id: 'f2', k: 'flow', label: 'Pay out', steps: [['s1'], ['c1', 's2'], ['s2']] }),
+    I({ id: 'f3', k: 'flow', label: 'Tiny', steps: [['s1']] }));
+  saveModel(root, m);
+  return root;
+}
+
+test('chain-reaction: steps derived from the flow, scrambled cards, ordered answer obfuscated, labels', async () => {
+  const root = await chainSetup();
+  const out = await bld(root, 'chain-reaction', { zone: 'trips', flow: 'f2' });
+  const r = loadRound(root, out.id);
+  assert.deepEqual(core.decode(r.answer), ['s1', 'c1', 's2']);
+  assert.deepEqual(r.cards.map((c) => c.id).sort(), ['c1', 's1', 's2']);
+  assert.notDeepEqual(r.cards.map((c) => c.id), ['s1', 'c1', 's2'], 'data order does not give the answer away');
+  assert.equal(r.labels.f2.label, 'Pay out');
+  assert.equal(r.labels.c1.label, 'Trip service');
+  assert.equal(r.flow, 'f2');
+  const sess = readJson(join(root, '.own-it', 'session.json')).rounds[out.id];
+  assert.equal(sess.rung, 'trace');
+  assert.deepEqual(sess.cardIds.sort(), ['c1', 's1', 's2']);
+});
+
+test('chain-reaction: unknown flow, non-flow id and one-step flows are rejected', async () => {
+  const root = await chainSetup();
+  await assert.rejects(bld(root, 'chain-reaction', { zone: 'trips', flow: 'zzz' }), /ids not in zone/);
+  await assert.rejects(bld(root, 'chain-reaction', { zone: 'trips', flow: 's1' }), /"s1" is not a flow/);
+  await assert.rejects(bld(root, 'chain-reaction', { zone: 'trips', flow: 'f3' }), /at least 2 steps/);
+});

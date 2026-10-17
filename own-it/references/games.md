@@ -1,6 +1,6 @@
 # Games (18)
 
-Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page data, adds ids and answers. Fields: `zone`, optional `mode`, and the shape in `assets/games/<game>.schema.json`. Only stage 2.0 is playable; do not build the rest.
+`build-round <game> <file>` writes the page data, adds ids and answers. Fields: `zone`, optional `mode`, and the shape in `assets/games/<game>.schema.json`. Only stage 2.0 is playable.
 
 | Game | Stage | Fit rule and data shape |
 |---|---|---|
@@ -10,9 +10,9 @@ Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page da
 | `quests` | 2.0 | A flow across screens or roles. `flow`, `goal`, `start`, `objectives` 2-8 `{text, element}`. Answers derived. |
 | `whiteboard` | 2.0 | Structure. `cards` 2-12 component ids. Edges derived. |
 | `boss-battle` | 2.0 | Final test. `questions` x5 `{q, kind}` why/malicious/structure/fails/term, per `bosses.md`. |
-| `memory-match` | 2.1 | Words, pairs of term and meaning. |
-| `spot-the-lie` | 2.1 | Any zone, 5 statements, one false. |
-| `chain-reaction` | 2.1 | A flow's step order. |
+| `memory-match` | 2.0 | Words. `pairs` 4-8 `{term, meaning}`, each said once. Pairing derived. |
+| `spot-the-lie` | 2.0 | Any zone. `statements` x5 `{text, why}`, `answer` index 0-4 of the false one. |
+| `chain-reaction` | 2.0 | A flow's step order. `flow` id with 2+ steps. Order derived. |
 | `whos-allowed` | 2.1 | Roles and permissions. |
 | `blast-radius` | 2.1 | Edges and dependencies. |
 | `pager` | 2.1 | Failures on a flow. |
@@ -25,6 +25,6 @@ Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page da
 
 Rungs: words (quiz, memory-match, spot-the-lie), map (whiteboard, screen-tour, guess-the-screen, blast-radius), trace (quests, chain-reaction, data-detective, pipe-plumber, whos-allowed), break (pager, what-if, design-duel), boss (boss-battle, escape-room).
 
-Quiz, screen-tour and guess-the-screen need `answer` on every entry. Screen-tour `chain`: `element`, 2-4 `choices` (model ids), answer one; `find`: no `choices`, answer an element id; `role`: free-text `choices`, answer one. Guess-the-screen: `choices` are surface ids, answer one. Quests and whiteboard carry none. A quest step is reachable from `start` by `goes`, or sits on a screen whose element `roles` differ from the step before (role switch, key R). Ids must exist in the zone. Quiz options are never bare identifiers.
+Quiz, screen-tour and guess-the-screen need `answer` on every entry. Screen-tour `chain`: `element`, 2-4 `choices` (model ids), answer one; `find`: no `choices`, answer an element id; `role`: free-text `choices`, answer one. Guess-the-screen: `choices` are surface ids, answer one. Quests and whiteboard carry none. A quest step is reachable from `start` by `goes`, or follows a role switch (key R). Ids must exist in the zone. Quiz options, memory-match pairs and statements are never bare identifiers.
 
-Errors name the bad field; fix and rerun, nothing was written.
+Errors name the bad field; fix, rerun.

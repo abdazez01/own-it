@@ -575,3 +575,42 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 @keyframes feedback-in { from { transform: translateX(110%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .feedback-panel { animation: none; } }
 @media (max-width: 1023px) { .feedback-panel { top: auto; left: 16px; width: auto; max-height: 50vh; } }
+
+/* v2.1 pack 1: Memory Match, Spot the Lie, Chain Reaction. Fluid from 360px to 2560px; no horizontal scroll. */
+.mm-panel, .cr-panel { max-width: 920px; margin-inline: auto; display: grid; gap: var(--s-4); min-width: 0; }
+.mm-board { display: grid; gap: var(--s-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 640px) { .mm-board { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.mm-card {
+  min-height: 88px; min-width: 0; padding: var(--s-3); display: grid; place-items: center; text-align: center; cursor: pointer;
+  color: var(--ink); font: 500 var(--fs-15)/1.35 var(--f-ui); overflow-wrap: anywhere; touch-action: manipulation;
+  background: var(--glass-hi-solid); border: 1px solid var(--edge); border-radius: var(--r-card);
+  transition: background var(--t-hover), border-color var(--t-hover), transform var(--t-press);
+}
+.mm-card:not(.up):not(.matched) { background: var(--tile-solid); color: var(--gold); font: 600 var(--fs-20) var(--f-flap); }
+.mm-card:hover, .mm-card:focus-visible { border-color: var(--gold-a60); }
+.mm-card.up { border-color: var(--gold); background: var(--gold-a16); }
+.mm-card.matched { border-color: var(--sage); background: var(--sage-a16); cursor: default; }
+.mm-status { color: var(--ink-2); font-size: var(--fs-15); min-height: 1.4em; }
+.lie-list { grid-template-columns: minmax(0, 1fr); }
+.cr-fuse { position: relative; height: 10px; margin-inline: 8px; border-radius: var(--r-pill); background: var(--track); border: 1px solid var(--edge); }
+.cr-fuse-line { position: relative; height: 100%; width: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--salmon), var(--gold)); transition: width 100ms linear; }
+.cr-spark {
+  position: absolute; right: -6px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%;
+  background: var(--gold); box-shadow: 0 0 12px 4px var(--gold-glow); animation: cr-flicker 280ms ease-in-out infinite alternate;
+}
+@keyframes cr-flicker { from { transform: scale(.8); opacity: .8; } to { transform: scale(1.25); opacity: 1; } }
+.cr-board { display: grid; gap: var(--s-3); padding-block: var(--s-2) var(--s-4); grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr)); }
+.cr-card {
+  display: flex; align-items: flex-start; gap: var(--s-3); min-height: var(--hit); min-width: 0; padding: var(--s-3) var(--s-4); text-align: left; cursor: pointer;
+  color: var(--ink); font: 500 var(--fs-15)/1.4 var(--f-ui); overflow-wrap: anywhere; touch-action: manipulation;
+  background: var(--glass-hi-solid); border: 1px solid var(--edge); border-radius: var(--r-inset);
+  transition: background var(--t-hover), border-color var(--t-hover), box-shadow var(--t-hover);
+}
+.cr-card:nth-child(3n+2) { margin-top: 10px; }
+.cr-card:nth-child(3n) { margin-top: 4px; }
+.cr-card:hover, .cr-card:focus-visible { border-color: var(--gold-a60); }
+.cr-num { flex: none; min-width: 1.2em; font: 600 var(--fs-13) var(--f-flap); color: var(--gold); padding-top: 2px; }
+.cr-card.lit { border-color: var(--sage); background: var(--sage-a16); cursor: default; }
+.cr-card.lit .cr-num { color: var(--sage); }
+.cr-card.boom { border-color: var(--salmon); background: var(--salmon-a16); }
+@media (prefers-reduced-motion: reduce) { .cr-spark { animation: none; } .cr-fuse-line { transition: none; } }

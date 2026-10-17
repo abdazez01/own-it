@@ -5,8 +5,8 @@
   "minutes": 4,
   "examReady": true,
   "usesScreens": false,
-  "stage": "2.1",
+  "stage": "2.0",
   "line": "You read five statements about this zone and find the one that is false.",
-  "keys": "1-3, Enter",
+  "keys": "1-5, Enter",
   "logo": "<svg viewBox=\"0 0 24 24\"><path d=\"M4 6c5 2 11 2 16 0v6c0 4-3.5 7-8 7s-8-3-8-7z\"/><path d=\"M8 10.5h2M14 10.5h2\"/><path stroke=\"#E8C26A\" d=\"M9 14.5c2 1.5 4 1.5 6 0\"/></svg>"
 }

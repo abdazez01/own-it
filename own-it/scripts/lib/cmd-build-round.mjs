@@ -20,6 +20,9 @@ const IDS = {
   'guess-the-screen': (r) => r.screens.flatMap((s) => [s.screen, ...s.choices]),
   quests: (r) => [r.flow, r.start, ...r.objectives.map((o) => o.element)],
   whiteboard: (r) => r.cards,
+  'memory-match': () => [],
+  'spot-the-lie': () => [],
+  'chain-reaction': (r) => [r.flow],
 };
 
 const cardOf = (it) => ({ id: it.id, label: it.label ?? it.id, kind: it.k, ref: it.ref, conf: it.conf });
@@ -50,6 +53,19 @@ function checkChoices(game, input, byId) {
   });
 }
 
+// Memory-match pairs: each term and meaning is said once, and none is a bare identifier.
+function checkPairs(input) {
+  for (const key of ['term', 'meaning']) {
+    const seen = new Set();
+    input.pairs.forEach((p, i) => {
+      if (identifierOnly(p[key])) throw new Error(`identifier-only answer in pairs[${i}].${key}; ${HINT}`);
+      const norm = p[key].trim().toLowerCase();
+      if (seen.has(norm)) throw new Error(`duplicate ${key} in pairs[${i}]`);
+      seen.add(norm);
+    });
+  }
+}
+
 // Quest objectives are elements of the quest's flow, each used once.
 function checkQuest(input, byId) {
   const flow = byId.get(input.flow);
@@ -75,11 +91,19 @@ function checkQuest(input, byId) {
   });
 }
 
+// A flow's step cards in order: the groups flattened, repeats dropped, ids outside the zone ignored.
+function flowSteps(flow, byId) {
+  const seen = new Set();
+  for (const g of Array.isArray(flow.steps) ? flow.steps : []) for (const id of Array.isArray(g) ? g : []) if (typeof id === 'string' && byId.has(id)) seen.add(id);
+  return [...seen];
+}
+
 // Surface ids a round shows, so a map-rung pass counts toward coverage.
 function shownCards(game, input, byId) {
   const ids = game === 'screen-tour' ? [input.screen, ...input.steps.map((s) => s.element && byId.get(s.element)?.on)]
     : game === 'guess-the-screen' ? input.screens.map((s) => s.screen)
-      : game === 'whiteboard' ? input.cards : [];
+      : game === 'whiteboard' ? input.cards
+        : game === 'chain-reaction' ? flowSteps(byId.get(input.flow), byId) : [];
   return [...new Set(ids.filter((x) => typeof x === 'string' && byId.has(x)))];
 }
 
@@ -120,6 +144,20 @@ function derive(game, round, byId, items) {
     const set = new Set(round.cards);
     round.cards = round.cards.map((id) => cardOf(byId.get(id)));
     round.answer = { edges: items.filter((x) => x.k === 'edge' && set.has(x.from) && set.has(x.to)).map((x) => ({ id: x.id, from: x.from, to: x.to })) };
+  } else if (game === 'memory-match') {
+    // Meanings sit one place off the terms, so the data order gives nothing away; the pairing is the obfuscated answer.
+    const n = round.pairs.length;
+    round.terms = round.pairs.map((p) => p.term);
+    round.meanings = round.pairs.map((_, j) => round.pairs[(j + 1) % n].meaning);
+    round.answer = round.pairs.map((_, i) => (i - 1 + n) % n);
+    delete round.pairs;
+  } else if (game === 'chain-reaction') {
+    const order = flowSteps(byId.get(round.flow), byId);
+    const scrambled = order.map((id) => cardOf(byId.get(id)))
+      .sort((a, b) => String(a.label).localeCompare(String(b.label)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    if (scrambled.every((c, i) => c.id === order[i])) scrambled.reverse();
+    round.cards = scrambled;
+    round.answer = order;
   }
 }
 
@@ -187,12 +225,20 @@ export async function run(args, ctx) {
 
   checkChoices(game, input, byId);
   if (game === 'quests') checkQuest(input, byId);
+  if (game === 'memory-match') checkPairs(input);
+  if (game === 'spot-the-lie') input.statements.forEach((s, i) => { if (identifierOnly(s.text)) throw new Error(`identifier-only answer in statements[${i}].text; ${HINT}`); });
+  if (game === 'chain-reaction') {
+    const flow = byId.get(input.flow);
+    if (flow.k !== 'flow') throw new Error(`"${input.flow}" is not a flow`);
+    if (flowSteps(flow, byId).length < 2) throw new Error(`flow "${input.flow}" needs at least 2 steps in the model`);
+  }
   const progress = loadProgress(ctx.root);
   const id = `${input.zone}-${game}-${progress.seq + 1}`;
   const round = { ...input };
   derive(game, round, byId, items);
   const labelIds = new Set(named);
   for (const id of named) { const it = byId.get(id); if (it && it.k === 'element') for (const x of [it.on, it.goes]) if (typeof x === 'string') labelIds.add(x); }
+  if (game === 'chain-reaction') round.cards.forEach((c) => labelIds.add(c.id));
   const nav = game === 'quests' ? navFor(input, items) : null;
   if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
   const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
