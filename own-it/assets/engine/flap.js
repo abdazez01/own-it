@@ -31,6 +31,7 @@
       if (ch === '/' || (opts.accent && opts.accent.indexOf(ch) >= 0)) tile.classList.add('accent');
       else if (opts.variant === 'ok') tile.classList.add('ok');
       else if (opts.variant === 'alert') tile.classList.add('alert');
+      if (ch === ' ') tile.classList.add('blank');
       var steps = flapSteps(ch, i);
       var still = OwnIt.reduced() || opts.instant;
       var final = steps[steps.length - 1];

@@ -66,6 +66,8 @@
   var OwnIt = window.OwnIt;
   OwnIt.field.start(document.getElementById('field'));
   if (!OwnIt.router.restore()) OwnIt.router.go('home');
+  // A pasted or edited game link changes only the hash, so open that game too.
+  window.addEventListener('hashchange', function () { OwnIt.router.restore(); });
   // Live mode: when Claude rewrites progress.js, recs.js or a data file, redraw Home in place.
   OwnIt.link.onData(function () {
     if (OwnIt.router.current() === 'home' && !document.querySelector('.building')) OwnIt.router.go('home');

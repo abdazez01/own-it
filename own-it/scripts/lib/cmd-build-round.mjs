@@ -390,6 +390,12 @@ export async function run(args, ctx) {
   }
   const lvl = st.level ? { level: st.level, ...(st.level === 'custom' ? { about: st.levelAbout, levelBase: st.levelBase } : {}) } : {};
   derive(game, round, byId, items, st.level === 'custom' ? st.levelBase : st.level);
+  // A screen with no built copy is drawn from its labelled elements; with fewer than 2 there is nothing to recognize.
+  if (game === 'guess-the-screen') round.screens.forEach((s, i) => {
+    if (!existsSync(ownItPath(ctx.root, 'screens', `${s.screen}.html`)) && s.sketch.length < 2) {
+      throw new Error(`screens[${i}] "${s.screen}" has no built copy and fewer than 2 labelled elements; build its copy (build-screen) or pick another screen`);
+    }
+  });
   if (game === 'escape-room') checkRepeats(input, progress.zones[input.zone]?.usedPuzzles || [], items);
   // Movers that are not model roles are shown as written, so they must read as words.
   if (game === 'data-detective') round.who.forEach((w) => { if (!byId.has(w.id) && identifierOnly(w.label)) throw new Error(`identifier-only answer in a transition "by"; ${HINT}`); });

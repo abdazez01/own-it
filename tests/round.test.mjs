@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, readdirSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import vm from 'node:vm';
 import { run as init } from '../own-it/scripts/lib/cmd-init.mjs';
@@ -29,6 +29,9 @@ async function setup() {
     I({ id: 'f1', k: 'flow', label: 'cancel', steps: [['s1'], ['s2']] }),
   ];
   saveModel(root, m);
+  // Built copies for both surfaces, so guess-the-screen rounds have something to show.
+  mkdirSync(join(root, '.own-it', 'screens'), { recursive: true });
+  for (const id of ['s1', 's2']) writeFileSync(join(root, '.own-it', 'screens', `${id}.html`), '<p>copy</p>');
   return root;
 }
 const opts = (t) => [0, 1, 2, 3].map((i) => ({ text: t ? t[i] : `Option number ${i}`, why: 'Because of the product rule.' }));
@@ -1000,4 +1003,10 @@ test('escape-room: a puzzle used in an earlier room of the zone is rejected; flo
   third.puzzles[0].action = 'refund a trip';
   third.puzzles[2].failure = 'Drivers get no alerts';
   assert.equal((await bld(root, 'escape-room', third)).id, 'trips-escape-room-3'); // both flows used: the pool is exhausted
+});
+
+test('guess-the-screen rejects a screen with no copy and fewer than 2 labelled elements', async () => {
+  const root = await setup();
+  rmSync(join(root, '.own-it', 'screens', 's1.html'));
+  await assert.rejects(bld(root, 'guess-the-screen', { zone: 'trips', screens: [1, 2, 3].map(() => ({ screen: 's1', choices: ['s1', 's2', 'el1', 'el2'], answer: 's1' })) }), /no built copy and fewer than 2 labelled elements/);
 });
