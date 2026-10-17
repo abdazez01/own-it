@@ -3,7 +3,7 @@ import { resolve, join } from 'node:path';
 import { check, loadSchema } from './validate.mjs';
 import { getGame, GAMES_DIR } from './games.mjs';
 import { loadModel } from './model.mjs';
-import { loadProgress, saveProgress } from './progress.mjs';
+import { loadProgress, saveProgress, defaultZoneProgress } from './progress.mjs';
 import core from './core.mjs';
 import { readJson, writeJson, writeJsRegistry, writeAggregate } from './json.mjs';
 import { ownItPath } from './paths.mjs';
@@ -118,6 +118,22 @@ function checkRoom(input) {
   input.puzzles.forEach((p, i) => {
     const words = [['role', p.role], ['action', p.action], ['failure', p.failure], ...(Array.isArray(p.logs) ? p.logs.map((l, j) => [`logs[${j}]`, l]) : [])];
     for (const [key, text] of words) if (typeof text === 'string' && identifierOnly(text)) throw new Error(`identifier-only answer in puzzles[${i}].${key}; ${HINT}`);
+  });
+}
+
+// Puzzle keys name what a puzzle asks, so a repeat is caught inside a room and across rooms of the same zone.
+const norm = (t) => String(t ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+const puzzleKey = (p) => (p.kind === 'role' ? `role:${norm(p.role)}|${norm(p.action)}` : p.kind === 'flow' ? `flow:${p.flow}` : `failure:${norm(p.failure)}`);
+
+function checkRepeats(input, used, items) {
+  const keys = input.puzzles.map(puzzleKey);
+  const dup = keys.findIndex((k, i) => keys.indexOf(k) !== i);
+  if (dup >= 0) throw new Error(`duplicate puzzle in puzzles[${dup}]; write a different one`);
+  const flowKeys = items.filter((x) => x.k === 'flow').map((x) => `flow:${x.id}`);
+  const flowPoolUsed = flowKeys.length > 0 && flowKeys.every((k) => used.includes(k));
+  keys.forEach((k, i) => {
+    if (!used.includes(k) || (k.startsWith('flow:') && flowPoolUsed)) return;
+    throw new Error(`puzzles[${i}] repeats an earlier room in zone "${input.zone}": ${k.replace(':', ' ')}; write a different one`);
   });
 }
 
@@ -264,6 +280,7 @@ export async function run(args, ctx) {
   const id = `${input.zone}-${game}-${progress.seq + 1}`;
   const round = { ...input };
   derive(game, round, byId, items);
+  if (game === 'escape-room') checkRepeats(input, progress.zones[input.zone]?.usedPuzzles || [], items);
   // Movers that are not model roles are shown as written, so they must read as words.
   if (game === 'data-detective') round.who.forEach((w) => { if (!byId.has(w.id) && identifierOnly(w.label)) throw new Error(`identifier-only answer in a transition "by"; ${HINT}`); });
   const labelIds = new Set(named);
@@ -295,6 +312,10 @@ export async function run(args, ctx) {
   writeAggregate(ownItPath(ctx.root, 'data'), ownItPath(ctx.root, 'rounds.js'), 'OWNIT_ROUNDS', (f) => !f.startsWith('feedback-'));
   writeJson(sessionPath, session);
   progress.seq += 1;
+  if (game === 'escape-room') {
+    const zp = progress.zones[input.zone] || (progress.zones[input.zone] = defaultZoneProgress(input.zone));
+    zp.usedPuzzles = [...new Set([...(zp.usedPuzzles || []), ...input.puzzles.map(puzzleKey)])].slice(-200);
+  }
   saveProgress(ctx.root, progress);
   return { id, est: estimate(text, readFileSync(dataJs, 'utf8')) };
 }
