@@ -11,6 +11,7 @@
   <img alt="Claude Code skill" src="https://img.shields.io/badge/Claude%20Code-skill-E8C26A?style=flat-square&labelColor=1A1B1F">
   <img alt="18 games" src="https://img.shields.io/badge/games-18-8FD3A8?style=flat-square&labelColor=1A1B1F">
   <img alt="Node 18+" src="https://img.shields.io/badge/node-%E2%89%A518-5A7BA8?style=flat-square&labelColor=1A1B1F">
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-E8C26A?style=flat-square&labelColor=1A1B1F">
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-F5F3EE?style=flat-square&labelColor=1A1B1F">
 </p>
 
@@ -112,10 +113,11 @@ Most games play from the keyboard, and the dashboard has sound effects, confetti
 
 Requirements: [Claude Code](https://claude.com/claude-code), Node.js 18+, and a desktop browser. If Node is missing, the skill offers to install a pinned LTS version and checks its checksum first.
 
-Copy the `own-it/` folder into your Claude Code skills directory:
+Clone the repo and copy the `own-it/` folder into your Claude Code skills directory:
 
 ```bash
-cp -r own-it ~/.claude/skills/own-it
+git clone https://github.com/abdazez01/own-it.git
+cp -r own-it/own-it ~/.claude/skills/own-it
 ```
 
 Then, in any project, start a fresh or forked session and run `/own-it`, or just say *"quiz me on my code"*.
@@ -142,3 +144,7 @@ npm test
 ```
 
 No dependencies to install. The suite covers every helper command, the browser engine (on a fake DOM), all 18 games, security rules, layout and the docs' word budgets.
+
+## License
+
+[MIT](LICENSE) © abdazez01
