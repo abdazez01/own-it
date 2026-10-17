@@ -57,7 +57,7 @@ function boot(withAudio, storage) {
   return { OwnIt: env.window.OwnIt, win: env.window, log };
 }
 
-const NAMES = ['press', 'hover', 'clack', 'toggle', 'correct', 'wrong', 'combo', 'streak-break', 'levelup', 'claim', 'hint', 'fog-lift', 'tick', 'alarm', 'build-wait'];
+const NAMES = ['crackStage', 'whoosh', 'whooshOut', 'dread', 'rumble', 'crackle', 'glass', 'press', 'hover', 'clack', 'toggle', 'correct', 'wrong', 'combo', 'streak-break', 'levelup', 'claim', 'hint', 'fog-lift', 'tick', 'alarm', 'build-wait'];
 
 test('audio.play before unlock does not throw', () => {
   const { OwnIt } = boot(false);

@@ -162,7 +162,8 @@
         OwnIt.chosenLevel = current;
         if (current === 'custom') OwnIt.chosenAbout = about;
         if (current === 'secret' && OwnIt.secret) {
-          OwnIt.secret.shatter(dlg, lastClick.x, lastClick.y, function () { api.close(); OwnIt.secret.dark(function () { onStart({ level: 'secret' }); }); });
+          // The crack, shatter and BREAK IT play out first; the callback runs when the player continues, as the round opens.
+          OwnIt.secret.shatter(dlg, lastClick.x, lastClick.y, function () { api.close(); onStart({ level: 'secret' }); });
           return;
         }
         api.close();
@@ -172,7 +173,12 @@
       function wire(b, i) {
         b.addEventListener('keydown', function (e) {
           var d = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
-          if (d) { e.preventDefault(); choose(rows[(i + d + rows.length) % rows.length].getAttribute('data-id'), true); }
+          if (d) {
+            e.preventDefault();
+            var n = i;
+            do { n = (n + d + rows.length) % rows.length; } while (rows[n].hasAttribute('hidden') && n !== i); // the Secret row is skipped until it appears
+            choose(rows[n].getAttribute('data-id'), true);
+          }
           else if (e.key === 'Enter') { e.preventDefault(); start(); }
         });
         rows.push(b);

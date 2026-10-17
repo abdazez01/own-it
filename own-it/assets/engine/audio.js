@@ -152,6 +152,105 @@
     tone('fanfare', 2093, 'sine', t + 0.42, 0.25, 0.03, true);
   }
 
+
+  // ---------------------------------------------------------------- the Secret level sounds
+  // Hand-tuned on a bare compressor bus, so they feed through one trim gain that restores their level behind the 0.45 master.
+  // They are not voice-registered: the sequence books many at once and the 12-voice cap would cut them. Each takes an optional
+  // offset in seconds (at) so the impact can be booked on the audio clock rather than a timer.
+  var SECRET_TRIM = 1.78;
+  function sbus() { var g = ctx.createGain(); g.gain.value = SECRET_TRIM; g.connect(out); return g; }
+  function nbuf(sec) {
+    var b = ctx.createBuffer(1, Math.floor(ctx.sampleRate * sec), ctx.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  function senv(node, t, a, peak, d) {
+    node.gain.setValueAtTime(0, t); node.gain.linearRampToValueAtTime(peak, t + a); node.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+  }
+  function sarg(a) { return a && typeof a === 'object' ? a : {}; }
+  function sat(a) { return Number(sarg(a).at) > 0 ? Number(sarg(a).at) : 0; }
+
+  function secretRumble(t, strength, m) { // low C1/C2/Eb2 drone plus filtered noise
+    [32.7, 65.4, 77.8].forEach(function (f, i) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = i ? 'triangle' : 'sine'; o.frequency.value = f;
+      o.frequency.linearRampToValueAtTime(f * 0.97, t + 1.2);
+      senv(g, t, 0.08, (i ? 0.05 : 0.12) * strength, 1.3); o.connect(g); g.connect(m); o.start(t); o.stop(t + 1.6);
+    });
+    var n = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), g2 = ctx.createGain();
+    n.buffer = nbuf(1.5); lp.type = 'lowpass'; lp.frequency.value = 180;
+    senv(g2, t, 0.05, 0.1 * strength, 1.1); n.connect(lp); lp.connect(g2); g2.connect(m); n.start(t);
+  }
+
+  function secretCrackle(t, n, gain, m) { // tiny glitch ticks
+    for (var i = 0; i < n; i++) {
+      var s = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), g = ctx.createGain(), at = t + Math.random() * 0.35;
+      s.buffer = nbuf(0.03); hp.type = 'highpass'; hp.frequency.value = 2500 + Math.random() * 3000;
+      senv(g, at, 0.001, gain * (0.5 + Math.random()), 0.025);
+      s.connect(hp); hp.connect(g); g.connect(m); s.start(at);
+    }
+  }
+
+  function secretGlass(t, m) { // sharp crack, falling tinkles on C major partials, low thud
+    var s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = nbuf(0.6); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 0.7;
+    senv(g, t, 0.002, 0.35, 0.35); s.connect(bp); bp.connect(g); g.connect(m); s.start(t);
+    var notes = [2093, 2637, 3136, 4186, 2349, 3520];
+    for (var i = 0; i < 14; i++) {
+      var o = ctx.createOscillator(), og = ctx.createGain(), at = t + 0.05 + Math.random() * 0.7;
+      o.type = 'sine'; o.frequency.value = notes[i % notes.length] * (1 + (Math.random() - 0.5) * 0.01);
+      senv(og, at, 0.002, 0.025 + Math.random() * 0.03, 0.25 + Math.random() * 0.3);
+      o.connect(og); og.connect(m); o.start(at); o.stop(at + 0.7);
+    }
+    var k = ctx.createOscillator(), kg = ctx.createGain();
+    k.frequency.setValueAtTime(110, t); k.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+    senv(kg, t, 0.003, 0.25, 0.4); k.connect(kg); kg.connect(m); k.start(t); k.stop(t + 0.5);
+  }
+
+  function secretCrackStage(t, k, m) { // glass stress: louder, brighter snap per stage
+    var s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = nbuf(0.3); bp.type = 'bandpass'; bp.frequency.value = 1800 + k * 700; bp.Q.value = 1.4;
+    senv(g, t, 0.002, 0.08 + k * 0.06, 0.12 + k * 0.05); s.connect(bp); bp.connect(g); g.connect(m); s.start(t);
+    var o = ctx.createOscillator(), og = ctx.createGain();
+    o.frequency.setValueAtTime(150 - k * 20, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.25);
+    senv(og, t, 0.003, 0.06 + k * 0.05, 0.3); o.connect(og); og.connect(m); o.start(t); o.stop(t + 0.4);
+    secretCrackle(t, 3 + k * 4, 0.03 + k * 0.015, m);
+  }
+
+  function secretWhoosh(t, m) { // rising filtered air, cut at the zoom landing, then a low thud
+    var land = t + 0.56;
+    var s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = nbuf(0.9); bp.type = 'bandpass'; bp.Q.value = 1.1;
+    bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(3200, land);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, land - 0.04); g.gain.exponentialRampToValueAtTime(0.0001, land + 0.12);
+    s.connect(bp); bp.connect(g); g.connect(m); s.start(t); s.stop(t + 0.9);
+    var k = ctx.createOscillator(), kg = ctx.createGain();
+    k.frequency.setValueAtTime(95, land); k.frequency.exponentialRampToValueAtTime(32, land + 0.45);
+    kg.gain.setValueAtTime(0, t); kg.gain.setValueAtTime(0, land); kg.gain.linearRampToValueAtTime(0.32, land + 0.005); kg.gain.exponentialRampToValueAtTime(0.0001, land + 0.55);
+    k.connect(kg); kg.connect(m); k.start(t); k.stop(land + 0.6);
+  }
+
+  function secretWhooshOut(t, m) { // mirror of whoosh: sharp suck-in, then air falling away
+    var s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = nbuf(1); bp.type = 'bandpass'; bp.Q.value = 1.1;
+    bp.frequency.setValueAtTime(3600, t); bp.frequency.exponentialRampToValueAtTime(220, t + 0.8);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.24, t + 0.09); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.85);
+    s.connect(bp); bp.connect(g); g.connect(m); s.start(t); s.stop(t + 1);
+    var o = ctx.createOscillator(), og = ctx.createGain();
+    o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.7);
+    senv(og, t, 0.05, 0.14, 0.65); o.connect(og); og.connect(m); o.start(t); o.stop(t + 0.8);
+  }
+
+  function secretDread(t, m) { // C2 + Db2 minor-second swell that snaps off on the reveal
+    var hit = t + 0.85;
+    [65.4, 69.3, 130.8].forEach(function (f, i) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = i === 2 ? 'sawtooth' : 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(i === 2 ? 0.025 : 0.09, hit - 0.02); g.gain.exponentialRampToValueAtTime(0.0001, hit + 0.08);
+      o.connect(g); g.connect(m); o.start(t); o.stop(hit + 0.15);
+    });
+  }
+
   var SOUNDS = {
     press: function (t, kind) {
       var base = PRESS_BASE[kind] || 520;
@@ -196,18 +295,14 @@
       tone(null, vary(f, 0.02), 'triangle', t, 0.04, 0.09, false, 0.003);
       noise(null, t, 0.012, 4, 'bandpass', 2200, 1.5, 0.05, false);
     },
-    rumble: function (t) { // low C, soft
-      tone('rumble', 65.41, 'sine', t, 1.1, 0.06, true, 0.25);
-      tone('rumble', 130.81, 'triangle', t + 0.05, 0.8, 0.018, false, 0.2);
-    },
-    crackle: function (t) {
-      for (var i = 0; i < 4; i++) noise('crackle', t + i * 0.045 + Math.random() * 0.02, 0.012, 4, 'highpass', vary(3800, 0.1), 0, 0.035, false);
-    },
-    glass: function (t) { // soft shatter: a short noise burst and a few high C partials
-      noise('glass', t, 0.09, 3, 'highpass', 2800, 0, 0.09, true);
-      [1046.5, 2093, 3135.96].forEach(function (f, i) { tone('glass', vary(f, 0.01), 'sine', t + i * 0.025, 0.28, 0.03, true, 0.004); });
-      tone('glass', 65.41, 'sine', t, 0.5, 0.05, false, 0.02);
-    },
+    // Secret level. arg: { s: strength, at: seconds ahead } for rumble, { n: ticks, g: gain, at } for crackle, { at } for glass.
+    rumble: function (t, a) { var o = sarg(a); secretRumble(t + sat(a), o.s != null ? Number(o.s) : 1, sbus()); },
+    crackle: function (t, a) { var o = sarg(a); secretCrackle(t + sat(a), o.n != null ? Number(o.n) : 10, o.g != null ? Number(o.g) : 0.06, sbus()); },
+    glass: function (t, a) { secretGlass(t + sat(a), sbus()); },
+    crackStage: function (t, k) { secretCrackStage(t, Math.min(3, Math.max(1, Number(k) || 1)), sbus()); },
+    whoosh: function (t) { secretWhoosh(t, sbus()); },
+    whooshOut: function (t) { secretWhooshOut(t, sbus()); },
+    dread: function (t) { secretDread(t, sbus()); },
     alarm: function (t) {
       for (var i = 0; i < 3; i++) {
         tone('alarm', 880, 'square', t + i * 0.3, 0.12, 0.035, false, 0.006);
@@ -253,7 +348,7 @@
           if (lastPlay[name] !== undefined && t - lastPlay[name] < RATE[name]) return;
           lastPlay[name] = t;
         }
-        var group = { press: 'press', clack: 'clack', toggle: 'toggle', correct: 'chime', combo: 'chime', 'streak-break': 'chime', hint: 'chime', wrong: 'bonk', levelup: 'fanfare', claim: 'fanfare', 'fog-lift': 'whoosh', alarm: 'alarm', rumble: 'rumble', crackle: 'crackle', glass: 'glass' }[name];
+        var group = { press: 'press', clack: 'clack', toggle: 'toggle', correct: 'chime', combo: 'chime', 'streak-break': 'chime', hint: 'chime', wrong: 'bonk', levelup: 'fanfare', claim: 'fanfare', 'fog-lift': 'whoosh', alarm: 'alarm' }[name];
         choke(group);
         fn(t, arg);
       } catch (e) { /* sound never breaks the UI */ }

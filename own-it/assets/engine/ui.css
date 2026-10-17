@@ -927,12 +927,43 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 @media (prefers-reduced-motion: reduce) { .nt-row { transition: none; } }
 
 /* Secret level: hidden picker option, scare, shatter, darkness. Motion only without reduced motion. */
-.secret-opt { position: relative; text-align: left; }
-.secret-opt .secret-desc { opacity: 0; transition: opacity 200ms; }
-.secret-opt.revealed { box-shadow: 0 0 0 1px var(--salmon); background: var(--salmon-a16); }
-.secret-opt.revealed .secret-desc { opacity: 1; }
+.secret-opt {
+  position: relative; display: flex; flex-direction: row; align-items: center; gap: 14px; overflow: hidden; text-align: left;
+  background: rgba(40,10,12,.55); border: 1.5px dashed rgba(240,138,122,.45);
+}
+.secret-opt .secret-desc { color: rgba(240,138,122,.85); font: 500 var(--fs-13) var(--f-flap); letter-spacing: .06em; }
+.secret-opt.revealed .flap-tile { background: var(--salmon); color: var(--gold-ink); }
+.secret-opt.glitch { animation: secret-row-glitch .55s steps(2, end) 1; }
+.secret-opt.rgb { text-shadow: -2px 0 rgba(255,60,60,.8), 2px 0 rgba(60,220,255,.7); }
+.secret-opt.idle { animation: secret-breathe 2.4s ease-in-out infinite; }
+@keyframes secret-row-glitch {
+  0% { clip-path: inset(0 0 70% 0); transform: translateX(-8px); filter: hue-rotate(40deg); }
+  20% { clip-path: inset(40% 0 20% 0); transform: translateX(10px); }
+  40% { clip-path: inset(10% 0 55% 0); transform: translateX(-4px); filter: none; }
+  60% { clip-path: inset(70% 0 0 0); transform: translateX(6px); }
+  80% { clip-path: inset(25% 0 35% 0); transform: translateX(-2px); }
+  100% { clip-path: inset(0); transform: none; }
+}
+@keyframes secret-breathe {
+  0%, 100% { box-shadow: 0 0 0 rgba(240,138,122,0); border-color: rgba(240,138,122,.45); }
+  50% { box-shadow: 0 0 22px -4px rgba(240,138,122,.45); border-color: rgba(240,138,122,.8); }
+}
 .secret-tiles { display: inline-flex; gap: 3px; vertical-align: middle; }
-.secret-opt { display: grid; gap: var(--s-1); justify-items: start; }
+/* The break sequence layers (appear, crack, shatter, BREAK IT). The stage sits over the page; it only catches clicks while the break plays. */
+.secret-stage { position: fixed; inset: 0; z-index: 80; pointer-events: none; overflow: hidden; }
+.secret-stage.hold { pointer-events: auto; }
+.secret-flick { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: rgb(200,30,30); opacity: 0; mix-blend-mode: screen; }
+.secret-scan { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; background: repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 1px, transparent 1px 3px); }
+.secret-web { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; }
+.secret-shards { position: absolute; inset: 0; z-index: 4; pointer-events: none; perspective: 1100px; }
+.secret-dark { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: #050506; opacity: 0; }
+.secret-title { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; pointer-events: none; opacity: 0; }
+.secret-title.live { pointer-events: auto; cursor: pointer; }
+.secret-title-in { position: relative; display: grid; justify-items: center; will-change: transform, filter, opacity; }
+.secret-title-flap { display: inline-flex; gap: 3px; perspective: 400px; }
+.secret-title-flap .flap-tile { width: min(54px, 10vw); height: min(72px, 13.3vw); font-size: min(40px, 7.4vw); border-radius: 10px; background: var(--salmon); color: var(--gold-ink); }
+.secret-title-sub { margin: 18px 0 0; text-align: center; font: 500 18px var(--f-ui); color: var(--ink-2); opacity: 0; }
+.secret-title-hint { margin: 26px 0 0; font: 500 12px var(--f-flap); letter-spacing: .2em; color: rgba(240,138,122,.7); opacity: 0; }
 .secret-appear { animation: secret-glitch 520ms steps(6, end); }
 @keyframes secret-glitch {
   0% { transform: translateX(0); opacity: 0; } 20% { transform: translateX(-5px); opacity: 1; } 40% { transform: translateX(6px) skewX(8deg); }
@@ -956,7 +987,7 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .secret-report { display: grid; gap: var(--s-2); border: 1px solid var(--salmon); background: var(--salmon-a16); border-radius: var(--r-inset); padding: var(--s-3) var(--s-4); }
 .secret-row { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .secret-appear, .secret-shake { animation: none; }
+  .secret-appear, .secret-shake, .secret-opt.glitch, .secret-opt.idle { animation: none; }
   .secret-veil.flicker { animation-duration: 250ms; }
   .secret-veil.dim { animation-duration: 400ms; }
 }
