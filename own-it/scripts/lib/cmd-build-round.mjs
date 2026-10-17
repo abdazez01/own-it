@@ -30,6 +30,9 @@ const IDS = {
   'pipe-plumber': (r) => [r.flow],
   'what-if': () => [],
   'data-detective': (r) => r.states.map((x) => x.state),
+  'design-duel': () => [],
+  'escape-room': (r) => r.puzzles.flatMap((p) => (p.kind === 'flow' ? [p.flow] : p.kind === 'failure' ? [p.answer] : [])),
+  'teach-back': (r) => [r.screen],
 };
 
 
@@ -92,6 +95,29 @@ function checkDials(input) {
       if (seen.has(norm)) throw new Error(`duplicate option in dials[${i}].options[${j}]`);
       seen.add(norm);
     });
+  });
+}
+
+// Design duel: every design and reason is words, no reason repeats within a decision, and the two designs differ.
+function checkDuel(input) {
+  const norm = (t) => t.trim().toLowerCase();
+  input.decisions.forEach((d, i) => {
+    for (const key of ['real', 'alt']) if (identifierOnly(d[key])) throw new Error(`identifier-only answer in decisions[${i}].${key}; ${HINT}`);
+    if (norm(d.real) === norm(d.alt)) throw new Error(`decisions[${i}]: real and alt are the same design`);
+    const seen = new Set();
+    d.reasons.forEach((x, j) => {
+      if (identifierOnly(x)) throw new Error(`identifier-only answer in decisions[${i}].reasons[${j}]; ${HINT}`);
+      if (seen.has(norm(x))) throw new Error(`duplicate reason in decisions[${i}].reasons[${j}]`);
+      seen.add(norm(x));
+    });
+  });
+}
+
+// Escape room: the words a player reads in each puzzle may not be bare identifiers.
+function checkRoom(input) {
+  input.puzzles.forEach((p, i) => {
+    const words = [['role', p.role], ['action', p.action], ['failure', p.failure], ...(Array.isArray(p.logs) ? p.logs.map((l, j) => [`logs[${j}]`, l]) : [])];
+    for (const [key, text] of words) if (typeof text === 'string' && identifierOnly(text)) throw new Error(`identifier-only answer in puzzles[${i}].${key}; ${HINT}`);
   });
 }
 
@@ -221,6 +247,9 @@ export async function run(args, ctx) {
   if (game === 'spot-the-lie') input.statements.forEach((s, i) => { if (identifierOnly(s.text)) throw new Error(`identifier-only answer in statements[${i}].text; ${HINT}`); });
   if (game === 'whos-allowed') checkPermissions(input);
   if (game === 'what-if') checkDials(input);
+  if (game === 'design-duel') checkDuel(input);
+  if (game === 'escape-room') checkRoom(input);
+  if (game === 'teach-back' && byId.get(input.screen).k !== 'surface') throw new Error(`"${input.screen}" is not a surface`);
   if (game === 'pager') {
     if (identifierOnly(input.failure)) throw new Error(`identifier-only answer in failure; ${HINT}`);
     input.logs.forEach((l, i) => { if (identifierOnly(l)) throw new Error(`identifier-only answer in logs[${i}]; ${HINT}`); });
@@ -241,6 +270,7 @@ export async function run(args, ctx) {
   for (const id of named) { const it = byId.get(id); if (it && it.k === 'element') for (const x of [it.on, it.goes]) if (typeof x === 'string') labelIds.add(x); }
   if (['chain-reaction', 'blast-radius', 'pager', 'data-detective'].includes(game)) round.cards.forEach((c) => labelIds.add(c.id));
   if (game === 'data-detective') round.who.forEach((c) => labelIds.add(c.id));
+  if (game === 'escape-room') round.puzzles.forEach((pz) => (pz.cards || []).forEach((c) => labelIds.add(c.id)));
   const nav = game === 'quests' ? navFor(input, items) : null;
   if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
   const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };

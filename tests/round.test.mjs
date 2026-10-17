@@ -756,3 +756,114 @@ test('pipe-plumber: a 12-step flow still lays out on the grid', async () => {
   assert.equal(core.decode(r.answer).cells.length, 12);
   assert.equal(new Set(core.decode(r.answer).cells).size, 12);
 });
+
+const dec = (i = 0) => ({ real: `Queue the work ${i}`, alt: `Do it inline ${i}`, reasons: [`Right reason ${i}`, `Wrong one ${i}a`, `Wrong one ${i}b`, `Wrong one ${i}c`], answer: 0 });
+const duelIn = (n = 3) => ({ zone: 'trips', decisions: Array.from({ length: n }, (_, i) => dec(i)) });
+
+test('design-duel: sides and reasons shuffled at build time, the real side and reason only in the obfuscated answer', async () => {
+  const root = await setup();
+  const sides = new Set(), reasonAt = new Set();
+  for (let k = 0; k < 30; k++) {
+    const out = await bld(root, 'design-duel', duelIn());
+    const r = loadRound(root, out.id);
+    if (k === 0) assert.equal(out.id, 'trips-design-duel-1');
+    assert.equal(r.decisions.length, 3);
+    const seenAt = [];
+    r.decisions.forEach((d) => {
+      assert.ok(!('real' in d) && !('alt' in d), 'no real/alt keys in the data');
+      const a = core.decode(d.answer);
+      const i = Number(d[a.side === 0 ? 'a' : 'b'].split(' ').pop());
+      seenAt.push(i);
+      assert.equal(d[a.side === 0 ? 'a' : 'b'], `Queue the work ${i}`);
+      assert.equal(d[a.side === 0 ? 'b' : 'a'], `Do it inline ${i}`);
+      assert.equal(d.reasons[a.reason], `Right reason ${i}`);
+      assert.deepEqual([...d.reasons].sort(), [`Right reason ${i}`, `Wrong one ${i}a`, `Wrong one ${i}b`, `Wrong one ${i}c`]);
+      sides.add(a.side); reasonAt.add(a.reason);
+    });
+    assert.deepEqual(seenAt.sort(), [0, 1, 2], 'every decision is kept');
+  }
+  assert.equal(sides.size, 2, 'the real design lands on both sides');
+  assert.ok(reasonAt.size > 1, 'the reason does not stay at the written index');
+  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds['trips-design-duel-1'].rung, 'break');
+});
+
+test('design-duel: wrong counts, repeats, same design twice, bad answers and identifier-only text are rejected before any write', async () => {
+  const root = await setup();
+  await assert.rejects(bld(root, 'design-duel', duelIn(2)), /at least 3/);
+  const a = duelIn(); a.decisions[1].answer = 4;
+  await assert.rejects(bld(root, 'design-duel', a), /above 3/);
+  const b = duelIn(); b.decisions[2].reasons[2] = ' right reason 2 ';
+  await assert.rejects(bld(root, 'design-duel', b), /duplicate reason in decisions\[2\]\.reasons\[2\]/);
+  const c = duelIn(); c.decisions[0].alt = 'queue the work 0';
+  await assert.rejects(bld(root, 'design-duel', c), /decisions\[0\]: real and alt are the same design/);
+  const d = duelIn(); d.decisions[1].real = 'jobs_queue';
+  await assert.rejects(bld(root, 'design-duel', d), /identifier-only answer in decisions\[1\]\.real/);
+  const e = duelIn(); e.decisions[0].reasons[3] = 'src/api/trips.ts';
+  await assert.rejects(bld(root, 'design-duel', e), /identifier-only answer in decisions\[0\]\.reasons\[3\]/);
+  assert.ok(!existsSync(join(root, '.own-it', 'data')) || readdirSync(join(root, '.own-it', 'data')).length === 0, 'nothing written');
+});
+
+const roomIn = () => ({ zone: 'trips', puzzles: [
+  { kind: 'role', role: 'Rider', action: 'cancel another rider trip', answer: 'deny', why: 'Only the owner may cancel.' },
+  { kind: 'flow', flow: 'fp' },
+  { kind: 'failure', failure: 'Riders see old prices', logs: ['Cache hit', 'Price stale', 'No refresh', 'Old value sent'], answer: 'c1' },
+] });
+
+test('escape-room: one puzzle of each kind, shuffled, flows scrambled, choices derived, every answer and reason obfuscated, labels carried', async () => {
+  const root = await pipeSetup();
+  const firsts = new Set();
+  for (let k = 0; k < 25; k++) {
+    const out = await bld(root, 'escape-room', roomIn());
+    const r = loadRound(root, out.id);
+    if (k === 0) assert.equal(out.id, 'trips-escape-room-1');
+    assert.equal(r.puzzles.length, 3);
+    assert.deepEqual(r.puzzles.map((p) => p.kind).sort(), ['failure', 'flow', 'role']);
+    firsts.add(r.puzzles[0].kind);
+    const role = r.puzzles.find((p) => p.kind === 'role'), flow = r.puzzles.find((p) => p.kind === 'flow'), fail = r.puzzles.find((p) => p.kind === 'failure');
+    assert.equal(core.decode(role.answer), 'deny');
+    assert.equal(core.decode(role.why), 'Only the owner may cancel.');
+    assert.notEqual(role.why, 'Only the owner may cancel.');
+    assert.deepEqual(core.decode(flow.answer), ['s1', 'c1', 'c2']);
+    assert.notDeepEqual(flow.cards.map((c) => c.id), ['s1', 'c1', 'c2']);
+    assert.deepEqual(flow.cards.map((c) => c.id).sort(), ['c1', 'c2', 's1']);
+    assert.equal(core.decode(fail.answer), 'c1');
+    assert.ok(fail.cards.some((c) => c.id === 'c1') && fail.cards.length >= 3 && fail.cards.length <= 4);
+    ['s1', 'c1', 'c2', 'fp'].forEach((id) => assert.ok(Object.hasOwn(r.labels, id), `label for ${id}`));
+  }
+  assert.ok(firsts.size > 1, 'the puzzle order is random');
+  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds['trips-escape-room-1'].rung, 'boss');
+});
+
+test('escape-room: missing or repeated kinds, bad ids and identifier-only text are rejected before any write', async () => {
+  const root = await pipeSetup();
+  const a = roomIn(); a.puzzles[2] = { ...a.puzzles[0] };
+  await assert.rejects(bld(root, 'escape-room', a), /one puzzle of each kind/);
+  const b = roomIn(); b.puzzles = b.puzzles.slice(0, 2);
+  await assert.rejects(bld(root, 'escape-room', b), /at least 3/);
+  const c = roomIn(); c.puzzles[1].flow = 's1';
+  await assert.rejects(bld(root, 'escape-room', c), /"s1" is not a flow/);
+  const d = roomIn(); d.puzzles[1].flow = 'ghost';
+  await assert.rejects(bld(root, 'escape-room', d), /ids not in zone "trips": ghost/);
+  const e = roomIn(); e.puzzles[2].answer = 'ghost';
+  await assert.rejects(bld(root, 'escape-room', e), /ids not in zone "trips": ghost/);
+  const f = roomIn(); f.puzzles[0].answer = 'maybe';
+  await assert.rejects(bld(root, 'escape-room', f), /role answer must be allow or deny/);
+  const g = roomIn(); g.puzzles[0].action = 'cancel_trip';
+  await assert.rejects(bld(root, 'escape-room', g), /identifier-only answer in puzzles\[0\]\.action/);
+  const h = roomIn(); h.puzzles[2].logs[1] = 'src/cache.ts';
+  await assert.rejects(bld(root, 'escape-room', h), /identifier-only answer in puzzles\[2\]\.logs\[1\]/);
+  assert.ok(!existsSync(join(root, '.own-it', 'data')) || readdirSync(join(root, '.own-it', 'data')).length === 0, 'nothing written');
+});
+
+test('teach-back: names a screen, rung none, label carried; non-screens are refused', async () => {
+  const root = await setup();
+  const out = await bld(root, 'teach-back', { zone: 'trips', screen: 's1' });
+  assert.equal(out.id, 'trips-teach-back-1');
+  const r = loadRound(root, out.id);
+  assert.equal(r.screen, 's1');
+  assert.equal(r.rung, 'none');
+  assert.equal(r.labels.s1.label, 'Trip screen');
+  assert.deepEqual(readJson(join(root, '.own-it', 'session.json')).rounds[out.id], { game: 'teach-back', zone: 'trips', rung: 'none', mode: 'practice', cardIds: [] });
+  await assert.rejects(bld(root, 'teach-back', { zone: 'trips', screen: 'el1' }), /"el1" is not a surface/);
+  await assert.rejects(bld(root, 'teach-back', { zone: 'trips', screen: 'ghost' }), /ids not in zone "trips": ghost/);
+});

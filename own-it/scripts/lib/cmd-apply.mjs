@@ -178,8 +178,10 @@ export async function run(args, ctx) {
     if (!CLAIM_RUNGS.every((r) => pz.rungs[r] === 'cleared')) {
       bossPractice = true;
     } else {
+      // Boss battle needs 3 solid answers graded in chat. Escape room grades itself: all three puzzles solved.
       const solids = BOSS_KEYS.filter((k) => f.text[k] === 'solid').length;
-      if (passed && solids >= BOSS_SOLIDS) {
+      const cleared = m.game === 'escape-room' ? m.got === m.of : solids >= BOSS_SOLIDS;
+      if (passed && cleared) {
         clearRung('boss');
         if (!pz.claimed) { pz.claimed = true; claimed = true; xp += XP.claim; }
       }

@@ -159,6 +159,43 @@ export function pipeLayout(flowId, byId, items) {
   return { grid: { cols, rows }, tiles, start: cells[0], end: cells[n - 1], pathLength: n, cells, names: steps.map((id) => byId.get(id).label) };
 }
 
+// Design duel: each decision's two designs land on random sides and its reasons in random order. The real side and reason live only in the answer.
+export function duelDecisions(decisions) {
+  return shuffle(decisions).map((d) => {
+    const side = randomInt(2);
+    const order = shuffle(d.reasons.map((_, i) => i));
+    const [a, b] = side === 0 ? [d.real, d.alt] : [d.alt, d.real];
+    return { a, b, reasons: order.map((i) => d.reasons[i]), answer: { side, reason: order.indexOf(d.answer) } };
+  });
+}
+
+// Escape room: one puzzle of each kind, in random order. The role puzzle is an allow or deny card, the flow puzzle a scrambled flow
+// (as in chain reaction), the failure puzzle a pager round. Throws before anything is written if the model cannot back a puzzle.
+export function roomPuzzles(input, byId, items) {
+  const kinds = input.puzzles.map((p) => p.kind).sort().join(',');
+  if (kinds !== 'failure,flow,role') throw new Error('escape room needs one puzzle of each kind: role, flow and failure');
+  return shuffle(input.puzzles.map((p, i) => {
+    const at = `puzzles[${i}]`;
+    if (p.kind === 'role') {
+      for (const k of ['role', 'action', 'answer', 'why']) if (typeof p[k] !== 'string' || !p[k].trim()) throw new Error(`${at}.${k} is required for a role puzzle`);
+      if (p.answer !== 'allow' && p.answer !== 'deny') throw new Error(`${at}: role answer must be allow or deny`);
+      return { kind: 'role', role: p.role, action: p.action, answer: p.answer, why: p.why };
+    }
+    if (p.kind === 'flow') {
+      if (typeof p.flow !== 'string') throw new Error(`${at}.flow is required for a flow puzzle`);
+      const flow = byId.get(p.flow);
+      if (flow.k !== 'flow') throw new Error(`"${p.flow}" is not a flow`);
+      const order = flowSteps(flow, byId);
+      if (order.length < 2) throw new Error(`flow "${p.flow}" needs at least 2 steps in the model`);
+      let scrambled = shuffle(order);
+      while (scrambled.every((id, j) => id === order[j])) scrambled = shuffle(order);
+      return { kind: 'flow', flow: p.flow, cards: scrambled.map((id) => cardOf(byId.get(id))), answer: order };
+    }
+    if (typeof p.failure !== 'string' || !p.failure.trim() || !Array.isArray(p.logs) || typeof p.answer !== 'string') throw new Error(`${at} needs failure, logs and answer for a failure puzzle`);
+    return { kind: 'failure', failure: p.failure, logs: p.logs, cards: pagerChoices(p, byId, items).map((x) => ({ id: x.id, label: x.label })), answer: p.answer };
+  }));
+}
+
 // Fills in answers the model already knows, so Claude never has to write them.
 export function derive(game, round, byId, items) {
   if (game === 'quests') {
@@ -210,6 +247,10 @@ export function derive(game, round, byId, items) {
       const perm = shuffle(d.options.map((_, i) => i));
       return { ...d, options: perm.map((i) => d.options[i]), answer: perm.indexOf(d.answer) };
     });
+  } else if (game === 'design-duel') {
+    round.decisions = duelDecisions(round.decisions);
+  } else if (game === 'escape-room') {
+    round.puzzles = roomPuzzles(round, byId, items);
   } else if (game === 'data-detective') {
     const { order, by, who } = detectiveSteps(round, byId, items);
     let scrambled = shuffle(order);

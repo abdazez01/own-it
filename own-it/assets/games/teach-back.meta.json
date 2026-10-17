@@ -5,7 +5,7 @@
   "minutes": 3,
   "examReady": false,
   "usesScreens": true,
-  "stage": "2.2",
+  "stage": "2.0",
   "line": "Explain one of your screens to a product manager in two sentences.",
   "keys": "Type, Enter",
   "logo": "<svg viewBox=\"0 0 24 24\"><path d=\"M5 4h14v9H5zM12 13v7M8 21l4-3 4 3\"/><path stroke=\"#E8C26A\" d=\"M8 10l3-2.5 2 2 3-3\"/></svg>"

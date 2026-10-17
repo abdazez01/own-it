@@ -19,9 +19,9 @@ Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page da
 | `data-detective` | 2.0 | State lifecycles with transitions in the model. `entity`, `states` 3-7 `{state}` in order. Movers derived. |
 | `pipe-plumber` | 2.0 | Button to database data flow. `flow` id, 2-12 steps, the first a surface and the last a component. Grid derived. |
 | `what-if` | 2.0 | Failure at scale. `dials` 3-5 `{label, options, answer, why}`, 4 options, answer 0-3. |
-| `design-duel` | 2.2 | Decisions with a real alternative. |
-| `escape-room` | 2.2 | Mixed boss. |
-| `teach-back` | 2.2 | Explaining a screen; Curiosity XP only. |
+| `design-duel` | 2.0 | Decisions with a real alternative. `decisions` x3 `{real, alt, reasons, answer}`: 4 `reasons` in words, `answer` index 0-3 of the real one. Sides and order are shuffled. |
+| `escape-room` | 2.0 | Mixed boss. `puzzles` x3, one of each kind: role `{role, action, answer allow/deny, why}`, flow `{flow}` (2+ steps), failure `{failure, logs 4-8, answer}` (3+ labeled parts of its kind). Needs 3/3 to pass; no chat grades. |
+| `teach-back` | 2.0 | Explaining a screen. `screen` surface id with a built copy. Curiosity XP only; grade the `ask` text q1 with `build-feedback`. |
 
 Rungs: words (quiz, memory-match, spot-the-lie), map (whiteboard, screen-tour, guess-the-screen, blast-radius), trace (quests, chain-reaction, data-detective, pipe-plumber, whos-allowed), break (pager, what-if, design-duel), boss (boss-battle, escape-room).
 

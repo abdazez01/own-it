@@ -304,3 +304,22 @@ test('logged estimate adds the mission floor from build-missions; --tokens repla
   await apply({ _: ['trips-trace-2'], flags: { tokens: '10,5' } }, ctx(root));
   assert.equal(loadProgress(root).tokens.at(-1).est, 15);
 });
+
+test('escape-room is a boss rung: it needs 3/3 and every earlier rung, and no graded text', async () => {
+  const root = await setup();
+  const meta = { zone: 'trips', rung: 'boss', game: 'escape-room', board: 'component', cardIds: [] };
+  setRungs(root, { words: 'cleared', map: 'cleared', trace: 'cleared', break: 'open', boss: 'open' });
+  mission(root, 'trips-escape-room-1', meta, { got: 3, of: 3 });
+  let out = await apply({ _: ['trips-escape-room-1'], flags: {} }, ctx(root));
+  assert.equal(out.claimed, false, 'an unfinished ladder keeps it practice');
+  assert.equal(out.practice, true);
+  setRungs(root, { break: 'cleared' });
+  mission(root, 'trips-escape-room-2', meta, { got: 2, of: 3 });
+  out = await apply({ _: ['trips-escape-room-2'], flags: {} }, ctx(root));
+  assert.equal(out.claimed, false, '2 of 3 leaves the door shut');
+  assert.deepEqual(out.cleared, []);
+  mission(root, 'trips-escape-room-3', meta, { got: 3, of: 3 });
+  out = await apply({ _: ['trips-escape-room-3'], flags: {} }, ctx(root));
+  assert.equal(out.claimed, true);
+  assert.deepEqual(out.cleared, ['boss']);
+});
