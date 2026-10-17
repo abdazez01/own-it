@@ -31,11 +31,11 @@ Errors name the bad field; fix and rerun, nothing was written.
 
 ## Levels
 
-Ask with 5 options:
+The player picks per game on Home:
 - **Easy**: I do not know this app. Screens and words, no code, free hints. Favor `screen-tour`, `quests`, `quiz`, `guess-the-screen`.
 - **Medium**: I know some parts. Data flow, light code names, hints cost 15 XP.
 - **Hard**: I know it well. Code paths, failures, permissions; hints cost 30 XP; Exam default.
 - **Impossible**: all-out. Edge cases, no hints, timers on, boss open. Favor break and boss games.
-- **Custom**: Describe what you know. Ask for a short text, pick the nearest base.
+- **Other**: describes what they know (`about`); infer the nearest base level.
 
-`build-recs` orders by level (custom uses its base). The page applies hint and timer policy.
+`build-recs` orders by the last level used (other uses its base). Rounds store their level. The page applies hint and timer policy.

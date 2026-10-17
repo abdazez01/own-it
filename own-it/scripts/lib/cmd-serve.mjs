@@ -8,7 +8,15 @@ import { ownItPath } from './paths.mjs';
 import { readJson, writeJson } from './json.mjs';
 
 const MAX_BODY = 256 * 1024;
-const EVENT_TYPES = ['pick', 'result', 'challenge', 'hint', 'ask', 'level'];
+// A pick may carry the chosen level; custom needs a 1..300 char description.
+const PICK_LEVELS = ['easy', 'medium', 'hard', 'impossible', 'custom'];
+function validLevel(ev) {
+  if (ev.level === undefined) return true;
+  if (!PICK_LEVELS.includes(ev.level)) return false;
+  if (ev.level !== 'custom') return ev.about === undefined;
+  return typeof ev.about === 'string' && ev.about.trim().length >= 1 && ev.about.length <= 300;
+}
+const EVENT_TYPES = ['pick', 'result', 'challenge', 'hint', 'ask'];
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2',
@@ -98,6 +106,7 @@ export function startServer(ctx, { port = 0 } = {}) {
         if (!ev || typeof ev !== 'object' || Array.isArray(ev) || !EVENT_TYPES.includes(ev.type)) {
           return send(res, 400, 'invalid event');
         }
+        if (ev.type === 'pick' && !validLevel(ev)) return send(res, 400, 'invalid level');
         const dir = ownItPath(ctx.root, 'inbox');
         mkdirSync(dir, { recursive: true });
         // Write to a tmp name, then rename: `wait` never sees a half-written event.

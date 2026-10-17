@@ -13,7 +13,7 @@ Never ask again this invocation.
 
 Say: "Everything own-it creates is stored in the `.own-it/` folder in this project: game page, progress, screen copies, sample data, answers. Delete that folder to remove it all. own-it never edits your code."
 
-Ask the level once (question tool; skip if `settings.level` is set): options in `games.md` Levels. After init run `level <x>` or `level custom --about <text> --base <level>`.
+No level question: the level arrives with each pick.
 
 ## 3. Node check
 
@@ -31,11 +31,10 @@ Extract zones (`extraction.md`, `screens.md`). Write `.own-it/recs.json` with 3-
 
 `serve` gives `{url}`; `open <url>` opens the browser. Say "Dashboard is open." Needs a desktop browser; on a remote machine forward the port (`ssh -L <port>:127.0.0.1:<port>`) and open the url locally. Background `wait`; react, then wait again:
 
-- `pick`: `build-round`, then wait. Mode is in the event; never ask it.
+- `pick {game, zone, mode, level, about?}`: `level <x>` (custom: `--about <about> --base <nearest level>`), then `build-round` at that level (`about` sets depth per zone), then wait. Rebuild a pre-built round whose stored level differs. Never ask mode or level.
 - `result`: `collect <round>`, grade free text. Practice: `build-feedback` and post the debrief in chat; Exam: no feedback file until the report card. `apply`, rebuild recs, wait.
 - `ask`: grade, `build-feedback` with `grades`, wait.
 - `challenge {id, item}`: see `grading.md` (also after `apply`), wait.
-- `level {level}`: `level <x>` (custom: ask what they know first), `build-recs`, rebuild page data, wait.
 - `hint {round}`: nothing to do, wait.
 - `invalid`: skip, wait.
 - `{idle:true}`: wait silently. After 6 idle waits in a row say "Still here. Click in the page or type here." and stop.

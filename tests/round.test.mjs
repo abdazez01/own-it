@@ -867,3 +867,16 @@ test('teach-back: names a screen, rung none, label carried; non-screens are refu
   await assert.rejects(bld(root, 'teach-back', { zone: 'trips', screen: 'el1' }), /"el1" is not a surface/);
   await assert.rejects(bld(root, 'teach-back', { zone: 'trips', screen: 'ghost' }), /ids not in zone "trips": ghost/);
 });
+
+test('build-round stores the stored level on the round and the session entry', async () => {
+  const root = await setup();
+  const p = loadProgress(root);
+  p.settings.level = 'custom';
+  p.settings.levelAbout = 'I know React';
+  saveProgress(root, p);
+  const out = await build({ _: ['quiz', put(root, quiz())], flags: {} }, ctx(root));
+  const session = readJson(join(root, '.own-it', 'session.json'));
+  assert.equal(session.rounds[out.id].level, 'custom');
+  assert.equal(session.rounds[out.id].about, 'I know React');
+  assert.match(readFileSync(join(root, '.own-it', 'data', `${out.id}.js`), 'utf8'), /"level": ?"custom"/);
+});

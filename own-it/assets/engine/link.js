@@ -1,6 +1,6 @@
 /* own-it engine: live link client (parent spec 5b-2) with a file:// fallback.
    Live: GET /state?t= polled by a self-scheduling loop (2 s, 10 s while the link is lost),
-   POST /event?t= for pick/result/challenge/hint/ask/level.
+   POST /event?t= for pick/result/challenge/hint/ask.
    File: results download as own-it-<id>.json and a copy offer carries OWNIT:<base64>. */
 (function () {
   'use strict';

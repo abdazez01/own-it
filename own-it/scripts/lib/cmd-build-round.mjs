@@ -273,13 +273,15 @@ export async function run(args, ctx) {
   if (game === 'escape-room') round.puzzles.forEach((pz) => (pz.cards || []).forEach((c) => labelIds.add(c.id)));
   const nav = game === 'quests' ? navFor(input, items) : null;
   if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
-  const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
+  const st = progress.settings;
+  const lvl = st.level ? { level: st.level, ...(st.level === 'custom' ? { about: st.levelAbout } : {}) } : {};
+  const data = { id, game, zone: input.zone, rung: meta.rung, ...lvl, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.
   const sessionPath = ownItPath(ctx.root, 'session.json');
   const session = readJson(sessionPath, { session: ctx.now().toISOString(), mode: 'practice', missions: {} });
   session.rounds = { ...(session.rounds || {}), [id]: { game, zone: input.zone, rung: meta.rung,
-    mode: input.mode || session.mode || 'practice',
+    mode: input.mode || session.mode || 'practice', ...lvl,
     cardIds: game === 'blast-radius' ? [round.target, ...round.cards.map((c) => c.id)] : shownCards(game, input, byId) } };
   const dataJs = ownItPath(ctx.root, 'data', `${id}.js`);
   writeJsRegistry(dataJs, 'OWNIT_ROUNDS', id, data);

@@ -72,11 +72,11 @@ test('build-recs uses the stored level, custom uses its base, unset keeps order'
   assert.deepEqual(games(), ['quiz', 'quests', 'pager']);
 });
 
-test('level is a live-link event and the CLI command list', () => {
+test('level is not a live-link event; pick validates it; CLI lists level', () => {
   const src = readFileSync(join(SKILL_DIR, 'scripts', 'lib', 'cmd-serve.mjs'), 'utf8');
-  assert.match(src.match(/EVENT_TYPES = \[[^\]]*\]/)[0], /'level'/);
+  assert.doesNotMatch(src.match(/EVENT_TYPES = \[[^\]]*\]/)[0], /'level'/);
+  assert.match(src, /validLevel/);
   assert.match(readFileSync(join(SKILL_DIR, 'scripts', 'own-it.mjs'), 'utf8'), /'level'/);
-  assert.ok(listGames().length > 0);
 });
 
 const FILES = ['z.js', 'icons.js', 'router.js', 'flap.js', 'toggle.js', 'juice.js', 'keys.js', 'link.js', 'shell.js', 'home.js'];
@@ -85,27 +85,90 @@ function boot(settings) {
   env.load(...FILES);
   const w = env.window;
   w.OWNIT_GAMES = listGames();
-  w.OWNIT_PROGRESS = { xp: 0, zones: {}, settings };
+  w.OWNIT_PROGRESS = { xp: 0, zones: { trips: { name: 'Trips', rungs: { words: 'open', map: 'locked', trace: 'locked', break: 'locked', boss: 'locked' }, claimed: false, fogged: false, weakSpots: [] } }, settings };
   const stage = env.document.createElement('div');
   stage.setAttribute('id', 'stage');
   env.document.body.appendChild(stage);
+  w.OwnIt.register({ id: 'quiz', name: 'Quiz', keys: [], play() {} });
+  w.__env = env;
   return { w, stage };
 }
 
-test('home shows a 5-way level switch at the stored level and sends a level event', () => {
-  const { w, stage } = boot({ level: 'hard' });
+const tile = (stage) => Array.from(stage.querySelectorAll('.tile-game')).find((t) => t.getAttribute('data-game') === 'quiz');
+const dlg = (w) => w.document.body.querySelector('.level-picker');
+const btn = (w, text) => Array.from(dlg(w).querySelectorAll('button')).find((b) => b.textContent === text);
+function live(w) {
   const sent = [];
   w.OwnIt.link.mode = 'live';
+  w.OwnIt.link.onData = () => () => {};
   w.OwnIt.link.send = (type, payload) => { sent.push([type, JSON.parse(JSON.stringify(payload))]); return Promise.resolve(true); };
+  return sent;
+}
+const press = (w, el, k) => el.dispatchEvent(w.__env.event('keydown', { key: k }));
+
+test('home has no level switch; clicking a tile opens the picker with 5 options', () => {
+  const { w, stage } = boot({ level: 'hard' });
   w.OwnIt.router.go('home');
-  const bar = stage.querySelector('.level-bar');
-  const btns = Array.from(bar.querySelectorAll('button'));
-  assert.deepEqual(btns.map((b) => b.textContent), ['Easy', 'Medium', 'Hard', 'Impossible', 'Custom']);
-  assert.equal(btns.find((b) => b.getAttribute('aria-checked') === 'true').textContent, 'Hard');
-  btns[3].click();
-  assert.deepEqual(sent, [['level', { level: 'impossible' }]]);
-  btns[4].click();
-  assert.deepEqual(sent[1], ['level', { level: 'custom' }]);
+  assert.equal(stage.querySelector('.level-bar'), null);
+  tile(stage).click();
+  assert.ok(dlg(w), 'picker open');
+  const opts = Array.from(dlg(w).querySelectorAll('.level-opt'));
+  assert.deepEqual(opts.map((b) => b.querySelector('strong').textContent), ['Easy', 'Medium', 'Hard', 'Impossible', 'Other']);
+  assert.equal(opts.find((b) => b.getAttribute('aria-checked') === 'true').getAttribute('data-id'), 'hard');
+});
+
+test('pick payload carries the level; hard defaults to exam', () => {
+  const { w, stage } = boot({ level: 'hard' });
+  const sent = live(w);
+  w.OwnIt.router.go('home');
+  tile(stage).click();
+  btn(w, 'Start').click();
+  assert.deepEqual(sent, [['pick', { game: 'quiz', zone: 'trips', mode: 'exam', level: 'hard' }]]);
+  w.OwnIt.stopBuilding();
+});
+
+test('Other requires text, then sends about', () => {
+  const { w, stage } = boot({});
+  const sent = live(w);
+  w.OwnIt.router.go('home');
+  tile(stage).click();
+  Array.from(dlg(w).querySelectorAll('.level-opt')).find((b) => b.getAttribute('data-id') === 'custom').click();
+  btn(w, 'Start').click();
+  assert.ok(dlg(w), 'still open without text');
+  assert.equal(sent.length, 0);
+  dlg(w).querySelector('textarea').value = '  I know React  ';
+  btn(w, 'Start').click();
+  assert.equal(dlg(w), null);
+  assert.deepEqual(sent, [['pick', { game: 'quiz', zone: 'trips', mode: 'practice', level: 'custom', about: 'I know React' }]]);
+  w.OwnIt.stopBuilding();
+});
+
+test('Esc cancels and Enter starts', () => {
+  const { w, stage } = boot({});
+  const sent = live(w);
+  w.OwnIt.router.go('home');
+  tile(stage).click();
+  press(w, dlg(w), 'Escape');
+  assert.equal(dlg(w), null);
+  assert.equal(sent.length, 0);
+  tile(stage).click();
+  press(w, dlg(w).querySelector('.level-opt[aria-checked="true"]'), 'ArrowDown');
+  assert.equal(dlg(w).querySelector('.level-opt[aria-checked="true"]').getAttribute('data-id'), 'hard');
+  press(w, dlg(w).querySelector('.level-opt[aria-checked="true"]'), 'Enter');
+  assert.equal(dlg(w), null);
+  assert.equal(sent[0][1].level, 'hard');
+  w.OwnIt.stopBuilding();
+});
+
+test('a round built at another level is not reused', () => {
+  const { w, stage } = boot({ level: 'easy' });
+  w.OWNIT_ROUNDS = { 'trips-quiz-1': { level: 'hard' }, 'trips-quiz-2': { level: 'easy' } };
+  let played = null;
+  w.OwnIt.register({ id: 'quiz', name: 'Quiz', keys: [], play(root, r) { played = r; } });
+  w.OwnIt.router.go('home');
+  tile(stage).click();
+  btn(w, 'Start').click();
+  assert.equal(played.level, 'easy');
 });
 
 test('level defaults to medium and drives hint cost', () => {
@@ -117,4 +180,13 @@ test('level defaults to medium and drives hint cost', () => {
   assert.equal(cost({ level: 'hard' }), 30);
   assert.equal(cost({ level: 'custom', levelBase: 'hard' }), 30);
   assert.equal(boot({ level: 'impossible' }).w.OwnIt.level(), 'impossible');
+});
+
+test('impossible marks the boss rung open on Home', () => {
+  const cells = (settings) => {
+    const { w, stage } = boot(settings);
+    w.OwnIt.router.go('home');
+    return Array.from(stage.querySelectorAll('.rung-cell')).filter((c) => c.classList.contains('o')).length;
+  };
+  assert.equal(cells({ level: 'impossible' }), cells({ level: 'hard' }) + 1);
 });

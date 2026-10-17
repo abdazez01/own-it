@@ -99,7 +99,7 @@
     dlg.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (opts.escape !== false) api.close(); return; }
       if (e.key !== 'Tab') return;
-      var f = dlg.querySelectorAll('button, input');
+      var f = dlg.querySelectorAll('button, input, textarea');
       if (!f.length) return;
       var first = f[0], last = f[f.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }

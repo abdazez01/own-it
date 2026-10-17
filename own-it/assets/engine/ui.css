@@ -749,11 +749,15 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 /* The hidden attribute must win over component display values (buttons are inline-flex), or Next and Skip show before they are due. */
 [hidden] { display: none !important; }
 
-/* Level switch on Home: five segments, wraps on narrow screens */
-.level-bar .toggle { max-width: 100%; }
-.level-bar .toggle button { padding: 0 12px; }
-.level-note { color: var(--ink-2); margin-top: var(--s-2); }
-@media (max-width: 639.98px) {
-  .level-bar .toggle { display: flex; }
-  .level-bar .toggle button { flex: 1 1 auto; padding: 0 8px; font-size: var(--fs-12, 12px); }
+/* Level picker dialog */
+.level-picker { max-width: min(480px, calc(100vw - 32px)); }
+.level-options { display: grid; gap: var(--s-2); margin: var(--s-3) 0; }
+.level-opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: var(--hit); padding: var(--s-2) var(--s-3);
+  background: var(--track); border: 1px solid var(--edge); border-radius: var(--r-inset); color: var(--ink); cursor: pointer; text-align: left;
+  font: 600 var(--fs-13) var(--f-ui);
 }
+.level-opt[aria-checked="true"] { box-shadow: 0 0 0 1px var(--gold); background: var(--gold-a14); }
+.level-desc { color: var(--ink-2); font-weight: 400; }
+.level-about { width: 100%; box-sizing: border-box; margin-bottom: var(--s-2); padding: var(--s-2); background: var(--track); border: 1px solid var(--edge); border-radius: var(--r-inset); color: var(--ink); font: var(--fs-13) var(--f-ui); }
+.level-about[hidden] { display: none; }
