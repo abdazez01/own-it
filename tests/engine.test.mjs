@@ -357,3 +357,25 @@ test('link: files written after the page loaded are injected on the first poll',
   const srcs = Array.from(env.document.head.querySelectorAll('script')).map((s) => s.getAttribute('src')).sort();
   assert.deepEqual(srcs, [`rounds.js?v=${fresh}`]);
 });
+
+test('router keeps the open game in the URL hash and restore() reopens it after a reload', () => {
+  const env = boot();
+  const { OwnIt } = env.window;
+  const stage = env.document.createElement('div');
+  stage.setAttribute('id', 'stage');
+  env.document.body.appendChild(stage);
+  const urls = [];
+  env.window.history = { replaceState: (_s, _t, url) => urls.push(url) };
+  env.window.location.pathname = '/game.html';
+  OwnIt.register({ id: 'quiz', name: 'Quiz', minutes: 5, keys: [], play() {} });
+  env.window.OWNIT_ROUNDS = { 'trips-quiz-1': { q: 1 } };
+  OwnIt.router.go({ game: 'quiz', roundId: 'trips-quiz-1' });
+  assert.ok(urls[urls.length - 1].endsWith('#/play/quiz/trips-quiz-1'));
+  OwnIt.router.go('home');
+  assert.ok(!urls[urls.length - 1].includes('#'));
+  env.window.location.hash = '#/play/quiz/trips-quiz-1';
+  assert.equal(OwnIt.router.restore(), true);
+  assert.equal(OwnIt.router.current().roundId, 'trips-quiz-1');
+  env.window.location.hash = '#/play/quiz/missing-round';
+  assert.equal(OwnIt.router.restore(), false, 'unknown round: stay home');
+});

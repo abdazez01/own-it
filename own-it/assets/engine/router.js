@@ -67,6 +67,25 @@
     return l;
   }
 
+  // The open game lives in the URL hash ('#/play/<game>/<round>') so a reload returns to it. replaceState keeps the ?t= token and adds no history.
+  function writeHash(game, roundId) {
+    try {
+      var loc = window.location || {};
+      var base = (loc.pathname || '') + (loc.search || '');
+      var hash = game ? '#/play/' + encodeURIComponent(game) + '/' + encodeURIComponent(roundId) : '';
+      if (window.history && typeof window.history.replaceState === 'function') window.history.replaceState(null, '', base + hash);
+    } catch (e) { /* the hash is a convenience */ }
+  }
+
+  function restore() {
+    var m = /^#\/play\/([^/]+)\/([^/]+)$/.exec((window.location && window.location.hash) || '');
+    if (!m) return false;
+    var game, id;
+    try { game = decodeURIComponent(m[1]); id = decodeURIComponent(m[2]); } catch (e) { return false; }
+    if (!games.has(game) || !resolveRound(id)) return false;
+    return go({ game: game, roundId: id });
+  }
+
   function notify() { listeners.forEach(function (f) { f(state); }); }
 
   function fail() {
@@ -74,6 +93,7 @@
     var mount = mountPoint();
     mount.textContent = '';
     state = 'home';
+    writeHash(null);
     if (typeof OwnIt.home === 'function') OwnIt.home(mount);
     if (OwnIt.toast) OwnIt.toast("This round can't be played. Ask Claude to rebuild it.");
     notify();
@@ -86,6 +106,7 @@
     mount.textContent = '';
     if (target === 'home' || target == null) {
       state = 'home';
+      writeHash(null);
       if (typeof OwnIt.home === 'function') OwnIt.home(mount);
       notify();
       return true;
@@ -98,6 +119,7 @@
       return false;
     }
     state = { game: target.game, roundId: target.roundId };
+    writeHash(target.roundId != null ? target.game : null, target.roundId);
     var root = OwnIt.el('div', { 'class': 'game-root', 'data-game': def.id });
     if (target.roundId != null) root.setAttribute('data-round', String(target.roundId));
     mount.appendChild(root);
@@ -137,6 +159,7 @@
     go: go,
     current: function () { return state; },
     onChange: function (fn) { listeners.push(fn); },
-    resolveRound: resolveRound
+    resolveRound: resolveRound,
+    restore: restore
   };
 })();

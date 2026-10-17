@@ -228,6 +228,12 @@ export function derive(game, round, byId, items) {
     scrambled = scrambled.map((id) => cardOf(byId.get(id)));
     round.cards = scrambled;
     round.answer = order;
+  } else if (game === 'guess-the-screen') {
+    // A screen with no built copy is drawn as a wireframe from its labelled elements. Never the screen's own label: that is the answer.
+    round.screens = round.screens.map((s) => ({
+      ...s,
+      sketch: items.filter((x) => x.k === 'element' && x.on === s.screen && labeled(x)).slice(0, 12).map((x) => ({ label: x.label })),
+    }));
   } else if (game === 'whos-allowed') {
     // Shuffled so the order in the file gives nothing away; each card's verdict is obfuscated by obfuscate().
     round.cards = shuffle(round.cards);

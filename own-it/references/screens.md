@@ -11,6 +11,8 @@ Give it one screen component (plus direct children if needed): at most 3 files a
 - sample data made up and plausible. Never copy values from fixtures, seeds or env files;
 - login-gated screens show their logged-in state.
 
+A Guess the Screen round works without a copy (it draws a wireframe from the model's element labels). A copy built later reaches the open page on its own; no reload needed.
+
 Unsupported framework or too dynamic? Fall back to a sketch card: a plain wireframe listing the screen's buttons and fields.
 
 ## Build

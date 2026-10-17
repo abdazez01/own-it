@@ -27,7 +27,7 @@
   }
 
   /* OwnIt.screenhost.mount(container, screenId, opts) builds the framed iframe inside container.
-     opts: { width, height, maxScale, blockPointer, reserve (px of window height kept for the rest of the page when enlarging on wide screens) }
+     opts: { width, height, maxScale, blockPointer, silent (no missing-copy message; the caller draws its own stand-in), onCopy (called once if a missing copy shows up through the live link), reserve (px of window height kept for the rest of the page when enlarging on wide screens) }
      Returns { ok, iframe, frame, doc, ids(), onPick(cb), highlight(id, kind), clear(), move(dir), pickCurrent(), current(), destroy() } */
   function mount(container, screenId, opts) {
     opts = opts || {};
@@ -43,7 +43,7 @@
     var readyCbs = [];
     var want = null;     // a highlight asked for before the iframe finished loading
     var gone = false;
-    var onResize = null, ro = null;
+    var onResize = null, ro = null, offCopy = null;
 
     var frame = OwnIt.el('div', { 'class': 'screen-frame' + (opts.blockPointer ? ' no-pointer' : '') });
     var vp = OwnIt.el('div', { 'class': 'screen-vp' });
@@ -91,6 +91,7 @@
         picks.length = 0;
         if (onResize && window.removeEventListener) window.removeEventListener('resize', onResize);
         if (ro) { try { ro.disconnect(); } catch (e) { /* gone */ } }
+        if (offCopy) { try { offCopy(); } catch (e) { /* gone */ } offCopy = null; }
         if (frame.remove) frame.remove();
       }
     };
@@ -117,8 +118,16 @@
     if (!api.ok) {
       ready = true; // nothing will ever load: callers waiting on onReady fall back at once
       vp.style.width = '100%';
-      vp.appendChild(OwnIt.el('p', { 'class': 'screen-missing' }, 'This screen copy is missing. Ask Claude to rebuild it.'));
+      if (!opts.silent) vp.appendChild(OwnIt.el('p', { 'class': 'screen-missing' }, 'This screen copy is missing. Ask Claude to rebuild it.'));
       container.appendChild(frame);
+      // A copy that Claude rebuilds while the page is open arrives through the live link as a new screens.js; opts.onCopy remounts.
+      if (typeof opts.onCopy === 'function' && OwnIt.link && typeof OwnIt.link.onData === 'function') {
+        offCopy = OwnIt.link.onData(function (ev) {
+          if (gone || !ev || ev.file !== 'screens.js' || !lookup(screenId)) return;
+          if (offCopy) { try { offCopy(); } catch (e) { /* gone */ } offCopy = null; }
+          opts.onCopy(api);
+        });
+      }
       return api;
     }
 

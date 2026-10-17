@@ -890,3 +890,14 @@ test('build-round --level stamps the pick level, base and about', async () => {
   await assert.rejects(build({ _: ['quiz', put(root, quiz())], flags: { level: 'custom' } }, ctx(root)), /--base/);
   await assert.rejects(build({ _: ['quiz', put(root, quiz())], flags: { level: 'nope' } }, ctx(root)), /--level/);
 });
+
+test('guess-the-screen carries a sketch of labelled elements, never the screen label', async () => {
+  const root = await setup();
+  const m = loadModel(root);
+  m.zones.trips.items.push(I({ id: 'el9', k: 'element', on: 's1', label: 'Cancel trip', does: 'f1' }));
+  saveModel(root, m);
+  const g = await bld(root, 'guess-the-screen', { zone: 'trips', screens: [1, 2, 3].map(() => ({ screen: 's1', choices: ['s1', 's2', 'el1', 'el2'], answer: 's1' })) });
+  const r = loadRound(root, g.id);
+  assert.deepEqual(r.screens[0].sketch, [{ label: 'Cancel trip' }]);
+  assert.ok(!JSON.stringify(r.screens.map((s) => s.sketch)).includes('Trip screen'));
+});

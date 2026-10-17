@@ -60,7 +60,7 @@
   'use strict';
   var OwnIt = window.OwnIt;
   OwnIt.field.start(document.getElementById('field'));
-  OwnIt.router.go('home');
+  if (!OwnIt.router.restore()) OwnIt.router.go('home');
   // Live mode: when Claude rewrites progress.js, recs.js or a data file, redraw Home in place.
   OwnIt.link.onData(function () {
     if (OwnIt.router.current() === 'home' && !document.querySelector('.building')) OwnIt.router.go('home');

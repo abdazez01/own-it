@@ -6,7 +6,7 @@ Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page da
 |---|---|---|
 | `quiz` | 2.0 | Words. `mode` required. `questions` x5: `q`, 4 `options` `{text, why}`, `answer` index 0-3, optional `peek`. |
 | `screen-tour` | 2.0 | Screens with elements. `screen`, `steps` 1-6: `kind` chain/find/role, `prompt`, `element`, `choices`, `answer`. |
-| `guess-the-screen` | 2.0 | Zones with 3+ surfaces in the model (built copies are optional). `screens` 3-8: `screen`, 4 `choices`, `answer`. |
+| `guess-the-screen` | 2.0 | Zones with 3+ surfaces in the model (built copies are optional: without one the game draws a wireframe from the model's labelled elements). `screens` 3-8: `screen`, 4 `choices`, `answer`. |
 | `quests` | 2.0 | A flow across screens or roles. `flow`, `goal`, `start`, `objectives` 2-8 `{text, element}`. Answers derived. |
 | `whiteboard` | 2.0 | Structure. `cards` 2-12 component ids. Edges derived. |
 | `boss-battle` | 2.0 | Final test. `questions` x5 `{q, kind}` why/malicious/structure/fails/term, per `bosses.md`. |

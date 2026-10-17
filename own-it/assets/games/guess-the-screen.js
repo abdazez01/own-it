@@ -75,11 +75,34 @@
 
     function setDots() { dots.paint(si, phase === 'locked', 'Screen'); }
 
-    function render() {
-      stopTick();
+    // Neutral wireframe of a screen with no built copy: its buttons and fields by label, never the screen's own name.
+    function wireframe(entry) {
+      var wire = OwnIt.el('div', { 'class': 'wire', 'aria-hidden': 'true' });
+      wire.appendChild(OwnIt.el('div', { 'class': 'wire-bar' }));
+      (Array.isArray(entry.sketch) ? entry.sketch : []).slice(0, 12).forEach(function (it) {
+        wire.appendChild(OwnIt.el('div', { 'class': 'wire-item' }, String(it && it.label != null ? it.label : '')));
+      });
+      for (var k = 0; k < 3; k++) wire.appendChild(OwnIt.el('div', { 'class': 'wire-line' }));
+      return wire;
+    }
+
+    function mountStage() {
       if (host) host.destroy();
       stage.textContent = '';
-      host = OwnIt.screenhost.mount(stage, screens[si].screen, { height: 640, maxScale: 1.3, blockPointer: true });
+      var at = si;
+      host = OwnIt.screenhost.mount(stage, screens[si].screen, {
+        height: 640, maxScale: 1.3, blockPointer: true, silent: true,
+        onCopy: function () { if (!done && at === si) mountStage(); }
+      });
+      if (!host.ok) {
+        host.frame.setAttribute('hidden', 'hidden');
+        stage.appendChild(wireframe(screens[si]));
+      }
+    }
+
+    function render() {
+      stopTick();
+      mountStage();
       phase = 'blur';
       title.textContent = 'Screen ' + (si + 1) + ' of ' + total + ': what is this screen?';
       choicesEl.textContent = '';
