@@ -2,7 +2,8 @@
    other part they think breaks with it, then presses Done. The set that really breaks arrives obfuscated (every part that depends on the
    broken one, directly or through others, nearest first) and is decoded only on Done. Score: precision = right taps / taps, recall =
    right taps / parts that break, XP = round(10 x 2PR / (P + R)). A ripple then spreads outward from the broken part to show what fell.
-   Builds DOM with OwnIt.el only. */
+   An intro card says the rules; the broken part is marked; after Check each part shows hit, missed or wrong with a one-line reason
+   from the model's dependency edges (the reasons arrive obfuscated too). Builds DOM with OwnIt.el only. */
 (function () {
   'use strict';
   var OwnIt = window.OwnIt;
@@ -28,15 +29,30 @@
     shell.startTimer();
 
     var panel = OwnIt.el('section', { 'class': 'panel br-panel' });
-    var goal = OwnIt.el('h2', { 'class': 'quiz-q' }, targetName + ' breaks. Tap every part that breaks with it.');
-    var core = OwnIt.el('div', { 'class': 'br-core', 'aria-hidden': 'true' });
+    var goal = OwnIt.el('h2', { 'class': 'quiz-q' }, targetName + ' breaks. Which other parts stop working?');
+    var intro = OwnIt.el('div', { 'class': 'br-intro well' });
+    intro.appendChild(OwnIt.el('p', { 'class': 'br-rule' }, 'This part breaks. Click every part that stops working because of it. Then press Check.'));
+    var ex = OwnIt.el('div', { 'class': 'br-example', 'aria-label': 'Example with three parts' });
+    var exRow = OwnIt.el('div', { 'class': 'br-ex-row' });
+    exRow.appendChild(OwnIt.el('span', { 'class': 'br-ex-node on' }, 'Profile page'));
+    exRow.appendChild(OwnIt.el('span', { 'class': 'br-ex-arrow', 'aria-hidden': 'true' }, 'calls \u2192'));
+    var exBroken = OwnIt.el('span', { 'class': 'br-ex-node broken' }, 'Login service');
+    exBroken.appendChild(OwnIt.el('span', { 'class': 'br-chip' }, 'BROKEN'));
+    exRow.appendChild(exBroken);
+    ex.appendChild(exRow);
+    ex.appendChild(OwnIt.el('span', { 'class': 'br-ex-node' }, 'Help page'));
+    ex.appendChild(OwnIt.el('p', { 'class': 'br-ex-note' }, 'Example: Profile page calls Login service, so it breaks too (click it). Help page does not (leave it).'));
+    intro.appendChild(ex);
+    var core = OwnIt.el('div', { 'class': 'br-core br-broken' });
+    core.appendChild(OwnIt.el('span', { 'class': 'br-chip' }, 'BROKEN'));
+    core.appendChild(OwnIt.el('span', { 'class': 'br-core-name' }, targetName));
     var board = OwnIt.el('div', { 'class': 'br-board', role: 'group', 'aria-label': 'Parts' });
     var status = OwnIt.el('p', { 'class': 'mm-status', 'aria-live': 'polite' });
     var actions = OwnIt.el('div', { 'class': 'actions' });
-    var doneBtn = OwnIt.button('Done', 'primary', null);
+    var doneBtn = OwnIt.button('Check', 'primary', null);
     actions.appendChild(doneBtn);
     var feedback = OwnIt.el('div', { 'class': 'quiz-feedback', 'aria-live': 'polite' });
-    [goal, core, board, status, actions, feedback].forEach(function (n) { panel.appendChild(n); });
+    [goal, core, intro, board, status, actions, feedback].forEach(function (n) { panel.appendChild(n); });
     area.appendChild(panel);
 
     var els = parts.map(function (c, i) {
@@ -47,7 +63,7 @@
     });
 
     function count() { return Object.keys(picked).length; }
-    function describe() { status.textContent = kit.plural(count(), 'part', 'parts') + ' chosen.'; }
+    function describe() { status.textContent = 'Selected ' + count() + (count() === 1 ? ' part' : ' parts') + '.'; }
 
     function toggle(i) {
       if (done || !parts[i]) return;
@@ -65,7 +81,9 @@
       done = true;
       els.forEach(function (b) { b.setAttribute('aria-disabled', 'true'); });
       doneBtn.setAttribute('hidden', 'hidden');
+      intro.setAttribute('hidden', 'hidden');
       var dec = OwnItCore.decode(round.answer); // the only place the damage set is decoded
+      var whys = round.why ? OwnItCore.decode(round.why) || {} : {}; // the reasons, decoded with it
       var order = Array.isArray(dec) ? dec : [];
       var idx = {};
       parts.forEach(function (c, i) { idx[c.id] = i; });
@@ -93,6 +111,19 @@
         if (reduced) apply(); else later(apply, k * RIPPLE_MS);
       });
       falseAlarm.forEach(function (i) { els[i].classList.add('false-alarm'); });
+      // Each part says what happened to it and why, in one line.
+      var verdict = function (i, chip, kind, why) {
+        var line = OwnIt.el('span', { 'class': 'br-result ' + kind });
+        line.appendChild(OwnIt.el('span', { 'class': 'br-chip ' + kind }, chip));
+        line.appendChild(OwnIt.el('span', { 'class': 'br-why' }, ' ' + why));
+        els[i].appendChild(line);
+      };
+      parts.forEach(function (c, i) {
+        var dep = typeof whys[c.id] === 'string' ? whys[c.id] : L(c) + ' depends on ' + targetName + '.';
+        if (picked[i] && isBreak[i]) verdict(i, 'HIT', 'hit', dep);
+        else if (isBreak[i]) verdict(i, 'MISSED', 'missed', dep);
+        else if (picked[i]) verdict(i, 'WRONG', 'wrong', 'Nothing it calls leads to ' + targetName + ', so it keeps working.');
+      });
       OwnIt.sound(f >= 0.99 ? 'correct' : f > 0 ? 'hint' : 'wrong');
       if (f < 0.99) OwnIt.juice.shake(board); else OwnIt.juice.confetti(panel);
       kit.note(feedback, f >= 0.99 ? 'good' : 'bad', 'You found ' + hit + ' of ' + m + ' parts that break, with ' + kit.plural(falseAlarm.length, 'false alarm', 'false alarms') + '.',
@@ -152,11 +183,67 @@
     };
   }
 
+
+  // Guided practice on a made-up board (not from the app): find the broken part, click what depends on it, leave the decoy, press Check.
+  var tutorial = {
+    title: 'How to play Blast Radius',
+    board: function (host) {
+      host.classList.add('tut-blast');
+      var nodes = {}, picked = 0;
+      var count = OwnIt.el('p', { 'class': 'tut-count', 'aria-live': 'polite' }, 'Selected 0 parts.');
+      function put(name, tag, label, col, row, cls) {
+        var n = OwnIt.el(tag, { 'class': cls }, label);
+        if (tag === 'button') n.setAttribute('type', 'button');
+        n.style.gridColumn = String(col);
+        n.style.gridRow = String(row);
+        host.appendChild(n);
+        if (name) nodes[name] = n;
+        return n;
+      }
+      put('profile', 'button', 'Profile page', 1, 1, 'br-part tut-node');
+      put(null, 'span', 'calls \u2192', 2, 1, 'br-ex-arrow');
+      put('admin', 'button', 'Admin panel', 1, 2, 'br-part tut-node');
+      put(null, 'span', 'calls \u2192', 2, 2, 'br-ex-arrow');
+      put('help', 'button', 'Help page', 1, 3, 'br-part tut-node');
+      var login = put('login', 'button', 'Login service', 3, 1, 'br-part tut-node br-broken');
+      login.style.gridRow = '1 / 4';
+      login.style.alignSelf = 'center';
+      login.appendChild(OwnIt.el('span', { 'class': 'br-chip' }, 'BROKEN'));
+      host.appendChild(count);
+      count.style.gridColumn = '1 / 4';
+      var check = OwnIt.button('Check', 'primary', null);
+      check.style.gridColumn = '1 / 4';
+      host.appendChild(check);
+      nodes.check = check;
+      nodes._pick = function () { picked++; count.textContent = 'Selected ' + picked + (picked === 1 ? ' part.' : ' parts.'); };
+      return nodes;
+    },
+    steps: [
+      { title: '1. Find the broken part', text: 'One part of the app is broken. Click the part marked BROKEN.', targets: ['login'],
+        nudge: 'That part still works. Click the one marked BROKEN.' },
+      { title: '2. Click what depends on it', text: 'An arrow points from a part to the part it calls. Click both parts that call Login service.', targets: ['profile', 'admin'],
+        nudges: { help: 'Help page has no arrow to Login service, so it keeps working. Leave it alone.', login: 'Login service is the broken one. Click the parts that call it.' },
+        onHit: function (name, nodes) { nodes._pick(); } },
+      { title: '3. Press Check', text: 'Now press Check. Each part shows hit, missed or wrong, with a reason.', targets: ['check'],
+        onDone: function (nodes) {
+          [['profile', 'HIT', 'hit', 'Profile page calls Login service.'], ['admin', 'HIT', 'hit', 'Admin panel calls Login service.'],
+            ['help', 'LEFT', 'hit', 'Help page does not depend on it. Good call.']].forEach(function (r) {
+            var line = OwnIt.el('span', { 'class': 'br-result ' + r[2] });
+            line.appendChild(OwnIt.el('span', { 'class': 'br-chip ' + r[2] }, r[1]));
+            line.appendChild(OwnIt.el('span', { 'class': 'br-why' }, ' ' + r[3]));
+            nodes[r[0]].appendChild(line);
+          });
+        } },
+      { title: 'You have got it', text: 'In the real round the broken part comes from your app, and there are more parts. Selecting and Check work the same way.' }
+    ]
+  };
+
   OwnIt.register({
     id: 'blast-radius',
     name: 'Blast Radius',
     minutes: 4,
-    keys: [['Arrows', 'Move between parts'], ['Space', 'Mark or unmark the part'], ['D', 'Done'], ['Esc', 'Leave']],
+    keys: [['Arrows', 'Move between parts'], ['Space', 'Mark or unmark the part'], ['D', 'Check'], ['Esc', 'Leave']],
+    tutorial: tutorial,
     play: play
   });
 })();

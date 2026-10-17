@@ -169,11 +169,45 @@
     };
   }
 
+
+  // Guided practice on a made-up dial (not from the app): pick the part that fails first, then lock it in.
+  var tutorial = {
+    title: 'How to play What-If Dial',
+    board: function (host) {
+      var nodes = {};
+      host.appendChild(OwnIt.el('p', { 'class': 'quiz-q' }, 'What if ten times more riders open the app at once? What fails first?'));
+      var row = OwnIt.el('div', { 'class': 'wi-opts', role: 'group', 'aria-label': 'Practice choices' });
+      [['web', 'The web page'], ['db', 'The database'], ['cache', 'The cache']].forEach(function (o, i) {
+        var b = OwnIt.el('button', { type: 'button', 'class': 'wi-opt' });
+        b.appendChild(OwnIt.el('span', { 'class': 'answer-key', 'aria-hidden': 'true' }, String(i + 1)));
+        b.appendChild(OwnIt.el('span', { 'class': 'answer-text' }, o[1]));
+        row.appendChild(b);
+        nodes[o[0]] = b;
+      });
+      host.appendChild(row);
+      var lock = OwnIt.button('Lock in', 'primary', null);
+      host.appendChild(lock);
+      nodes.lock = lock;
+      var why = OwnIt.el('p', { 'class': 'quiz-why', hidden: 'hidden' }, 'The database does the most work for every rider, so it runs out of room first.');
+      host.appendChild(why);
+      nodes._why = why;
+      return nodes;
+    },
+    steps: [
+      { title: '1. Turn the dial', text: 'Each dial is a what-if. Point it at the part you think fails first. For this practice, pick the database.', targets: ['db'],
+        nudges: { web: 'A web page is cheap to serve. For this practice, pick the database.', cache: 'The cache is built for load. For this practice, pick the database.' } },
+      { title: '2. Lock it in', text: 'Press Lock in to commit. In the real game Enter does the same, and the reason shows after.', targets: ['lock'],
+        onDone: function (nodes) { nodes._why.removeAttribute('hidden'); } },
+      { title: 'Reason shown', text: 'A right call is worth 10 XP. Arrow keys turn the dial, and keys 1 to 4 pick an option.' }
+    ]
+  };
+
   OwnIt.register({
     id: 'what-if',
     name: 'What-If Dial',
     minutes: 3,
     keys: [['Left and Right', 'Turn the dial'], ['1-4', 'Point at a choice'], ['Enter', 'Lock in, then move on'], ['Esc', 'Leave']],
+    tutorial: tutorial,
     play: play
   });
 })();

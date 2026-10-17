@@ -378,7 +378,7 @@ const brRound = () => ({
   cards: [{ id: 'a', label: 'Alpha' }, { id: 'b', label: 'Bravo' }, { id: 'c', label: 'Charlie' }, { id: 'd', label: 'Delta' }],
 });
 const brParts = (t) => Array.from(t.root.querySelectorAll('.br-part'));
-const brDone = (t) => Array.from(t.root.querySelectorAll('button')).find((b) => b.textContent === 'Done');
+const brDone = (t) => Array.from(t.root.querySelectorAll('button')).find((b) => b.textContent === 'Check');
 
 test('blast-radius: score is 10 x the balance of precision and recall, decoded only on Done', () => {
   const t = boot('blast-radius', brRound());
@@ -401,6 +401,24 @@ test('blast-radius: score is 10 x the balance of precision and recall, decoded o
   assert.ok(brParts(t)[2].classList.contains('missed'));
   assert.ok(brParts(t)[1].classList.contains('hit'));
   assert.ok(brParts(t)[3].classList.contains('false-alarm'));
+});
+
+test('blast-radius: intro card, BROKEN mark, live selected count, and a hit, missed or wrong line with a reason after Check', () => {
+  const r = brRound();
+  r.why = core.encode({ b: 'Bravo calls Core service.', c: 'Charlie calls Bravo, which breaks too.' });
+  const t = boot('blast-radius', r);
+  assert.match(t.root.textContent, /This part breaks\. Click every part that stops working because of it\. Then press Check\./);
+  assert.match(t.root.querySelector('.br-broken').textContent, /BROKEN.*Core service|Core service.*BROKEN/);
+  assert.ok(!/Bravo calls/.test(t.root.textContent), 'reasons stay hidden before Check');
+  assert.match(t.root.querySelector('.mm-status').textContent, /Selected 0 parts/);
+  brParts(t)[1].click(); brParts(t)[3].click();
+  assert.match(t.root.querySelector('.mm-status').textContent, /Selected 2 parts/);
+  brDone(t).click();
+  const text = (i) => brParts(t)[i].textContent;
+  assert.match(text(1), /HIT.*Bravo calls Core service\./);
+  assert.match(text(2), /MISSED.*Charlie calls Bravo, which breaks too\./);
+  assert.match(text(3), /WRONG.*keeps working/);
+  assert.ok(!/HIT|MISSED|WRONG/.test(text(0)), 'a part left alone that does not break says nothing');
 });
 
 test('blast-radius: tapping again unmarks; a perfect pick scores 10, nothing picked scores 0', () => {

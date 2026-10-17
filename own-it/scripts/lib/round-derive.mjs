@@ -24,9 +24,10 @@ export function blastSet(input, byId, items) {
   }
   const seen = new Set([input.target]);
   const order = [];
+  const via = new Map(); // part -> the part it calls on the way to the target
   for (let frontier = [input.target]; frontier.length;) {
     const next = [];
-    for (const id of frontier) for (const c of callers.get(id) || []) if (!seen.has(c)) { seen.add(c); next.push(c); order.push(c); }
+    for (const id of frontier) for (const c of callers.get(id) || []) if (!seen.has(c)) { seen.add(c); next.push(c); order.push(c); via.set(c, id); }
     frontier = next;
   }
   const parts = order.filter((id) => { const it = byId.get(id); return !!it && (it.k === 'surface' || it.k === 'component'); });
@@ -37,7 +38,9 @@ export function blastSet(input, byId, items) {
   if (!damaged.length) throw new Error(`nothing depends on "${input.target}" in the model`);
   const rest = shuffle(items.filter((x) => (x.k === 'surface' || x.k === 'component') && labeled(x) && x.id !== input.target && !seen.has(x.id)).map((x) => x.id));
   if (!rest.length) throw new Error(`everything depends on "${input.target}"; pick a part with something independent of it`);
-  return { damaged, shown: [...damaged, ...rest.slice(0, 12 - damaged.length)] };
+  const name = (id) => byId.get(id)?.label || id;
+  const why = Object.fromEntries(damaged.map((id) => [id, `${name(id)} calls ${name(via.get(id))}${via.get(id) === input.target ? '' : ', which breaks too'}.`]));
+  return { damaged, shown: [...damaged, ...rest.slice(0, 12 - damaged.length)], why };
 }
 
 // Pager: the breaking step plus up to 3 look-alikes of the same kind, all with player-facing labels.
@@ -263,9 +266,10 @@ export function derive(game, round, byId, items, level = 'medium') {
     // Shuffled so the order in the file gives nothing away; each card's verdict is obfuscated by obfuscate().
     round.cards = shuffle(round.cards);
   } else if (game === 'blast-radius') {
-    const { damaged, shown } = blastSet(round, byId, items);
+    const { damaged, shown, why } = blastSet(round, byId, items);
     round.cards = shuffle(shown).map((id) => ({ id, label: byId.get(id).label }));
     round.answer = damaged;
+    round.why = why;
   } else if (game === 'pager') {
     round.cards = pagerChoices(round, byId, items).map((x) => ({ id: x.id, label: x.label }));
   } else if (game === 'pipe-plumber') {

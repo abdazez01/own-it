@@ -233,6 +233,8 @@
     var hintBtn = button('Hint', 'secondary', function () { openHint(); }, noHints ? { disabled: 'disabled', title: 'Hints are off in this mode.' } : null);
     if (!opts.hint) hintBtn.setAttribute('hidden', 'hidden');
     head.appendChild(hintBtn);
+    var howBtn = button('How to play', 'quiet', function () { if (OwnIt.howToPlay && !openDialogs.length) OwnIt.howToPlay(ctx.game); }, { 'data-how': '1' });
+    head.appendChild(howBtn);
     var helpBtn = OwnIt.el('button', { type: 'button', 'class': 'icon-btn', 'aria-label': 'Keyboard help' });
     helpBtn.appendChild(OwnIt.icons.svg('help'));
     helpBtn.addEventListener('click', function () { OwnIt.keys.help(); });
@@ -277,7 +279,7 @@
       setScore: function (got, total) { OwnIt.flapSet(scoreEl, got + '/' + total); },
       startTimer: function () {
         if (tick || !timerEl) return;
-        tick = setInterval(function () { secs++; OwnIt.flapSet(timerEl, fmtTime(secs)); }, 1000);
+        tick = setInterval(function () { if (OwnIt.tutorialOpen) return; secs++; OwnIt.flapSet(timerEl, fmtTime(secs)); }, 1000);
       },
       stopTimer: function () { if (tick) { clearInterval(tick); tick = null; } },
       seconds: function () { return secs; },

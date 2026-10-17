@@ -247,6 +247,7 @@
     function stop() { if (timer) { clearInterval(timer); timer = null; } }
     paint();
     timer = setInterval(function () {
+      if (OwnIt.tutorialOpen) return; // the clock waits while a tutorial is open
       elapsed += step;
       paint();
       if (o.onTick) o.onTick(elapsed);
@@ -267,7 +268,228 @@
     });
   }
 
+  // ---------------------------------------------------------------- coach marks, guided practice and "How to play"
+
+  var seenMem = {};
+  // True once this player has seen a game's tutorial (or the home tour, under the key 'home'). Claude may also write settings.tutorials[key].
+  function tutorialSeen(key) {
+    try { var st = window.OWNIT_PROGRESS && window.OWNIT_PROGRESS.settings; if (st && st.tutorials && st.tutorials[key]) return true; } catch (e) { /* none */ }
+    if (seenMem[key]) return true;
+    try { return !!(window.localStorage && window.localStorage.getItem('ownit-seen-' + key)); } catch (e) { return false; }
+  }
+  function markSeen(key) {
+    seenMem[key] = true;
+    try { if (window.localStorage) window.localStorage.setItem('ownit-seen-' + key, '1'); } catch (e) { /* blocked */ }
+  }
+
+  function targetsOf(t) {
+    var v = typeof t === 'function' ? t() : t;
+    return (Array.isArray(v) ? v : [v]).filter(function (x) { return x && x.classList; });
+  }
+
+  /* A row of coach marks. steps: [{title?, text, target?: element | [elements] | function, gated?: bool}]. A gated step hides Next: the
+     caller calls api.next() when the player has done the thing. Inline (default) marks the target with .coach-spot inside o.host;
+     o.float spotlights real page elements with a hole and a scrim that blocks the page. o: { host, float, label, finishLabel, onEnd(reason) }.
+     Esc or Skip ends with 'skip', the last Next with 'done'. Returns { next, back, nudge(text), end(reason), index(), el }. */
+  function coach(steps, o) {
+    o = o || {};
+    var at = 0, ended = false, spotted = [], floating = !!o.float;
+    var bubble = OwnIt.el('div', { 'class': 'coach-bubble' + (floating ? ' float' : ''), role: 'group', 'aria-label': o.label || 'Guide', 'aria-live': 'polite' });
+    var title = OwnIt.el('strong', { 'class': 'coach-title' });
+    var text = OwnIt.el('p', { 'class': 'coach-text' });
+    var nudgeEl = OwnIt.el('p', { 'class': 'coach-nudge', hidden: 'hidden' });
+    var foot = OwnIt.el('div', { 'class': 'coach-foot' });
+    var count = OwnIt.el('span', { 'class': 'coach-count' });
+    var back = OwnIt.button('Back', 'quiet', function () { api.back(); });
+    var nextBtn = OwnIt.button('Next', 'primary', function () { api.next(); });
+    var skip = OwnIt.button('Skip', 'quiet', function () { api.end('skip'); });
+    [count, back, skip, nextBtn].forEach(function (n) { foot.appendChild(n); });
+    [title, text, nudgeEl, foot].forEach(function (n) { bubble.appendChild(n); });
+    var layer = null, hole = null;
+    if (floating) {
+      layer = OwnIt.el('div', { 'class': 'coach-layer' });
+      layer.appendChild(OwnIt.el('div', { 'class': 'coach-block' }));
+      hole = OwnIt.el('div', { 'class': 'coach-hole', 'aria-hidden': 'true' });
+      layer.appendChild(hole);
+      layer.appendChild(bubble);
+      document.body.appendChild(layer);
+    } else if (o.host) {
+      o.host.appendChild(bubble);
+    }
+
+    function rectOf(list) {
+      var r = null;
+      list.forEach(function (n) {
+        var b = n.getBoundingClientRect ? n.getBoundingClientRect() : null;
+        if (!b || (!b.width && !b.height)) return;
+        var x2 = b.right !== undefined ? b.right : b.left + b.width, y2 = b.bottom !== undefined ? b.bottom : b.top + b.height;
+        r = r ? { left: Math.min(r.left, b.left), top: Math.min(r.top, b.top), right: Math.max(r.right, x2), bottom: Math.max(r.bottom, y2) } : { left: b.left, top: b.top, right: x2, bottom: y2 };
+      });
+      return r;
+    }
+    function place() {
+      if (!floating) return;
+      var r = rectOf(targetsOf(steps[at].target)), pad = 8;
+      var vw = window.innerWidth || 1280, vh = window.innerHeight || 800;
+      if (!r) { hole.style.display = 'none'; bubble.classList.add('center'); bubble.style.left = ''; bubble.style.top = ''; return; }
+      bubble.classList.remove('center');
+      hole.style.display = '';
+      hole.style.left = Math.max(0, r.left - pad) + 'px';
+      hole.style.top = Math.max(0, r.top - pad) + 'px';
+      hole.style.width = (r.right - r.left + 2 * pad) + 'px';
+      hole.style.height = (r.bottom - r.top + 2 * pad) + 'px';
+      var bw = Math.min(380, vw - 24), bh = bubble.offsetHeight || 170;
+      var top = r.bottom + pad + 14;
+      if (top + bh > vh - 12) top = Math.max(12, r.top - pad - 14 - bh);
+      if (top + bh > vh - 12) top = Math.max(12, vh - bh - 12);
+      bubble.style.top = top + 'px';
+      bubble.style.left = Math.max(12, Math.min(r.left, vw - bw - 12)) + 'px';
+    }
+    function unspot() { spotted.forEach(function (n) { n.classList.remove('coach-spot'); }); spotted = []; }
+    function render() {
+      var s = steps[at];
+      unspot();
+      title.textContent = s.title || '';
+      if (s.title) title.removeAttribute('hidden'); else title.setAttribute('hidden', 'hidden');
+      text.textContent = s.text;
+      nudgeEl.textContent = '';
+      nudgeEl.setAttribute('hidden', 'hidden');
+      count.textContent = (at + 1) + ' of ' + steps.length;
+      if (at > 0 && !steps[at - 1].gated) back.removeAttribute('hidden'); else back.setAttribute('hidden', 'hidden');
+      if (s.gated) nextBtn.setAttribute('hidden', 'hidden'); else nextBtn.removeAttribute('hidden');
+      nextBtn.textContent = at === steps.length - 1 ? (o.finishLabel || 'Got it') : 'Next';
+      var list = targetsOf(s.target);
+      if (!floating) list.forEach(function (n) { n.classList.add('coach-spot'); spotted.push(n); });
+      if (floating && list[0] && list[0].scrollIntoView) { try { list[0].scrollIntoView({ block: 'center', behavior: 'auto' }); } catch (e) { /* optional */ } }
+      place();
+      if (s.onShow) s.onShow(api);
+      var f = s.gated && list[0] && list[0].focus ? list[0] : nextBtn;
+      if (f.focus) f.focus();
+    }
+    bubble.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); api.end('skip'); }
+      else if (e.key === 'ArrowRight' && !steps[at].gated) { e.preventDefault(); api.next(); }
+      else if (e.key === 'ArrowLeft' && at > 0 && !steps[at - 1].gated) { e.preventDefault(); api.back(); }
+    });
+    var onSize = function () { place(); };
+    if (floating && window.addEventListener) window.addEventListener('resize', onSize);
+
+    var api = {
+      el: bubble,
+      index: function () { return at; },
+      next: function () { if (ended) return; if (at >= steps.length - 1) api.end('done'); else { at++; render(); } },
+      back: function () { if (ended || at < 1) return; at--; render(); },
+      nudge: function (t) { nudgeEl.textContent = t; nudgeEl.removeAttribute('hidden'); },
+      end: function (reason) {
+        if (ended) return;
+        ended = true;
+        unspot();
+        if (floating && window.removeEventListener) window.removeEventListener('resize', onSize);
+        if (layer && layer.remove) layer.remove(); else if (bubble.remove) bubble.remove();
+        if (o.onEnd) o.onEnd(reason);
+      }
+    };
+    render();
+    return api;
+  }
+
+  /* Guided practice on a tiny made-up board, so nothing real can be given away.
+     spec: { title, board(host) -> {name: element}, steps: [{text, title?, targets?: [names], show?: [names], nudge?, nudges?: {name: text}, onHit?, onDone?(nodes)}] }.
+     A step with targets is gated: the player must press all of them (any other node gets a gentle nudge). A step without targets ends the
+     practice with Got it. Esc or Skip leaves. Both mark the game's tutorial as seen. opts: { game, onEnd(reason) }. */
+  function tutorial(spec, opts) {
+    opts = opts || {};
+    var cv = null, nodes = {}, hit = {}, last = -1, closing = false;
+    OwnIt.tutorialOpen = (OwnIt.tutorialOpen || 0) + 1;
+    var shellApi = OwnIt.dialog(function (dlg, api) {
+      dlg.classList.add('tutorial-card');
+      dlg.appendChild(OwnIt.el('h2', null, spec.title || 'How to play'));
+      dlg.appendChild(OwnIt.el('p', { 'class': 'note' }, 'Practice board. Nothing here comes from your app.'));
+      var host = OwnIt.el('div', { 'class': 'tut-board' });
+      dlg.appendChild(host);
+      nodes = spec.board(host) || {};
+      var guide = OwnIt.el('div', { 'class': 'tut-guide' });
+      dlg.appendChild(guide);
+      var steps = spec.steps.map(function (s) {
+        return { title: s.title, text: s.text, gated: !!(s.targets && s.targets.length), target: (s.targets || s.show || []).map(function (n) { return nodes[n]; }) };
+      });
+      cv = coach(steps, { host: guide, label: 'How to play', onEnd: function (reason) {
+        if (opts.game) markSeen(opts.game);
+        closing = true;
+        api.close();
+        if (opts.onEnd) opts.onEnd(reason);
+      } });
+      Object.keys(nodes).filter(function (name) { return name.charAt(0) !== '_' && nodes[name] && typeof nodes[name].addEventListener === 'function'; }).forEach(function (name) {
+        nodes[name].addEventListener('click', function () {
+          var i = cv.index(), s = spec.steps[i];
+          if (!s || !s.targets || !s.targets.length) return;
+          if (s.targets.indexOf(name) < 0) {
+            OwnIt.sound('hint');
+            cv.nudge((s.nudges && s.nudges[name]) || s.nudge || 'Not that one. Press the part that glows.');
+            return;
+          }
+          if (last !== i) { hit = {}; last = i; }
+          if (hit[name]) return;
+          hit[name] = true;
+          nodes[name].classList.add('tut-done');
+          OwnIt.sound('press');
+          if (s.onHit) s.onHit(name, nodes);
+          if (s.targets.every(function (n) { return hit[n]; })) {
+            OwnIt.sound('correct');
+            if (s.onDone) s.onDone(nodes);
+            cv.next();
+          }
+        });
+      });
+    }, { label: spec.title || 'How to play', onClose: function () {
+      OwnIt.tutorialOpen = Math.max(0, (OwnIt.tutorialOpen || 1) - 1);
+      if (!closing && cv) { closing = true; cv.end('skip'); }
+    } });
+    return { dialog: shellApi, coach: cv, nodes: nodes };
+  }
+
+  // A one-card "How to play": the game's line and its keys.
+  function howToCard(def, meta, opts) {
+    OwnIt.tutorialOpen = (OwnIt.tutorialOpen || 0) + 1;
+    return OwnIt.dialog(function (dlg, api) {
+      dlg.classList.add('tutorial-card');
+      dlg.appendChild(OwnIt.el('h2', null, 'How to play ' + ((def && def.name) || (meta && meta.name) || 'this game')));
+      if (meta && meta.line) dlg.appendChild(OwnIt.el('p', null, meta.line));
+      var keys = def && Array.isArray(def.keys) ? def.keys : [];
+      if (keys.length) {
+        dlg.appendChild(OwnIt.el('h3', { 'class': 'panel-title' }, 'Keys'));
+        var list = OwnIt.el('div', { 'class': 'well' });
+        keys.forEach(function (k) {
+          var row = OwnIt.el('p', { 'class': 'how-key' });
+          row.appendChild(OwnIt.el('kbd', null, String(k[0])));
+          row.appendChild(OwnIt.el('span', null, ' ' + String(k[1] || '')));
+          list.appendChild(row);
+        });
+        dlg.appendChild(list);
+      }
+      var actions = OwnIt.el('div', { 'class': 'actions' });
+      actions.appendChild(OwnIt.button('Got it', 'primary', function () { api.close(); }, { 'data-autofocus': '1' }));
+      dlg.appendChild(actions);
+    }, { label: 'How to play', onClose: function () {
+      OwnIt.tutorialOpen = Math.max(0, (OwnIt.tutorialOpen || 1) - 1);
+      if (opts && opts.game) markSeen(opts.game);
+      if (opts && opts.onEnd) opts.onEnd('done');
+    } });
+  }
+
+  // The "How to play" for a game: its guided practice if it has one (def.tutorial), else a one-card summary.
+  OwnIt.howToPlay = function (game, opts) {
+    opts = Object.assign({ game: game }, opts || {});
+    var def = OwnIt.games && OwnIt.games.get(game), all = window.OWNIT_GAMES, meta = null;
+    if (Array.isArray(all)) all.forEach(function (m) { if (m && m.id === game) meta = m; });
+    if (def && def.tutorial) return tutorial(def.tutorial, opts);
+    return howToCard(def, meta, opts);
+  };
+  // Opens it once, the first time a game starts.
+  OwnIt.autoHowTo = function (game) { if (!tutorialSeen(game)) OwnIt.howToPlay(game); };
+
   OwnIt.kit = { has: has, plural: plural, label: label, note: note, dots: dots, answerButtons: answerButtons, targetIndex: targetIndex, mine: mine,
     choiceKeys: choiceKeys, clock: clock, onActivate: onActivate, arrowKeys: arrowKeys, gridMove: gridMove, timers: timers, release: release, nextLabel: nextLabel, lazy: lazy, verdict: verdict, stepper: stepper,
-    gradeFor: gradeFor, asker: asker, finish: finish, modalOpen: modalOpen };
+    gradeFor: gradeFor, asker: asker, finish: finish, modalOpen: modalOpen,
+    coach: coach, tutorial: tutorial, tutorialSeen: tutorialSeen, markSeen: markSeen };
 })();

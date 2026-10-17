@@ -472,6 +472,14 @@ test('blast-radius: damage set is reverse reachability over edges, nearest first
   assert.ok(orders.size > 3, 'card order is shuffled');
 });
 
+test('blast-radius: each broken part carries a one-line reason from its dependency edge, obfuscated', async () => {
+  const root = await blastSetup();
+  const r = loadRound(root, (await bld(root, 'blast-radius', { zone: 'trips', target: 'c2' })).id);
+  assert.equal(typeof r.why, 'string', 'the reasons are obfuscated');
+  assert.ok(!JSON.stringify({ ...r, answer: undefined, why: undefined }).includes(' calls '), 'no reason in plain data');
+  assert.deepEqual(core.decode(r.why), { c1: 'Trip service calls Database.', c3: 'Billing calls Database.', s1: 'Trip screen calls Trip service, which breaks too.' });
+});
+
 test('blast-radius: a target nobody depends on, a non-part target and an unlabeled target are rejected', async () => {
   const root = await blastSetup();
   await assert.rejects(bld(root, 'blast-radius', { zone: 'trips', target: 'c4' }), /nothing depends on/);

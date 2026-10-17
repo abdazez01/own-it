@@ -129,6 +129,7 @@
       if (typeof console !== 'undefined' && console.error) console.error(e);
       return fail();
     }
+    if (OwnIt.autoHowTo) { try { OwnIt.autoHowTo(def.id); } catch (e) { /* the guide never blocks a game */ } }
     notify();
     return true;
   }

@@ -157,11 +157,38 @@
     };
   }
 
+
+  // Guided practice on three made-up steps (not from the app): light them in the order they happen.
+  var tutorial = {
+    title: 'How to play Chain Reaction',
+    board: function (host) {
+      host.classList.add('cr-board');
+      var nodes = {};
+      [['charge', 'The server charges the card'], ['pay', 'The rider taps Pay'], ['mail', 'A receipt is emailed']].forEach(function (c, i) {
+        var b = OwnIt.el('button', { type: 'button', 'class': 'cr-card' });
+        b.appendChild(OwnIt.el('span', { 'class': 'cr-num', 'aria-hidden': 'true' }, String(i + 1)));
+        b.appendChild(OwnIt.el('span', { 'class': 'cr-text' }, c[1]));
+        host.appendChild(b);
+        nodes[c[0]] = b;
+      });
+      return nodes;
+    },
+    steps: [
+      { title: '1. What happens first?', text: 'The steps of one flow lie scattered. Light the one that happens first.', targets: ['pay'],
+        nudge: 'Not first. Something has to start the flow: what does the rider do?' },
+      { title: '2. Then the next', text: 'Light the step that comes next.', targets: ['charge'],
+        nudge: 'Not yet. What follows the tap?' },
+      { title: '3. And the last', text: 'One left. Light it.', targets: ['mail'] },
+      { title: 'Chain complete', text: 'In the real round a fuse burns, so be quick. Keys 1 to 9 light the nth step.' }
+    ]
+  };
+
   OwnIt.register({
     id: 'chain-reaction',
     name: 'Chain Reaction',
     minutes: 3,
     keys: [['1-9', 'Light that step'], ['Arrows', 'Move between steps'], ['Enter', 'Light the focused step'], ['Esc', 'Leave']],
+    tutorial: tutorial,
     play: play
   });
 })();

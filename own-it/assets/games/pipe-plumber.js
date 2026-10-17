@@ -207,11 +207,48 @@
     };
   }
 
+
+  // Guided practice on a made-up row of four pipes (not from the app): turn the two middle tiles until the water runs from gold to green.
+  var tutorial = {
+    title: 'How to play Pipe Plumber',
+    board: function (host) {
+      host.classList.add('pp-board');
+      host.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
+      host.style.maxWidth = '420px';
+      var nodes = {}, turns = {};
+      [['a', 'cap', 1, ' source'], ['b', 'straight', 0, ''], ['c', 'straight', 0, ''], ['d', 'cap', 3, ' sink']].forEach(function (t) {
+        var b = OwnIt.el('button', { type: 'button', 'class': 'pp-tile' + t[3], 'aria-label': 'Practice pipe ' + t[0] });
+        var pipe = OwnIt.parseSvg('<svg viewBox="0 0 24 24"><path d="' + DRAW[t[1]] + '"/></svg>');
+        pipe.setAttribute('class', 'pp-pipe');
+        pipe.style.transform = 'rotate(' + t[2] * 90 + 'deg)';
+        turns[t[0]] = t[2];
+        b.appendChild(pipe);
+        b.addEventListener('click', function () {
+          if (t[0] === 'a' || t[0] === 'd') return;
+          turns[t[0]] = (turns[t[0]] + 1) % 4;
+          pipe.style.transform = 'rotate(' + turns[t[0]] * 90 + 'deg)';
+        });
+        host.appendChild(b);
+        nodes[t[0]] = b;
+      });
+      return nodes;
+    },
+    steps: [
+      { title: '1. Turn a tile', text: 'A tap turns a tile a quarter turn. Turn the first middle tile until it lies flat, so it joins the gold tile.', targets: ['b'],
+        nudge: 'The gold and green ends are already right. Turn a middle tile.' },
+      { title: '2. Finish the path', text: 'Now turn the second middle tile. When the pipes connect, the water runs from gold to green.', targets: ['c'],
+        nudge: 'Turn the other middle tile.',
+        onDone: function (nodes) { ['a', 'b', 'c', 'd'].forEach(function (k) { nodes[k].classList.add('wet'); }); } },
+      { title: 'Water flows', text: 'In the real round the grid is bigger and has decoys. You can also press R or Enter to turn the tile you are on.' }
+    ]
+  };
+
   OwnIt.register({
     id: 'pipe-plumber',
     name: 'Pipe Plumber',
     minutes: 4,
     keys: [['R', 'Turn the tile'], ['Enter', 'Turn the tile'], ['Arrows', 'Move between tiles'], ['Esc', 'Leave']],
+    tutorial: tutorial,
     play: play
   });
 })();

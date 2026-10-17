@@ -6,7 +6,7 @@
   "examReady": true,
   "usesScreens": false,
   "stage": "2.0",
-  "line": "Break one part of your app, then click everything else that breaks with it.",
+  "line": "One part breaks. Click every part that stops working because of it, then press Check.",
   "keys": "Click",
   "logo": "<svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"2.5\"/><circle stroke=\"#E8C26A\" cx=\"12\" cy=\"12\" r=\"6\"/><circle cx=\"12\" cy=\"12\" r=\"9.5\" stroke-dasharray=\"2 3\"/></svg>"
 }
