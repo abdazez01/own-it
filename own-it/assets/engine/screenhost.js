@@ -13,6 +13,7 @@
     + '[data-ownit]:hover,[data-ownit]:focus,[data-ownit-hl="1"]{outline:2px solid #E8C26A;outline-offset:2px;border-radius:4px}'
     + '[data-ownit-hl="bad"]{outline:2px solid #E8907C;outline-offset:2px;border-radius:4px}'
     + '[data-ownit-hl="ok"]{outline:3px solid #8FC9A0;outline-offset:2px;border-radius:4px}';
+  var RELAY = ['r', 'R', 'q', 'Q', 'n', 'N', 'm', 'M', '?', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
   var DEFAULT_W = 390, DEFAULT_H = 720;
 
   function lookup(id) {
@@ -151,6 +152,17 @@
         if (t && t.closest && t.closest('a[href], area[href], button[type=submit], input[type=submit]')) e.preventDefault();
       }, true);
       doc.addEventListener('submit', function (e) { e.preventDefault(); }, true);
+      // Keys typed while focus is inside the copy never reach the host page, so hand the game keys over. Enter and Space on a
+      // tagged element stay with the element handler below. The relayed event targets the host body so key ownership checks pass.
+      doc.addEventListener('keydown', function (e) {
+        if (!e || RELAY.indexOf(e.key) < 0 || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+        var tt = e.target && e.target.tagName ? String(e.target.tagName).toLowerCase() : '';
+        if (e.key !== 'Escape' && (tt === 'input' || tt === 'textarea' || tt === 'select')) return;
+        var k = OwnIt.keys;
+        if (!k || typeof k.dispatch !== 'function') return;
+        k.dispatch({ key: e.key, target: document.body, shiftKey: !!e.shiftKey, ctrlKey: false, metaKey: false, altKey: false,
+          defaultPrevented: false, preventDefault: function () { if (e.preventDefault) e.preventDefault(); }, stopPropagation: function () {} });
+      });
       var style = doc.createElement('style');
       style.textContent = OUTLINE;
       (doc.head || doc.documentElement).appendChild(style);

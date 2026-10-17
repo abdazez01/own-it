@@ -49,6 +49,12 @@ function boot(round, { exam = false, screens = SCREENS } = {}) {
   w.TextDecoder = TextDecoder;
   w.OWNIT_SCREENS = screens;
   vm.runInContext(readFileSync(new URL('core.js', ASSETS), 'utf8'), env.ctx, { filename: 'core.js' });
+  let decodes = 0;
+  const realDecode = w.OwnItCore.decode;
+  w.OwnItCore.decode = (x) => { decodes++; return realDecode(x); };
+  const results = [];
+  w.OwnIt.resultCard = (c, r) => { results.push(r); if (r.payload) c.finish(r.payload); return { sent: true }; };
+  const routed = [];
   const sounds = [];
   w.OwnIt.audio = { play: (n) => sounds.push(n) };
   let shakes = 0, confetti = 0;
@@ -72,7 +78,7 @@ function boot(round, { exam = false, screens = SCREENS } = {}) {
   env.document.body.appendChild(root);
   const finished = [], toasts = [];
   const ctx = {
-    game: 'quests', roundId: round.id, root, router: { go() {} }, toast: (m) => toasts.push(m),
+    game: 'quests', roundId: round.id, root, router: { go: (r) => routed.push(r) }, toast: (m) => toasts.push(m),
     keys: { on: (k, f) => w.OwnIt.keys.on(k, f, 'quests') },
     finish: (p) => finished.push(p),
   };
@@ -105,7 +111,7 @@ function boot(round, { exam = false, screens = SCREENS } = {}) {
   };
   const start = () => { press('Start quest'); return load('s1'); };
   const rows = () => Array.from(root.querySelectorAll('.quest-row'));
-  return { env, w, root, key, sounds, finished, toasts, cleanup, frames, load, click, press, start, rows, buttons, counts: { shakes: () => shakes, confetti: () => confetti } };
+  return { routed, results, decodes: () => decodes, env, w, root, key, sounds, finished, toasts, cleanup, frames, load, click, press, start, rows, buttons, counts: { shakes: () => shakes, confetti: () => confetti } };
 }
 
 test('quest pop-up opens first with the goal and numbered objectives, and Start begins the quest', () => {
@@ -266,4 +272,97 @@ test('game page loads quests.js and ignores keys while the pop-up is open', () =
   const t = boot(questRound());
   t.key('r');
   assert.equal(t.env.document.body.querySelectorAll('.dialog').length, 1, 'R does not stack a second dialog');
+});
+
+const finishRun = (t) => {
+  t.click('el-open'); t.load('s2'); t.press('Switch role'); t.press('Manager'); t.click('el-approve');
+};
+
+test('keys typed inside the screen copy are relayed to the game (R opens the role switcher)', () => {
+  const t = boot(questRound());
+  const f = t.start();
+  const inner = f.inner.body.querySelector('[data-ownit="el-help"]');
+  inner.dispatchEvent(t.env.event('keydown', { key: 'r' }));
+  assert.ok(t.env.document.body.querySelector('.dialog'), 'role switcher opened from inside the iframe');
+});
+
+test('relay ignores Enter and modified keys, and typing in a field except Escape', () => {
+  const t = boot(questRound());
+  const f = t.start();
+  const field = f.inner.createElement('input');
+  f.inner.body.appendChild(field);
+  field.dispatchEvent(t.env.event('keydown', { key: 'r' }));
+  field.dispatchEvent(t.env.event('keydown', { key: 'q', ctrlKey: true }));
+  assert.equal(t.env.document.body.querySelector('.dialog'), null);
+});
+
+test('Esc inside the screen asks to leave, and Leave goes Home; Back on the pop-up goes Home', () => {
+  const t = boot(questRound());
+  const f = t.start();
+  f.inner.body.querySelector('[data-ownit="el-help"]').dispatchEvent(t.env.event('keydown', { key: 'Escape' }));
+  assert.match(t.env.document.body.querySelector('.dialog').textContent, /Leave this game/);
+  t.press('Leave');
+  assert.deepEqual(t.routed, ['home']);
+  const u = boot(questRound());
+  u.press('Back');
+  assert.deepEqual(u.routed, ['home']);
+});
+
+test('Enter on the pop-up does not start the quest when focus is on Back', () => {
+  const t = boot(questRound());
+  const back = t.buttons().find((b) => b.textContent.trim() === 'Back');
+  back.dispatchEvent(t.env.event('keydown', { key: 'Enter' }));
+  assert.ok(t.env.document.body.querySelector('.dialog'), 'still open');
+  assert.deepEqual(t.routed, []);
+});
+
+test('arrows move over tagged elements and Enter taps the current one', () => {
+  const t = boot(questRound());
+  t.start();
+  t.key('ArrowRight'); // el-open
+  t.key('ArrowRight'); // el-help
+  t.key('Enter');
+  assert.equal(t.rows()[0].getAttribute('data-state'), 'now');
+  assert.equal(t.finished.length, 0);
+  t.key('ArrowLeft'); // back to el-open
+  t.key('Enter');
+  assert.equal(t.rows()[0].getAttribute('data-state'), 'done');
+});
+
+test('cleanup removes the iframe and the key handlers', () => {
+  const t = boot(questRound());
+  t.start();
+  t.cleanup();
+  assert.equal(t.root.querySelectorAll('iframe').length, 0);
+  t.key('r'); t.key('q');
+  assert.equal(t.env.document.body.querySelector('.dialog'), null);
+});
+
+test('score is 10 per objective plus 50 clean, minus 5 per wrong turn', () => {
+  const clean = boot(questRound());
+  clean.start(); finishRun(clean);
+  assert.equal(clean.results[0].xp, 2 * 10 + 50);
+  const dirty = boot(questRound());
+  dirty.start();
+  dirty.click('el-help'); dirty.click('el-help'); dirty.click('el-help');
+  finishRun(dirty);
+  assert.equal(dirty.results[0].xp, 2 * 10 - 3 * 5);
+});
+
+test('the expected path is decoded once per tap and never otherwise', () => {
+  const t = boot(questRound());
+  t.start();
+  t.key('ArrowRight'); t.key('r'); t.press('Cancel');
+  assert.equal(t.decodes(), 0);
+  t.click('el-help');
+  assert.equal(t.decodes(), 1);
+  t.click('el-open');
+  assert.equal(t.decodes(), 2);
+});
+
+test('exam mode does not name the required role', () => {
+  const t = boot(questRound({ mode: 'exam' }), { exam: true });
+  t.start(); t.click('el-open'); t.load('s2'); t.click('el-approve');
+  assert.match(t.root.textContent, /Wrong account for this step\./);
+  assert.doesNotMatch(t.root.textContent, /Manager/);
 });

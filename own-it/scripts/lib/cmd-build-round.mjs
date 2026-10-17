@@ -64,6 +64,8 @@ function checkQuest(input, byId) {
   }
   const start = byId.get(input.start);
   if (start.k !== 'surface' || byId.get(input.objectives[0].element).on !== input.start) throw new Error('start must be the screen of the first objective');
+  const { reach } = reachFrom(input.start, [...byId.values()]);
+  for (const o of input.objectives) if (!reach.has(byId.get(o.element).on)) throw new Error(`objective ${o.element} not reachable from start`);
 }
 
 // Surface ids a round shows, so a map-rung pass counts toward coverage.
@@ -115,13 +117,18 @@ function derive(game, round, byId, items) {
 
 // Navigation facts for a quest: every element on a screen the player can reach from `start` by following `goes`.
 // Plain data (not answers): the game needs them to move between screens and to know who may use what.
-function navFor(input, items) {
+function reachFrom(start, items) {
   const els = items.filter((x) => x.k === 'element' && typeof x.on === 'string');
-  const reach = new Set([input.start]);
+  const reach = new Set([start]);
   for (let grew = true; grew;) {
     grew = false;
     for (const e of els) if (reach.has(e.on) && typeof e.goes === 'string' && !reach.has(e.goes)) { reach.add(e.goes); grew = true; }
   }
+  return { els, reach };
+}
+
+function navFor(input, items) {
+  const { els, reach } = reachFrom(input.start, items);
   return Object.fromEntries(els.filter((e) => reach.has(e.on)).map((e) => {
     const n = { on: e.on };
     if (typeof e.goes === 'string') n.goes = e.goes;

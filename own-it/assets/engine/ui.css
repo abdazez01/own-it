@@ -499,5 +499,5 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .quest-tally { margin: 0; color: var(--ink-2); font-size: var(--fs-15); }
 .quest-summary { display: grid; gap: var(--s-2); }
 .quest-summary p { margin: 0; font-size: var(--fs-15); }
-@keyframes quest-flash { from { background: var(--sage-a35, var(--sage-a16)); } to { background: var(--sage-a16); } }
+@keyframes quest-flash { from { box-shadow: 0 0 0 4px var(--sage); } to { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .quest-row[data-state="done"] { animation: none; } }

@@ -248,6 +248,15 @@ test('screen-tour find answer must be a zone id; quest start must match first ob
   await assert.rejects(q('el1'), /start must be the screen of the first objective/);
 });
 
+test('quests reject an objective whose screen is not reachable from start via goes', async () => {
+  const root = await setup();
+  const m = loadModel(root);
+  m.zones.trips.items.push(I({ id: 's9', k: 'surface', label: 'Island' }), I({ id: 'el9', k: 'element', on: 's9', does: 'f1' }));
+  saveModel(root, m);
+  await assert.rejects(bld(root, 'quests', { zone: 'trips', flow: 'f1', goal: 'g', start: 's1',
+    objectives: [{ text: 'a', element: 'el1' }, { text: 'b', element: 'el9' }] }), /objective el9 not reachable from start/);
+});
+
 test('rounds carry plain labels for every referenced model id, never for a find answer', async () => {
   const root = await setup();
   const t = tour({ steps: [{ kind: 'find', prompt: 'Which control cancels?', element: 'el1', answer: 'el2' }] });

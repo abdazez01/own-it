@@ -55,6 +55,7 @@
     fallback.setAttribute('hidden', 'hidden');
     var feedback = OwnIt.el('div', { 'class': 'panel quest-feedback quiz-feedback', 'aria-live': 'polite' });
     [bar, screenBox, fallback, feedback].forEach(function (n) { area.appendChild(n); });
+    area.setAttribute('tabindex', '-1');
 
     // ---- side panel: objectives
     var goalEl = OwnIt.el('p', { 'class': 'quest-goal' }, (round && round.goal) || '');
@@ -149,7 +150,7 @@
       }
       var needs = own(nav, id) && nav[id].roles;
       if (needs && needs.length && needs.indexOf(role) < 0) {
-        wrongTurn(id, id, 'You are signed in as ' + L(role) + ', but this step is for ' + needs.map(L).join(' or ') + '. Press R to switch role.');
+        wrongTurn(id, id, exam ? 'Wrong account for this step.' : 'You are signed in as ' + L(role) + ', but this step is for ' + needs.map(L).join(' or ') + '. Press R to switch role.');
         return;
       }
       tick(id, step);
@@ -205,12 +206,13 @@
         OwnIt.flap(title, 'QUEST');
         listNode(dlg);
         var actions = OwnIt.el('div', { 'class': 'actions' });
-        actions.appendChild(OwnIt.button('Back', 'quiet', function () { api.close(); }));
+        var backBtn = OwnIt.button('Back', 'quiet', function () { api.close(); });
+        actions.appendChild(backBtn);
         function begin() { if (begun) return; begun = true; api.close(); }
         actions.appendChild(OwnIt.button('Start quest', 'primary', begin, { 'data-autofocus': '1' }));
         dlg.appendChild(actions);
         dlg.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') { e.preventDefault(); begin(); }
+          if (e.key === 'Enter' && e.target !== backBtn) { e.preventDefault(); begin(); }
         });
       }, { label: 'Quest', onClose: function () {
         if (done) return;
@@ -255,8 +257,7 @@
     }
 
     function focusScreen() {
-      var f = host && host.iframe;
-      if (f && f.focus) { try { f.focus(); } catch (e) { /* not focusable yet */ } }
+      if (area.focus) { try { area.focus(); } catch (e) { /* not focusable */ } }
     }
 
     // ---- keys
