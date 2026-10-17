@@ -92,8 +92,9 @@
 
   // ---------------------------------------------------------------- actions
 
-  function copyCommand(game, zone) {
+  function copyCommand(game, zone, pk) {
     var cmd = 'play ' + game + ' ' + zone;
+    if (pk) cmd += ' --level ' + pk.level + (pk.level === 'custom' ? ' --about "' + pk.about.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"' : '');
     var done = function () { OwnIt.toast('Copied. Paste it to Claude in the chat.'); };
     var fail = function () { OwnIt.toast("Couldn't copy. Type: " + cmd); };
     try {
@@ -118,6 +119,13 @@
     var v = OwnIt.chosenLevel || st.level;
     var ok = LEVELS.some(function (l) { return l.id === v; });
     return { level: ok ? v : 'medium', about: OwnIt.chosenAbout !== undefined ? OwnIt.chosenAbout : (typeof st.levelAbout === 'string' ? st.levelAbout : '') };
+  }
+
+  // Custom plays at its base level (set by Claude); the rest are their own base.
+  function baseOf(level) {
+    var p = progress(), st = p && p.settings ? p.settings : {};
+    if (level !== 'custom') return level;
+    return ['easy', 'medium', 'hard', 'impossible'].indexOf(st.levelBase) >= 0 ? st.levelBase : 'medium';
   }
 
   // Glass dialog: pick a level (Other needs a description), then onStart({level, about?}).
@@ -199,23 +207,29 @@
     if (OwnIt.link && OwnIt.link.mode === 'live') {
       var key = game + '|' + zone + '|' + pk.level + '|' + pk.about;
       // Hard defaults to Exam unless the player picked a mode on the dashboard.
-      var mode = pk.level === 'hard' && !OwnIt.modeChosen ? 'exam' : OwnIt.mode;
+      var mode = baseOf(pk.level) === 'hard' && !OwnIt.modeChosen ? 'exam' : OwnIt.mode;
       var ev = { game: game, zone: zone, mode: mode, level: pk.level };
       if (pk.level === 'custom') ev.about = pk.about;
       if (!building[key]) OwnIt.link.send('pick', ev);
       building[key] = true;
       var mount = document.getElementById('stage') || document.body;
+      var began = Date.now();
       runCleanup();
       OwnIt.building(mount, {
         game: game, zone: zone, name: meta ? meta.name : game,
-        isReady: function () { return !!roundFor(zone, game, pk); },
-        onReady: function () { OwnIt.router.go({ game: game, roundId: roundFor(zone, game, pk) }); },
+        // If Claude built the round at another level, open it anyway after a wait instead of spinning forever.
+        isReady: function () { return !!(roundFor(zone, game, pk) || (Date.now() - began >= OwnIt.home.fallbackMs && roundFor(zone, game))); },
+        onReady: function () {
+          var exact = roundFor(zone, game, pk);
+          if (!exact) OwnIt.toast('Opened a round built at another level.');
+          OwnIt.router.go({ game: game, roundId: exact || roundFor(zone, game) });
+        },
         onBack: function () { OwnIt.router.go('home'); },
-        onCopy: function () { copyCommand(game, zone); }
+        onCopy: function () { copyCommand(game, zone, pk); }
       });
       return;
     }
-    copyCommand(game, zone);
+    copyCommand(game, zone, pk);
   }
 
   // ---------------------------------------------------------------- pieces
@@ -364,7 +378,7 @@
     RUNG_CHARS.forEach(function (rc) {
       var v = z.rungs && z.rungs[rc[0]];
       // Impossible unlocks the boss rung.
-      if (rc[0] === 'boss' && v === 'locked' && lastLevel().level === 'impossible') v = 'open';
+      if (rc[0] === 'boss' && v === 'locked' && baseOf(lastLevel().level) === 'impossible') v = 'open';
       var cell = OwnIt.el('span', { 'class': 'rung-cell' + (v === 'cleared' ? ' c' : v === 'open' ? ' o' : ''), 'aria-hidden': 'true' }, rc[1]);
       row.appendChild(cell);
       if (v === 'cleared') done.push(rc[0]);
@@ -540,6 +554,7 @@
     return wrap;
   };
 
+  OwnIt.home.fallbackMs = 30000;
   OwnIt.home._pick = pick;
   OwnIt.home._reset = function () { entered = false; building = {}; selectedZone = null; };
 })();

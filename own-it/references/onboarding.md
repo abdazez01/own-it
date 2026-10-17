@@ -31,7 +31,7 @@ Extract zones (`extraction.md`, `screens.md`). Write `.own-it/recs.json` with 3-
 
 `serve` gives `{url}`; `open <url>` opens the browser. Say "Dashboard is open." Needs a desktop browser; on a remote machine forward the port (`ssh -L <port>:127.0.0.1:<port>`) and open the url locally. Background `wait`; react, then wait again:
 
-- `pick {game, zone, mode, level, about?}`: `level <x>` (custom: `--about <about> --base <nearest level>`), then `build-round` at that level (`about` sets depth per zone), then wait. Rebuild a pre-built round whose stored level differs. Never ask mode or level.
+- `pick {game, zone, mode, level, about?}`: `level <x>` (custom: `--about <about> --base <nearest level>`), then `build-round ... --level <x> [--base <b> --about <about>]` (`about` sets depth per zone), then wait. Rebuild a pre-built round whose stored level differs. Never ask mode or level.
 - `result`: `collect <round>`, grade free text. Practice: `build-feedback` and post the debrief in chat; Exam: no feedback file until the report card. `apply`, rebuild recs, wait.
 - `ask`: grade, `build-feedback` with `grades`, wait.
 - `challenge {id, item}`: see `grading.md` (also after `apply`), wait.
@@ -39,4 +39,4 @@ Extract zones (`extraction.md`, `screens.md`). Write `.own-it/recs.json` with 3-
 - `invalid`: skip, wait.
 - `{idle:true}`: wait silently. After 6 idle waits in a row say "Still here. Click in the page or type here." and stop.
 
-File mode (serve fails): `open` the file page; a pasted `play <game> <zone>` is a `pick`.
+File mode (serve fails): `open` the file page; a pasted `play <game> <zone> --level <x> [--about "<text>"]` is a `pick`.

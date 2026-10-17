@@ -880,3 +880,13 @@ test('build-round stores the stored level on the round and the session entry', a
   assert.equal(session.rounds[out.id].about, 'I know React');
   assert.match(readFileSync(join(root, '.own-it', 'data', `${out.id}.js`), 'utf8'), /"level": ?"custom"/);
 });
+
+test('build-round --level stamps the pick level, base and about', async () => {
+  const root = await setup();
+  const out = await build({ _: ['quiz', put(root, quiz())], flags: { level: 'custom', base: 'hard', about: 'I know React' } }, ctx(root));
+  const session = readJson(join(root, '.own-it', 'session.json'));
+  assert.deepEqual([session.rounds[out.id].level, session.rounds[out.id].levelBase, session.rounds[out.id].about], ['custom', 'hard', 'I know React']);
+  assert.match(readFileSync(join(root, '.own-it', 'data', `${out.id}.js`), 'utf8'), /"levelBase": ?"hard"/);
+  await assert.rejects(build({ _: ['quiz', put(root, quiz())], flags: { level: 'custom' } }, ctx(root)), /--base/);
+  await assert.rejects(build({ _: ['quiz', put(root, quiz())], flags: { level: 'nope' } }, ctx(root)), /--level/);
+});

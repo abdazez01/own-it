@@ -99,7 +99,9 @@
     dlg.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (opts.escape !== false) api.close(); return; }
       if (e.key !== 'Tab') return;
-      var f = dlg.querySelectorAll('button, input, textarea');
+      var f = Array.prototype.filter.call(dlg.querySelectorAll('button, input, textarea'), function (x) {
+        return x.getAttribute('tabindex') !== '-1' && !x.hasAttribute('hidden');
+      });
       if (!f.length) return;
       var first = f[0], last = f[f.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -138,18 +140,19 @@
   // Difficulty level: the dashboard stores it in progress settings. Custom plays at its base level. Absent means medium.
   var LEVEL_IDS = ['easy', 'medium', 'hard', 'impossible'];
   var HINT_COST = { easy: 0, medium: 15, hard: 30, impossible: 0 };
-  OwnIt.level = function () {
-    var p = window.OWNIT_PROGRESS, st = p && p.settings ? p.settings : {};
+  // The round's own level (stamped by build-round) wins over settings, which may be stale. Custom plays at its base.
+  OwnIt.level = function (roundId) {
+    var rounds = window.OWNIT_ROUNDS, rd = roundId && rounds && typeof rounds === 'object' ? rounds[roundId] : null;
+    var p = window.OWNIT_PROGRESS, st = rd && rd.level ? rd : (p && p.settings ? p.settings : {});
     var id = st.level === 'custom' ? st.levelBase : st.level;
     return LEVEL_IDS.indexOf(id) >= 0 ? id : 'medium';
   };
-  // XP one hint costs at the current level.
-  OwnIt.hintCost = function () { return HINT_COST[OwnIt.level()]; };
+  // XP one hint costs at the round's level.
+  OwnIt.hintCost = function (roundId) { return HINT_COST[OwnIt.level(roundId)]; };
 
   // Hint (5.16): costs XP, answer is one sentence labelled as a prediction.
-  function hintDialog(getHint) {
+  function hintDialog(getHint, cost) {
     return dialog(function (dlg, api) {
-      var cost = OwnIt.hintCost();
       dlg.appendChild(OwnIt.el('h2', null, cost ? 'Use a hint? It costs ' + cost + ' XP.' : 'Use a hint? It is free.'));
       var actions = OwnIt.el('div', { 'class': 'actions' });
       actions.appendChild(button('Not now', 'quiet', function () { api.close(); }));
@@ -211,7 +214,7 @@
     head.appendChild(OwnIt.el('span', { 'class': 'grow' }));
 
     var timerEl = null, scoreEl = null;
-    if (opts.timer !== false || OwnIt.level() === 'impossible') {
+    if (opts.timer !== false || OwnIt.level(ctx.roundId) === 'impossible') {
       var tw = OwnIt.el('div', { 'class': 'flap-label' });
       tw.appendChild(OwnIt.el('span', null, 'Time'));
       timerEl = OwnIt.el('span');
@@ -226,7 +229,7 @@
     head.appendChild(sw);
     OwnIt.flap(scoreEl, '0/' + (opts.total != null ? opts.total : 0));
 
-    var noHints = OwnIt.mode === 'exam' || OwnIt.level() === 'impossible';
+    var noHints = OwnIt.mode === 'exam' || OwnIt.level(ctx.roundId) === 'impossible';
     var hintBtn = button('Hint', 'secondary', function () { openHint(); }, noHints ? { disabled: 'disabled', title: 'Hints are off in this mode.' } : null);
     if (!opts.hint) hintBtn.setAttribute('hidden', 'hidden');
     head.appendChild(hintBtn);
@@ -255,7 +258,7 @@
     }
     var hints = 0;
     function openHint() {
-      if (!opts.hint || OwnIt.mode === 'exam' || OwnIt.level() === 'impossible') return;
+      if (!opts.hint || OwnIt.mode === 'exam' || OwnIt.level(ctx.roundId) === 'impossible') return;
       hintDialog(function () {
         hints++;
         if (OwnIt.link && OwnIt.link.mode === 'live') OwnIt.link.send('hint', { round: ctx.roundId });

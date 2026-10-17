@@ -81,7 +81,7 @@ test('pick in file mode copies command', async () => {
   home();
   Array.from(stage.querySelectorAll('.tile-game')).find((t) => t.getAttribute('data-game') === 'quiz').click();
   go(w);
-  assert.equal(copied, 'play quiz trips');
+  assert.equal(copied, 'play quiz trips --level medium');
   await new Promise((r) => setTimeout(r, 0));
 });
 

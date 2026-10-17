@@ -190,3 +190,72 @@ test('impossible marks the boss rung open on Home', () => {
   };
   assert.equal(cells({ level: 'impossible' }), cells({ level: 'hard' }) + 1);
 });
+
+test('the round level beats stale settings for hint cost and policy', () => {
+  const { w } = boot({ level: 'easy' });
+  w.OWNIT_ROUNDS = { r1: { level: 'hard' }, r2: { level: 'custom', levelBase: 'impossible' } };
+  assert.equal(w.OwnIt.hintCost('r1'), 30);
+  assert.equal(w.OwnIt.level('r2'), 'impossible');
+  assert.equal(w.OwnIt.hintCost('nope'), 0);
+  assert.equal(w.OwnIt.level(), 'easy');
+});
+
+test('a lone round at another level opens after the fallback delay', () => {
+  const { w, stage } = boot({ level: 'easy' });
+  w.OWNIT_ROUNDS = { 'trips-quiz-1': { level: 'hard' } };
+  live(w);
+  let played = null;
+  w.OwnIt.register({ id: 'quiz', name: 'Quiz', keys: [], play(root, r) { played = r; } });
+  w.OwnIt.home.fallbackMs = 0;
+  let cb = null;
+  w.OwnIt.link.onData = (f) => { cb = f; return () => {}; };
+  w.OwnIt.router.go('home');
+  tile(stage).click();
+  btn(w, 'Start').click();
+  assert.equal(played, null);
+  cb();
+  assert.equal(played.level, 'hard');
+});
+
+test('file mode copies the level, quoting about for Other', async () => {
+  const { w, stage } = boot({ level: 'hard' });
+  let copied = null;
+  w.navigator = { clipboard: { writeText: async (t) => { copied = t; } } };
+  w.OwnIt.router.go('home');
+  tile(stage).click();
+  btn(w, 'Start').click();
+  assert.equal(copied, 'play quiz trips --level hard');
+  tile(stage).click();
+  Array.from(dlg(w).querySelectorAll('.level-opt')).find((b) => b.getAttribute('data-id') === 'custom').click();
+  dlg(w).querySelector('textarea').value = 'I know "React"';
+  btn(w, 'Start').click();
+  assert.equal(copied, 'play quiz trips --level custom --about "I know \\"React\\""');
+});
+
+test('Shift+Tab on the first option wraps to Start', () => {
+  const { w, stage } = boot({});
+  w.OwnIt.router.go('home');
+  tile(stage).click();
+  const checked = dlg(w).querySelector('.level-opt[aria-checked="true"]');
+  checked.focus();
+  const ev = w.__env.event('keydown', { key: 'Tab', shiftKey: true });
+  dlg(w).dispatchEvent(ev);
+  assert.equal(ev.defaultPrevented, true);
+  assert.equal(w.document.activeElement.textContent, 'Start');
+});
+
+test('custom resolves to its base for the hard exam default and the boss unlock', () => {
+  const { w, stage } = boot({ level: 'custom', levelBase: 'hard', levelAbout: 'I know React' });
+  const sent = live(w);
+  w.OwnIt.router.go('home');
+  tile(stage).click();
+  btn(w, 'Start').click();
+  assert.equal(sent[0][1].mode, 'exam');
+  w.OwnIt.stopBuilding();
+  const open = (settings) => {
+    const b = boot(settings);
+    b.w.OwnIt.router.go('home');
+    return Array.from(b.stage.querySelectorAll('.rung-cell')).filter((c) => c.classList.contains('o')).length;
+  };
+  assert.equal(open({ level: 'custom', levelBase: 'impossible' }), open({ level: 'hard' }) + 1);
+});
