@@ -4,3 +4,4 @@ node_modules/
 *.tmp
 playground/
 docs/superpowers/gallery/
+brag-output/
