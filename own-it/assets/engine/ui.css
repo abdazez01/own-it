@@ -785,3 +785,12 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 }
 /* A game without a side panel uses the full shell width instead of reserving an empty column. */
 .shell:not(:has(> .side)) { grid-template-columns: minmax(0, 1fr); }
+
+/* Quests on wide screens: the screen copy sits left at full window height (scaled up by screenhost), role bar, fallback and feedback stack in a right column. */
+@media (min-width: 1600px) {
+  .quest-area { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-content: start; align-items: start; column-gap: var(--s-6); }
+  .quest-area > .quest-screen { grid-column: 1; grid-row: 1 / span 4; }
+  .quest-area > .quest-bar, .quest-area > .quest-fallback, .quest-area > .quest-feedback { grid-column: 2; margin-top: 0; }
+  .quest-screen { display: grid; justify-items: center; }
+  .quest-screen .screen-frame { width: fit-content; }
+}
