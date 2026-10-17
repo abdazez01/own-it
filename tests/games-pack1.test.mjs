@@ -14,6 +14,7 @@ const live = [];
 after(() => live.forEach((f) => { try { f(); } catch { /* already cleaned */ } }));
 
 function boot(game, round) {
+  Math.random = () => 0;
   const env = createEnv({ reduced: true });
   env.load(...FILES);
   const w = env.window;
@@ -60,7 +61,14 @@ const mmRound = () => ({
   labels: {},
 });
 const mmCards = (t) => Array.from(t.root.querySelectorAll('.mm-card'));
-const cardOf = (t, kind, idx) => mmCards(t).find((c) => c.getAttribute('data-kind') === kind && c.getAttribute('data-idx') === String(idx));
+// The DOM carries no ids. With Math.random fixed at 0 the game's shuffle is known: replay it to find a card by what it is.
+function layout(n) {
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(['term', i], ['meaning', i]);
+  for (let i = a.length - 1; i > 0; i--) { const j = 0, x = a[i]; a[i] = a[j]; a[j] = x; }
+  return a;
+}
+const cardOf = (t, kind, idx) => mmCards(t)[layout(N).findIndex((c) => c[0] === kind && c[1] === idx)];
 const flip = (t, kind, idx) => cardOf(t, kind, idx).click();
 
 test('memory-match: registers, shows 2n face-down cards, decodes only when a term meets a meaning', () => {
@@ -68,6 +76,7 @@ test('memory-match: registers, shows 2n face-down cards, decodes only when a ter
   assert.equal(t.w.OwnIt.games.get('memory-match').id, 'memory-match');
   assert.equal(mmCards(t).length, 8);
   assert.ok(!/Alpha/.test(t.root.textContent), 'faces are hidden');
+  assert.ok(mmCards(t).every((c) => !c.hasAttribute('data-kind') && !c.hasAttribute('data-idx')), 'no pairing hints in the DOM');
   flip(t, 'term', 0);
   assert.equal(t.decodes(), 0);
   assert.match(t.root.textContent, /Alpha/);
@@ -196,7 +205,8 @@ const crRound = () => ({
   cards: [{ id: 'c', label: 'Third' }, { id: 'a', label: 'First' }, { id: 'b', label: 'Second' }],
 });
 const crCards = (t) => Array.from(t.root.querySelectorAll('.cr-card'));
-const crClick = (t, id) => crCards(t).find((c) => c.getAttribute('data-id') === id).click();
+const crLabel = { a: 'First', b: 'Second', c: 'Third' };
+const crClick = (t, id) => crCards(t).find((c) => c.textContent.endsWith(crLabel[id])).click();
 
 test('chain-reaction: in-order clicks score 10 each with a rising combo', () => {
   const t = boot('chain-reaction', crRound());
@@ -215,6 +225,7 @@ test('chain-reaction: in-order clicks score 10 each with a rising combo', () => 
 
 test('chain-reaction: a wrong click explodes (shake, wrong), the step is retried, only the streak is lost', () => {
   const t = boot('chain-reaction', crRound());
+  assert.ok(crCards(t).every((c) => !c.hasAttribute('data-id')), 'no model ids in the DOM');
   crClick(t, 'a');
   assert.equal(t.decodes(), 1, 'decoded on the click, not before');
   crClick(t, 'a'); // already lit: ignored
@@ -227,7 +238,8 @@ test('chain-reaction: a wrong click explodes (shake, wrong), the step is retried
   assert.equal(t.finished.length, 1);
   assert.equal(t.results[0].xp, 30);
   assert.deepEqual(plain(t.finished[0].wrong), [['c', 'b']]);
-  assert.deepEqual(plain(t.finished[0].missed), ['b']);
+  assert.deepEqual(plain(t.finished[0].missed), [], 'a step lit after a retry is done');
+  assert.match(t.results[0].missed.map((m) => m.text).join(' '), /Lit after a retry.*Second/);
 });
 
 test('chain-reaction: the fuse burns 30 s with ticks in the last 5, then the unlit steps are missed', () => {

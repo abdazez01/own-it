@@ -73,7 +73,7 @@
         c.pos = pos;
         c.up = false;
         c.matched = false;
-        c.el = OwnIt.el('button', { type: 'button', 'data-kind': c.kind, 'data-idx': String(c.idx) });
+        c.el = OwnIt.el('button', { type: 'button' }); // no ids in the DOM: kind and index live in this closure only
         c.el.addEventListener('click', function () { cur = pos; flip(c); });
         paint(c);
         cards.push(c);

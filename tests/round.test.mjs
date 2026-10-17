@@ -314,19 +314,27 @@ test('build-round regenerates rounds.js with every round', async () => {
 const pairs = (n = 4) => Array.from({ length: n }, (_, i) => ({ term: `Term number ${i}`, meaning: `What term ${i} means for a rider` }));
 const lie = (over = {}) => ({ zone: 'trips', statements: Array.from({ length: 5 }, (_, i) => ({ text: `Statement ${i} about trips`, why: `Reason ${i} in plain words` })), answer: 2, ...over });
 
-test('memory-match: shuffled meanings, pairing obfuscated, ids absent', async () => {
+test('memory-match: terms and meanings are randomly permuted, pairing only in the obfuscated answer', async () => {
   const root = await setup();
-  const out = await bld(root, 'memory-match', { zone: 'trips', pairs: pairs(5) });
-  assert.equal(out.id, 'trips-memory-match-1');
-  const r = loadRound(root, out.id);
-  assert.equal(r.pairs, undefined);
-  assert.equal(r.terms.length, 5);
-  assert.equal(r.meanings.length, 5);
-  assert.equal(typeof r.answer, 'string');
-  const map = core.decode(r.answer);
-  r.terms.forEach((t, i) => assert.equal(r.meanings[map[i]], `What term ${t.split(' ')[2]} means for a rider`));
-  assert.notDeepEqual(map, [0, 1, 2, 3, 4], 'meanings are not in term order');
-  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds[out.id].rung, 'words');
+  const maps = new Set(), termOrders = new Set();
+  for (let k = 0; k < 20; k++) {
+    const n = 4 + (k % 3);
+    const out = await bld(root, 'memory-match', { zone: 'trips', pairs: pairs(n) });
+    const r = loadRound(root, out.id);
+    if (k === 0) assert.equal(out.id, 'trips-memory-match-1');
+    assert.equal(r.pairs, undefined);
+    assert.equal(r.terms.length, n);
+    assert.equal(r.meanings.length, n);
+    assert.equal(typeof r.answer, 'string');
+    const map = core.decode(r.answer);
+    r.terms.forEach((t, i) => assert.equal(r.meanings[map[i]], `What term ${t.split(' ')[2]} means for a rider`));
+    assert.ok(map.every((m, i) => m !== i), 'no meaning sits at its own term position');
+    assert.ok(![...Array(n).keys()].some((off) => map.every((m, i) => m === (i + off) % n)), 'not a fixed offset or rotation');
+    maps.add(map.join()); termOrders.add(r.terms.join());
+  }
+  assert.ok(maps.size > 3, 'mappings vary between builds');
+  assert.ok(termOrders.size > 3, 'term order varies between builds');
+  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds['trips-memory-match-1'].rung, 'words');
 });
 
 test('memory-match: 3 or 9 pairs, duplicates and identifier-only text are rejected', async () => {
@@ -375,6 +383,13 @@ test('chain-reaction: steps derived from the flow, scrambled cards, ordered answ
   assert.deepEqual(core.decode(r.answer), ['s1', 'c1', 's2']);
   assert.deepEqual(r.cards.map((c) => c.id).sort(), ['c1', 's1', 's2']);
   assert.notDeepEqual(r.cards.map((c) => c.id), ['s1', 'c1', 's2'], 'data order does not give the answer away');
+  const orders = new Set();
+  for (let k = 0; k < 20; k++) {
+    const o = loadRound(root, (await bld(root, 'chain-reaction', { zone: 'trips', flow: 'f2' })).id).cards.map((c) => c.id);
+    assert.notDeepEqual(o, ['s1', 'c1', 's2']);
+    orders.add(o.join());
+  }
+  assert.ok(orders.size > 1, 'card order is shuffled, not sorted');
   assert.equal(r.labels.f2.label, 'Pay out');
   assert.equal(r.labels.c1.label, 'Trip service');
   assert.equal(r.flow, 'f2');

@@ -49,7 +49,7 @@
 
     var nums = [];
     var els = cards.map(function (c, i) {
-      var b = OwnIt.el('button', { type: 'button', 'class': 'cr-card', 'data-id': c.id });
+      var b = OwnIt.el('button', { type: 'button', 'class': 'cr-card' });
       var num = OwnIt.el('span', { 'class': 'cr-num', 'aria-hidden': 'true' }, i < 9 ? String(i + 1) : '');
       nums.push(num);
       b.appendChild(num);
@@ -136,12 +136,13 @@
       done = true;
       stopFuse();
       var seq = sequence();
-      var missedIds = seq.filter(function (id) { return boomed[id] || !lit[id]; });
+      var missedIds = seq.filter(function (id) { return !lit[id]; });
       var byId = {};
       cards.forEach(function (c) { byId[c.id] = c; });
-      var review = missedIds.map(function (id) {
-        return { text: 'Step ' + (seq.indexOf(id) + 1) + ' of ' + total + ': ' + (byId[id] ? L(byId[id]) : id) + '.' };
-      });
+      var say = function (id, lead) {
+        return { text: lead + 'Step ' + (seq.indexOf(id) + 1) + ' of ' + total + ': ' + (byId[id] ? L(byId[id]) : id) + '.' };
+      };
+      var review = seq.filter(function (id) { return boomed[id] || !lit[id]; }).map(function (id) { return say(id, lit[id] ? 'Lit after a retry. ' : ''); });
       kit.finish(shell, ctx, { game: 'chain-reaction', mode: mode, got: progress, of: total, xp: progress * XP_STEP, missed: missedIds, review: review, extra: { wrong: wrong } });
     }
 

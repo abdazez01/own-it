@@ -1,4 +1,5 @@
 import { readFileSync, existsSync } from 'node:fs';
+import { randomInt } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { check, loadSchema } from './validate.mjs';
 import { getGame, GAMES_DIR } from './games.mjs';
@@ -24,6 +25,13 @@ const IDS = {
   'spot-the-lie': () => [],
   'chain-reaction': (r) => [r.flow],
 };
+
+// Fisher-Yates with a cryptographic source, so a shuffled order cannot be predicted.
+function shuffle(list) {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
 
 const cardOf = (it) => ({ id: it.id, label: it.label ?? it.id, kind: it.k, ref: it.ref, conf: it.conf });
 
@@ -145,17 +153,22 @@ function derive(game, round, byId, items) {
     round.cards = round.cards.map((id) => cardOf(byId.get(id)));
     round.answer = { edges: items.filter((x) => x.k === 'edge' && set.has(x.from) && set.has(x.to)).map((x) => ({ id: x.id, from: x.from, to: x.to })) };
   } else if (game === 'memory-match') {
-    // Meanings sit one place off the terms, so the data order gives nothing away; the pairing is the obfuscated answer.
+    // Terms and meanings are each randomly permuted, and no meaning sits at its own term's place or at a fixed offset from it,
+    // so the data order gives nothing away; the pairing is only in the obfuscated answer.
     const n = round.pairs.length;
-    round.terms = round.pairs.map((p) => p.term);
-    round.meanings = round.pairs.map((_, j) => round.pairs[(j + 1) % n].meaning);
-    round.answer = round.pairs.map((_, i) => (i - 1 + n) % n);
+    const p = shuffle([...Array(n).keys()]);
+    let q;
+    do q = shuffle([...Array(n).keys()]);
+    while (q.some((x, j) => x === p[j]) || [...Array(n).keys()].some((off) => q.every((x, j) => x === p[(j + off) % n])));
+    round.terms = p.map((i) => round.pairs[i].term);
+    round.meanings = q.map((i) => round.pairs[i].meaning);
+    round.answer = p.map((i) => q.indexOf(i));
     delete round.pairs;
   } else if (game === 'chain-reaction') {
     const order = flowSteps(byId.get(round.flow), byId);
-    const scrambled = order.map((id) => cardOf(byId.get(id)))
-      .sort((a, b) => String(a.label).localeCompare(String(b.label)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    if (scrambled.every((c, i) => c.id === order[i])) scrambled.reverse();
+    let scrambled = shuffle(order);
+    while (scrambled.every((id, i) => id === order[i])) scrambled = shuffle(order);
+    scrambled = scrambled.map((id) => cardOf(byId.get(id)));
     round.cards = scrambled;
     round.answer = order;
   }
