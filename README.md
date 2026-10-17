@@ -13,6 +13,7 @@
   <img alt="Node 18+" src="https://img.shields.io/badge/node-%E2%89%A518-5A7BA8?style=flat-square&labelColor=1A1B1F">
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-E8C26A?style=flat-square&labelColor=1A1B1F">
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-F5F3EE?style=flat-square&labelColor=1A1B1F">
+  <img alt="About 1k tokens per round" src="https://img.shields.io/badge/tokens-~1k%20per%20round-8FD3A8?style=flat-square&labelColor=1A1B1F">
 </p>
 
 <p align="center">
@@ -36,6 +37,26 @@ You don't need to remember line numbers. You do need to answer:
 - *Why this design and not the obvious alternative?*
 
 own-it reads your repo, splits it into **zones** (Trips, Payments, Auth…), and builds games from what it finds: your app's own words, flows, roles and screens.
+
+## Built to be cheap
+
+Most AI study tools burn tokens on every question. own-it doesn't: **the game runs in your browser, not in the chat.**
+
+| | Tokens |
+|---|---|
+| While you play a round in the page | **0**: the page scores it itself, and Claude only wakes for results |
+| Building one quiz round | **~1,100** |
+| A full session of 6 rounds, with grading and feedback | **~10,400** |
+| Reading a zone's code (once, cached afterwards) | capped at 30k, **~1,500** on the sample app |
+
+<sub>Measured in the v2 end-to-end run on the bundled sample app. Big codebases cost more to read once, and the same per round.</sub>
+
+How:
+
+- **A script does the chores.** A zero-dependency Node helper scans, validates, derives answers, shuffles, scores and saves progress. Claude never spends tokens on mechanical work.
+- **Claude writes only small data.** Each game is a ready-made template, and Claude fills in a short JSON round instead of writing a page.
+- **Cheap jobs go to cheap models.** Question drafting goes to Haiku and code reading to Sonnet. Your main model is kept for grading and the boss.
+- **Docs load only when needed.** The skill is split into small files Claude reads one phase at a time, each with a word budget the tests enforce.
 
 ## How it plays
 
@@ -106,7 +127,7 @@ Most games play from the keyboard, and the dashboard has sound effects, confetti
 
 - **Never edits your code.** own-it writes only inside `.own-it/`, even if you ask it to fix something mid-game. If it spots a bug, it tells you.
 - **Screens are safe copies.** Quests run on sanitized rebuilds of your screens with fake data. They have no login, no backend and no scripts, and run in a locked-down frame.
-- **Token-lean.** A zero-dependency Node helper does the mechanical work: scanning, validation, grading math and progress. Claude writes only the round data. Cheap jobs go to Haiku, extraction to Sonnet, with at most 2 helper agents at once.
+- **Token-lean.** About 1k tokens per round and 0 while you play. See [Built to be cheap](#built-to-be-cheap).
 - **Spoiler-safe.** Answers are hidden in the page data and only revealed when you act.
 
 ## Install
