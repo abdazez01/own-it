@@ -134,8 +134,10 @@
 
     // ---- geometry
     // Labels wrap at spaces only, so a card grows to the height its longest label needs at width w (about 7 px a character, 17 px a line).
+    // K grows the board with its width (wide screens): bigger cards, gaps and type. F is the type scale (K times the root font scale).
+    var K = 1, F = 1;
     function cardHeight(w) {
-      var perLine = Math.max(4, Math.floor((w - 22) / 7)), most = 1;
+      var perLine = Math.max(4, Math.floor((w - 22 * K) / (7 * F))), most = 1;
       ids.forEach(function (id) {
         var lines = 1, used = 0;
         String(L(id)).split(/\s+/).forEach(function (word) {
@@ -144,12 +146,18 @@
         });
         most = Math.max(most, lines);
       });
-      return Math.max(CARD_H, most * 17 + 16);
+      return Math.max(CARD_H * K, most * 17 * F + 16 * K);
     }
 
     function relayout() {
       var rect = board.getBoundingClientRect ? board.getBoundingClientRect() : null;
       var W = Math.max(240, Math.round((rect && rect.width) || 640));
+      var rootPx = 16;
+      try { rootPx = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16; } catch (e) { rootPx = 16; }
+      K = W >= 1300 ? Math.min(1.7, W / 1100) : 1;
+      F = K * rootPx / 16;
+      if (board.style.setProperty) board.style.setProperty('--wb-k', String(K));
+      var PAD = 16 * K, GAP_FLOW = 64 * K + Math.max(0, W - 1100) * 0.2, GAP_ROW = 14 * K, MAX_W = 170 * K;
       // only the layers that hold cards take space
       var used = [0, 1].filter(function (l) { return ids.some(function (id) { return lay[id].layer === l; }); });
       var groups = used.map(function (l) {
