@@ -6,5 +6,7 @@
   "examReady": true,
   "usesScreens": false,
   "stage": "2.2",
-  "line": "Pick the design you would ship and the real reason it beats the alternative."
+  "line": "Pick the design you would ship and the real reason it beats the alternative.",
+  "keys": "A, B",
+  "logo": "<svg viewBox=\"0 0 24 24\"><path d=\"M4 4l16 16M20 20h-5M20 20v-5\"/><path stroke=\"#E8C26A\" d=\"M20 4L4 20M4 20h5M4 20v-5\"/></svg>"
 }

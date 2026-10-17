@@ -14,7 +14,9 @@ const META = { type: 'object', required: ['id', 'name', 'rung', 'minutes', 'exam
   examReady: { type: 'boolean' },
   usesScreens: { type: 'boolean' },
   stage: { type: 'string', enum: ['2.0', '2.1', '2.2'] },
-  line: { type: 'string', max: 140 } } };
+  line: { type: 'string', max: 140 },
+  keys: { type: 'string', max: 40 },
+  logo: { type: 'string', pattern: '^<svg viewBox="0 0 24 24">[^]*</svg>$' } } };
 
 // Per-directory cache: the metas are read and validated once per process.
 const cache = new Map();

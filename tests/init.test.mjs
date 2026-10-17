@@ -75,3 +75,18 @@ test('init rejects duplicate zone ids', async () => {
   const zf = zonesFile(root, [{ id: 'a', name: 'A', paths: ['x'] }, { id: 'a', name: 'B', paths: ['y'] }]);
   await assert.rejects(init({ _: [], flags: { zones: zf } }, ctx(root)), /invalid zones file: duplicate zone id "a"/);
 });
+
+test('init copies engine and registry', async () => {
+  const root = tmpProject({});
+  await init({ _: [], flags: { zones: zonesFile(root, [{ id: 'a', name: 'A', paths: ['x'] }]) } }, ctx(root));
+  const base = join(root, '.own-it');
+  for (const f of ['game.html', 'engine/shell.js', 'engine/home.js', 'engine/tokens.css', 'brand/mark.svg', 'brand/favicon.svg', 'games/quiz.meta.json']) {
+    assert.ok(existsSync(join(base, f)), f);
+  }
+  const reg = readFileSync(join(base, 'games', 'registry.js'), 'utf8');
+  assert.match(reg, /^window\.OWNIT_GAMES = \[/);
+  const games = JSON.parse(reg.replace(/^window\.OWNIT_GAMES = /, '').replace(/;\s*$/, ''));
+  assert.equal(games.length, 18);
+  assert.ok(games.every((g) => g.logo.startsWith('<svg') && g.keys));
+  assert.doesNotMatch(readFileSync(join(base, 'game.html'), 'utf8'), /prefers-color-scheme/);
+});
