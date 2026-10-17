@@ -40,8 +40,14 @@ export const ITEM = { type: 'object', required: ['id', 'k', 'ref', 'conf'], prop
   ref: { type: 'string', pattern: '^[^:]+:\\d+$' },
   conf: { type: 'string', enum: ['high', 'medium', 'low'] },
   outside: { type: 'boolean' } } };
+export const WEAKNESS = { type: 'object', required: ['id', 'kind', 'text', 'why', 'ref', 'steps'], props: {
+  id: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,24}$' },
+  kind: { type: 'string', enum: ['role', 'double', 'order', 'input'] },
+  text: { type: 'string', max: 160 }, why: { type: 'string', max: 300 },
+  ref: { type: 'string', pattern: '^[^:]+:\\d+$' },
+  steps: { type: 'array', min: 1, max: 4, items: { type: 'object', required: ['element'], props: { element: str, role: str } } } } };
 export const EXTRACTION = { type: 'object', required: ['zone', 'files', 'items'], props: {
-  zone: str, files: ids, items: { type: 'array', items: ITEM, max: 80 } } };
+  zone: str, files: ids, items: { type: 'array', items: ITEM, max: 80 }, weaknesses: { type: 'array', max: 5 } } };
 export const ZONES = { type: 'object', required: ['zones'], props: { zones: { type: 'array', min: 1, items: {
   type: 'object', required: ['id', 'name', 'paths'], props: {
     id: { type: 'string', pattern: '^[a-z0-9-]{1,24}$' }, name: str, paths: { type: 'array', min: 1, items: str } } } } } };

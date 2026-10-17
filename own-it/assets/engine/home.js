@@ -41,7 +41,7 @@
   // First round id for '<zone>-<game>-<n>' in OWNIT_ROUNDS, or null.
   // A round built at another level (or for another custom description) does not match. Old rounds count as medium.
   function levelMatches(rd, pk) {
-    if (!pk) return true;
+    if (!pk) return !(rd && rd.level === 'secret');
     var lv = (rd && rd.level) || 'medium';
     return lv === pk.level && (lv !== 'custom' || ((rd && rd.about) || '') === pk.about);
   }
@@ -129,7 +129,7 @@
   }
 
   // Glass dialog: pick a level (Other needs a description), then onStart({level, about?}).
-  function levelPicker(onStart) {
+  function levelPicker(onStart, where) {
     var current = lastLevel().level;
     var note = null, area = null, rows = [];
     return OwnIt.dialog(function (dlg, api) {
@@ -161,23 +161,36 @@
         OwnIt.sound('press');
         OwnIt.chosenLevel = current;
         if (current === 'custom') OwnIt.chosenAbout = about;
+        if (current === 'secret' && OwnIt.secret) {
+          OwnIt.secret.shatter(dlg, lastClick.x, lastClick.y, function () { api.close(); OwnIt.secret.dark(function () { onStart({ level: 'secret' }); }); });
+          return;
+        }
         api.close();
         onStart(current === 'custom' ? { level: current, about: about } : { level: current });
+      }
+      var lastClick = { x: undefined, y: undefined };
+      function wire(b, i) {
+        b.addEventListener('keydown', function (e) {
+          var d = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
+          if (d) { e.preventDefault(); choose(rows[(i + d + rows.length) % rows.length].getAttribute('data-id'), true); }
+          else if (e.key === 'Enter') { e.preventDefault(); start(); }
+        });
+        rows.push(b);
+        group.appendChild(b);
       }
       LEVELS.forEach(function (l, i) {
         var b = OwnIt.el('button', { type: 'button', role: 'radio', 'class': 'level-opt', 'data-id': l.id });
         b.appendChild(OwnIt.el('strong', null, l.label));
         b.appendChild(OwnIt.el('span', { 'class': 'level-desc' }, l.text));
         b.addEventListener('click', function () { choose(l.id, false); });
-        b.addEventListener('keydown', function (e) {
-          var d = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
-          if (d) { e.preventDefault(); choose(LEVELS[(i + d + LEVELS.length) % LEVELS.length].id, true); }
-          else if (e.key === 'Enter') { e.preventDefault(); start(); }
-        });
         if (l.id === current) b.setAttribute('data-autofocus', '1');
-        rows.push(b);
-        group.appendChild(b);
+        wire(b, i);
       });
+      // The hidden Secret option appears only when Claude recorded a weakness for this game's zone.
+      var zp = where && progress() && progress().zones ? progress().zones[where.zone] : null;
+      if (where && OwnIt.secret && OwnIt.secret.isAvailable(where.game, zp)) {
+        wire(OwnIt.secret.option(function (e) { lastClick = { x: e && e.clientX, y: e && e.clientY }; choose('secret', false); start(); }), LEVELS.length);
+      }
       dlg.appendChild(group);
       area = OwnIt.el('textarea', { 'class': 'level-about', maxlength: '300', rows: '3', 'aria-label': 'Describe what you know', placeholder: 'e.g. I built checkout and auth, never touched billing' });
       area.value = lastLevel().about;
@@ -196,7 +209,7 @@
   function pick(game, zone) {
     if (!isBuilt(game)) { OwnIt.toast('That game is coming in a later update'); return; }
     if (!zone) { OwnIt.toast('No zones yet. Ask Claude to set up your zones.'); return; }
-    levelPicker(function (pk) { start(game, zone, pk); });
+    levelPicker(function (pk) { start(game, zone, pk); }, { game: game, zone: zone });
   }
 
   function start(game, zone, pk) {

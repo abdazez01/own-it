@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
-import { check, EXTRACTION, ITEM } from './validate.mjs';
+import { check, EXTRACTION, ITEM, WEAKNESS } from './validate.mjs';
 import { loadModel, saveModel, zoneFiles } from './model.mjs';
 import { hashesFor, lineCount } from './hash.mjs';
 import { toPosix } from './paths.mjs';
@@ -89,6 +89,22 @@ export async function run(args, ctx) {
     }
   }
 
+  // Weaknesses (the Secret level): kept only with a real ref and steps that name elements (and roles) that survived.
+  const sound = (w) => {
+    if (check(w, WEAKNESS).length) return false;
+    const f = confine(ctx.root, fileOf(toPosix(w.ref)));
+    const line = lineOf(w.ref);
+    if (!f || !existsSync(resolve(ctx.root, f)) || line < 1 || line > lineCount(ctx.root, f)) return false;
+    return w.steps.every((s) => merged.get(s.element)?.k === 'element' && (s.role === undefined || merged.get(s.role)?.k === 'role'));
+  };
+  const weak = new Map();
+  for (const w of zone.weaknesses || []) if (!reExtracted.has(fileOf(w.ref)) && sound(w)) weak.set(w.id, w);
+  for (const w of Array.isArray(ex.weaknesses) ? ex.weaknesses : []) {
+    if (w && typeof w === 'object' && sound(w)) weak.set(w.id, { ...w, ref: `${confine(ctx.root, fileOf(toPosix(w.ref)))}:${lineOf(w.ref)}` });
+    else drop(w && w.id, 'weakness');
+  }
+  if (weak.size) zone.weaknesses = [...weak.values()]; else delete zone.weaknesses;
+
   zone.items = [...merged.values()];
   // Partial re-extraction only re-stamps what was re-read, so changes elsewhere stay detectable as stale.
   const stamp = firstExtraction ? [...inZone] : [...reExtracted];
@@ -97,6 +113,8 @@ export async function run(args, ctx) {
 
   const est = estimate(raw);
   const progress = loadProgress(ctx.root);
+  // The page learns whether the Secret level is on offer from this count.
+  if (Object.hasOwn(progress.zones, ex.zone) && (weak.size || progress.zones[ex.zone].weaknesses !== undefined)) progress.zones[ex.zone].weaknesses = weak.size;
   progress.tokens.push({ t: ctx.now().toISOString(), kind: 'extraction', zone: ex.zone, est });
   saveProgress(ctx.root, progress);
 
