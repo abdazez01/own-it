@@ -304,6 +304,15 @@ function checkWeakness(w, input, byId, nav) {
   }
 }
 
+// The model items whose code a round is about: the ids it names (decoy choices left out), the steps of any flow, the parts that break.
+function whereIds(game, input, round, named) {
+  const ids = new Set(named);
+  const dropDecoys = (entries) => entries.forEach((e) => (e.choices || []).forEach((c) => { if (c !== e.answer) ids.delete(c); }));
+  if (game === 'screen-tour') dropDecoys(input.steps.filter((s) => s.kind !== 'role'));
+  if (game === 'guess-the-screen') dropDecoys(input.screens);
+  return ids;
+}
+
 export async function run(args, ctx) {
   const [game, arg] = args._;
   if (!game || !arg) throw new Error('usage: build-round <game> <file>');
@@ -371,7 +380,16 @@ export async function run(args, ctx) {
   const progress = loadProgress(ctx.root);
   const id = `${input.zone}-${game}-${progress.seq + 1}`;
   const round = { ...input };
-  derive(game, round, byId, items);
+  // The pick's level (--level, --base, --about) wins; else the level stored by the `level` command.
+  const fl = args.flags;
+  let st = progress.settings;
+  if (fl.level !== undefined) {
+    if (![...LEVELS, 'custom', 'secret'].includes(fl.level)) throw new Error('--level must be easy, medium, hard, impossible, custom or secret');
+    if (fl.level === 'custom' && !['easy', 'medium', 'hard', 'impossible'].includes(fl.base)) throw new Error('--base <easy|medium|hard|impossible> is required for custom');
+    st = { level: fl.level, levelBase: fl.base, levelAbout: typeof fl.about === 'string' ? fl.about.trim() : undefined };
+  }
+  const lvl = st.level ? { level: st.level, ...(st.level === 'custom' ? { about: st.levelAbout, levelBase: st.levelBase } : {}) } : {};
+  derive(game, round, byId, items, st.level === 'custom' ? st.levelBase : st.level);
   if (game === 'escape-room') checkRepeats(input, progress.zones[input.zone]?.usedPuzzles || [], items);
   // Movers that are not model roles are shown as written, so they must read as words.
   if (game === 'data-detective') round.who.forEach((w) => { if (!byId.has(w.id) && identifierOnly(w.label)) throw new Error(`identifier-only answer in a transition "by"; ${HINT}`); });
@@ -390,15 +408,6 @@ export async function run(args, ctx) {
     round.secret = { kind: w.kind, answer: { steps: w.steps, text: w.text, why: w.why, ref: w.ref } };
     for (const s of w.steps) if (s.role) labelIds.add(s.role);
   } else if (input.weakness !== undefined) throw new Error('weakness needs --level secret');
-  // The pick's level (--level, --base, --about) wins; else the level stored by the `level` command.
-  const fl = args.flags;
-  let st = progress.settings;
-  if (fl.level !== undefined) {
-    if (![...LEVELS, 'custom', 'secret'].includes(fl.level)) throw new Error('--level must be easy, medium, hard, impossible, custom or secret');
-    if (fl.level === 'custom' && !['easy', 'medium', 'hard', 'impossible'].includes(fl.base)) throw new Error('--base <easy|medium|hard|impossible> is required for custom');
-    st = { level: fl.level, levelBase: fl.base, levelAbout: typeof fl.about === 'string' ? fl.about.trim() : undefined };
-  }
-  const lvl = st.level ? { level: st.level, ...(st.level === 'custom' ? { about: st.levelAbout, levelBase: st.levelBase } : {}) } : {};
   if (game === 'case-file') {
     // The level decides how many clues and suspects the page shows; the case is checked first, so a bad case still writes nothing.
     scaleCase(round, st.level === 'custom' ? st.levelBase : (st.level || 'medium'), byId, items);
@@ -407,7 +416,13 @@ export async function run(args, ctx) {
   }
   if (game === 'next-tick') nextTickRound(round, lvl.level === 'custom' ? lvl.levelBase : lvl.level);
   const rung = secret ? 'break' : meta.rung; // a find is a claim on the Break rung
-  const data = { id, game, zone: input.zone, rung, ...lvl, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
+  // "Where this lives in your code" (case-file shows its own culprit ref): file:line for the items the round is about, obfuscated and shown only when the round finishes.
+  const used = whereIds(game, input, round, named);
+  for (const id of [...used]) if (byId.get(id)?.k === 'flow') for (const step of flowSteps(byId.get(id), byId)) used.add(step);
+  if (game === 'blast-radius') for (const id of round.answer) used.add(id);
+  const where = [...used].map((id) => byId.get(id)).filter((it) => it && typeof it.ref === 'string' && it.ref.trim())
+    .map((it) => ({ label: typeof it.label === 'string' && it.label.trim() ? it.label : it.id, ref: it.ref.trim() }));
+  const data = { id, game, zone: input.zone, rung, ...lvl, ...obfuscate(round), ...(where.length && game !== 'case-file' ? { where: core.encode(where) } : {}), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.
   const sessionPath = ownItPath(ctx.root, 'session.json');

@@ -42,3 +42,4 @@ The player picks per game on Home:
 - **Secret** (hidden; `quests`, zone has `weaknesses`): break it. Not stored by `level`.
 
 `build-recs` orders by the last level used (other uses its base). Rounds store their level; the page applies hint and timer policy. `case-file` scales: easy 4 clues, 2 suspects; hard 5 suspects; impossible timed.
+Pipe plumber scales: bigger grid, decoys; hard adds locks, par; impossible a timer.

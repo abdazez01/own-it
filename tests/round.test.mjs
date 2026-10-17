@@ -472,6 +472,33 @@ test('blast-radius: damage set is reverse reachability over edges, nearest first
   assert.ok(orders.size > 3, 'card order is shuffled');
 });
 
+test('blast-radius: each broken part carries a one-line reason from its dependency edge, obfuscated', async () => {
+  const root = await blastSetup();
+  const r = loadRound(root, (await bld(root, 'blast-radius', { zone: 'trips', target: 'c2' })).id);
+  assert.equal(typeof r.why, 'string', 'the reasons are obfuscated');
+  assert.ok(!JSON.stringify({ ...r, answer: undefined, why: undefined }).includes(' calls '), 'no reason in plain data');
+  assert.deepEqual(core.decode(r.why), { c1: 'Trip service calls Database.', c3: 'Billing calls Database.', s1: 'Trip screen calls Trip service, which breaks too.' });
+});
+
+test('where this lives: every round carries obfuscated file:line refs for the items it uses; blast radius lists the target and what breaks', async () => {
+  const root = await blastSetup();
+  const m = loadModel(root);
+  const byId = Object.fromEntries(m.zones.trips.items.map((x) => [x.id, x]));
+  byId.c2.ref = 'api/db.ts:7'; byId.c1.ref = 'api/trips.ts:3'; byId.c3.ref = 'api/billing.ts:9'; byId.c4.ref = 'api/mail.ts:5';
+  saveModel(root, m);
+  const r = loadRound(root, (await bld(root, 'blast-radius', { zone: 'trips', target: 'c2' })).id);
+  assert.equal(typeof r.where, 'string');
+  assert.ok(!JSON.stringify({ ...r, where: undefined }).includes('api/'), 'no ref in plain data');
+  const list = core.decode(r.where);
+  const refs = Object.fromEntries(list.map((w) => [w.label, w.ref]));
+  assert.equal(refs.Database, 'api/db.ts:7');
+  assert.equal(refs['Trip service'], 'api/trips.ts:3');
+  assert.equal(refs.Billing, 'api/billing.ts:9');
+  assert.ok(!('Mailer' in refs), 'a part that does not break is left out');
+  const quiz = loadRound(root, (await bld(root, 'quiz', { zone: 'trips', mode: 'practice', questions: Array.from({ length: 5 }, (_, i) => ({ q: `Question ${i}?`, options: [0, 1, 2, 3].map((j) => ({ text: `Choice ${i} ${j} here`, why: `Because ${i} ${j}` })), answer: 0 })) })).id);
+  assert.equal(quiz.where, undefined, 'a round that names no model item has none');
+});
+
 test('blast-radius: a target nobody depends on, a non-part target and an unlabeled target are rejected', async () => {
   const root = await blastSetup();
   await assert.rejects(bld(root, 'blast-radius', { zone: 'trips', target: 'c4' }), /nothing depends on/);
@@ -685,7 +712,7 @@ function reaches(r) {
   for (const i of seen) {
     open(r.tiles[i]).forEach((d) => {
       if ((d === 1 && i % cols === cols - 1) || (d === 3 && i % cols === 0)) return;
-      const j = i + SIDE[d];
+      const j = i + [-cols, 1, cols, -1][d];
       if (j < 0 || j >= r.tiles.length || seen.has(j) || !open(r.tiles[j]).includes((d + 2) % 4)) return;
       seen.add(j);
     });
@@ -697,7 +724,7 @@ test('pipe-plumber: a real path on the grid, solvable, never connected at the st
   const root = await pipeSetup();
   const starts = new Set(), turnSets = new Set();
   for (let k = 0; k < 60; k++) {
-    const out = await bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fp' });
+    const out = await build({ _: ['pipe-plumber', put(root, { zone: 'trips', flow: 'fp' })], flags: { level: 'easy' } }, ctx(root));
     const r = loadRound(root, out.id);
     if (k === 0) assert.equal(out.id, 'trips-pipe-plumber-1');
     const ans = core.decode(r.answer);
@@ -756,6 +783,58 @@ test('pipe-plumber: a 12-step flow still lays out on the grid', async () => {
   assert.equal(core.decode(r.answer).cells.length, 12);
   assert.equal(new Set(core.decode(r.answer).cells).size, 12);
 });
+
+
+// Per level: the grid grows, decoys appear, fewer path tiles start right, and the round is solvable but never starts connected.
+const PP_LEVEL = { easy: { cols: 4, decoys: 0, wrong: 0.5 }, medium: { cols: 5, decoys: 3, wrong: 0.7 }, hard: { cols: 6, decoys: 5, wrong: 0.85 }, impossible: { cols: 7, decoys: 8, wrong: 1 } };
+const BASE_OPEN = { cap: [0], straight: [0, 2], corner: [0, 1], tee: [0, 1, 3] };
+for (const level of Object.keys(PP_LEVEL)) {
+  test(`pipe-plumber ${level}: solvable, decoys, not started solved, level extras`, async () => {
+    const root = await pipeSetup();
+    const m = loadModel(root);
+    const mid = Array.from({ length: 5 }, (_, i) => I({ id: `y${i}`, k: 'component', label: `Piece ${i}` }));
+    m.zones.trips.items.push(...mid, I({ id: 'f7', k: 'flow', label: 'Seven', steps: [['s1'], ...mid.map((x) => [x.id]), ['c2']] }));
+    saveModel(root, m);
+    for (const flow of ['fp', 'f7']) {
+      for (let k = 0; k < 25; k++) {
+        const out = await build({ _: ['pipe-plumber', put(root, { zone: 'trips', flow })], flags: { level } }, ctx(root));
+        const r = loadRound(root, out.id);
+        const want = PP_LEVEL[level];
+        const { cells } = core.decode(r.answer);
+        const n = cells.length;
+        assert.equal(r.grid.cols, want.cols);
+        assert.equal(r.tiles.length, r.grid.cols * r.grid.rows);
+        assert.equal(reaches(r), false, 'never starts connected');
+        // solvable: turning every path tile to a fitting turn connects the ends
+        const solved = r.tiles.map((t) => ({ ...t }));
+        cells.forEach((c, i) => {
+          const need = [cells[i - 1], cells[i + 1]].filter((x) => x !== undefined).map((o) => [-want.cols, 1, want.cols, -1].indexOf(o - c));
+          const rot = [0, 1, 2, 3].find((q) => need.every((d) => BASE_OPEN[solved[c].type].map((x) => (x + q) % 4).includes(d)));
+          assert.notEqual(rot, undefined, 'every path tile has a fitting turn');
+          solved[c].rot = rot;
+        });
+        assert.equal(reaches({ ...r, tiles: solved }), true, 'solvable');
+        const decoys = r.tiles.filter((t, c) => t.type === 'tee' || (!cells.includes(c) && t.type === 'cap')).length;
+        assert.equal(r.decoys, decoys);
+        assert.ok(decoys >= want.decoys, `${level} has at least ${want.decoys} decoys`);
+        const locked = r.locked || [];
+        const right = cells.filter((c, i) => {
+          const need = [cells[i - 1], cells[i + 1]].filter((x) => x !== undefined).map((o) => [-want.cols, 1, want.cols, -1].indexOf(o - c));
+          return need.every((d) => BASE_OPEN[r.tiles[c].type].map((x) => (x + r.tiles[c].rot) % 4).includes(d));
+        });
+        const lockedOnPath = locked.filter((c) => cells.includes(c)).length;
+        const wrongNeeded = Math.min(n - lockedOnPath, Math.max(1, level === 'easy' ? Math.floor(n / 2) : Math.ceil(n * want.wrong)));
+        assert.ok(n - right.length >= wrongNeeded, `${level}: at least ${wrongNeeded} path tiles start wrong`);
+        if (level === 'hard' || level === 'impossible') {
+          assert.ok(locked.length >= 1 && r.par >= 1, 'locked tiles and a par');
+          locked.forEach((c) => assert.ok(c >= 0 && c < r.tiles.length));
+        } else assert.equal(r.locked, undefined);
+        assert.equal(r.timeLimit !== undefined, level === 'impossible');
+        assert.equal(r.hideStart === true, level === 'impossible');
+      }
+    }
+  });
+}
 
 const dec = (i = 0) => ({ real: `Queue the work ${i}`, alt: `Do it inline ${i}`, reasons: [`Right reason ${i}`, `Wrong one ${i}a`, `Wrong one ${i}b`, `Wrong one ${i}c`], answer: 0 });
 const duelIn = (n = 3) => ({ zone: 'trips', decisions: Array.from({ length: n }, (_, i) => dec(i)) });
