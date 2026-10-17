@@ -5,3 +5,4 @@ node_modules/
 playground/
 docs/superpowers/gallery/
 brag-output/
+.claude/worktrees/
