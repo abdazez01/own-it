@@ -9,8 +9,10 @@
   var OwnIt = window.OwnIt;
   var kit = OwnIt.kit;
   var LIVES = 3;
-  var HIT = { solid: 20, partial: 10, miss: 0 };
-  var XP = { solid: 20, partial: 10, miss: 0 };
+  var SCORE = { solid: { hit: 20, xp: 20 }, partial: { hit: 10, xp: 10 }, miss: { hit: 0, xp: 0 } };
+  var STEP = 20;               // boss HP per tile
+  var SKIP_AFTER_MS = 60000;   // waiting this long for Claude offers Skip question
+  var FULL = '\u25A0', HALF = '\u2584', EMPTY = '\u25A1';
   var KINDS = {
     why: 'Why this and not that',
     malicious: 'What an attacker tries',
@@ -19,7 +21,7 @@
     term: 'What the word means'
   };
 
-  function own(obj, key) { return !!obj && Object.prototype.hasOwnProperty.call(obj, key); }
+  var own = kit.has;
 
   // 'q2', 'Q2', 2 and '2' all mean the second question. Anything else is null.
   function qKey(q) {
@@ -27,11 +29,12 @@
     return m ? 'q' + parseInt(m[1], 10) : null;
   }
 
-  /* Reads the grade for key from whatever shape Claude wrote: {q, grade}, [{q, grade}], {grades: ...} or {q1: 'solid'}. */
+  /* Reads the grade for key. Canonical shape: {grades: {q1: 'solid'|'partial'|'miss', ...}, notes?: {q1: '...'}}.
+     Older shapes still parse: {q, grade}, [{q, grade}] and {q1: 'solid'}. */
   function gradeFor(fb, key) {
     if (!fb || typeof fb !== 'object') return null;
     var found = null;
-    function ok(g) { return own(HIT, g) ? g : null; }
+    function ok(g) { return own(SCORE, g) ? g : null; }
     if (Array.isArray(fb)) {
       fb.forEach(function (e) { if (e && qKey(e.q) === key && ok(e.grade)) found = e.grade; });
       return found;
@@ -58,6 +61,7 @@
     var texts = {};            // q1.. -> typed answer
     var grades = {};           // q1.. -> solid | partial | miss
     var order = [];            // keys in the order they were answered
+    var dmgTimer = null, skipTimer = null;
 
     var shell = OwnIt.shell(root, ctx, {
       zone: round && round.zone, total: total, side: false,
@@ -68,30 +72,26 @@
     shell.startTimer();
 
     // ---- boss bar and lives
-    var top = OwnIt.el('section', { 'class': 'panel boss-top' });
+    var head = OwnIt.el('section', { 'class': 'panel boss-top' });
     var hpRow = OwnIt.el('div', { 'class': 'flap-label boss-hp-row' });
     hpRow.appendChild(OwnIt.el('span', null, 'Boss'));
     var hpEl = OwnIt.el('span', { 'class': 'boss-hp' });
     hpRow.appendChild(hpEl);
-    OwnIt.flap(hpEl, 'HP 100');
+    paintHp();
     var damage = OwnIt.el('span', { 'class': 'boss-damage', 'aria-hidden': 'true' });
     hpRow.appendChild(damage);
-    var bar = OwnIt.el('div', { 'class': 'boss-bar', role: 'presentation' });
-    var fill = OwnIt.el('div', { 'class': 'boss-fill' });
-    fill.style.width = '100%';
-    bar.appendChild(fill);
     var livesRow = OwnIt.el('div', { 'class': 'flap-label boss-lives-row' });
     livesRow.appendChild(OwnIt.el('span', null, 'Lives'));
-    var livesEl = OwnIt.el('span', { 'class': 'boss-lives', role: 'img', 'aria-label': LIVES + ' lives left' });
+    var livesEl = OwnIt.el('span', { 'class': 'flap boss-lives', role: 'img', 'aria-label': LIVES + ' lives left' });
     var flags = [];
     for (var i = 0; i < LIVES; i++) {
-      var f = OwnIt.el('span', { 'class': 'boss-life', 'aria-hidden': 'true' });
+      var f = OwnIt.el('span', { 'class': 'flap-tile boss-life', 'aria-hidden': 'true' });
       f.appendChild(OwnIt.icons.svg('flag'));
       flags.push(f);
       livesEl.appendChild(f);
     }
     livesRow.appendChild(livesEl);
-    [hpRow, bar, livesRow].forEach(function (n) { top.appendChild(n); });
+    [hpRow, livesRow].forEach(function (n) { head.appendChild(n); });
 
     // ---- question card
     var card = OwnIt.el('section', { 'class': 'panel boss-card' });
@@ -104,24 +104,34 @@
     var sendBtn = OwnIt.button('Send answer', 'primary', function () { submit(); }, { 'class': 'btn btn-primary boss-send' });
     var nextBtn = OwnIt.button('Next', 'primary', function () { next(); }, { 'class': 'btn btn-primary boss-next' });
     nextBtn.setAttribute('hidden', 'hidden');
+    var skipBtn = OwnIt.button('Skip question', 'quiet', function () { skip(); }, { 'class': 'btn btn-quiet boss-skip' });
+    skipBtn.setAttribute('hidden', 'hidden');
+    actions.appendChild(skipBtn);
     actions.appendChild(sendBtn);
     actions.appendChild(nextBtn);
     [dots.el, kindEl, qText, box, status, actions].forEach(function (n) { card.appendChild(n); });
-    area.appendChild(top);
+    area.appendChild(head);
     area.appendChild(card);
 
     function qk(i) { return 'q' + (i + 1); }
-    function setHp(next) {
-      hp = Math.max(0, next);
-      OwnIt.flapSet(hpEl, 'HP ' + hp);
-      fill.style.width = hp + '%';
+    // Five tiles, one per 20 HP: full, half (10 left) or empty.
+    function paintHp() {
+      var glyphs = '';
+      for (var t = 0; t < 100 / STEP; t++) {
+        var left = hp - t * STEP;
+        glyphs += left >= STEP ? FULL : left >= STEP / 2 ? HALF : EMPTY;
+      }
+      OwnIt.flapSet(hpEl, glyphs);
+      hpEl.setAttribute('aria-label', 'Boss HP ' + hp);
     }
+    function setHp(next) { hp = Math.max(0, next); paintHp(); }
     function showDamage(n) {
       damage.textContent = '';
       var d = OwnIt.el('span');
       damage.appendChild(d);
       OwnIt.flap(d, '-' + n, { variant: 'alert' });
-      setTimeout(function () { if (d.remove) d.remove(); }, 1100);
+      if (dmgTimer) clearTimeout(dmgTimer);
+      dmgTimer = setTimeout(function () { dmgTimer = null; if (d.remove) d.remove(); }, 1100);
     }
     function loseLife() {
       lives = Math.max(0, lives - 1);
@@ -140,6 +150,7 @@
       status.textContent = '';
       sendBtn.removeAttribute('hidden');
       nextBtn.setAttribute('hidden', 'hidden');
+      skipBtn.setAttribute('hidden', 'hidden');
       dots.paint(qi, false, 'Question');
       if (box.focus) box.focus();
     }
@@ -157,11 +168,33 @@
       if (liveMode()) {
         phase = 'waiting';
         say('', 'Sent.', 'Claude is grading your answer.');
-        link.send('ask', { round: ctx.roundId, q: key, text: text });
-        pollFeedback();
+        var at = qi;
+        clearSkip();
+        skipTimer = setTimeout(function () { skipTimer = null; if (phase === 'waiting' && qi === at) skipBtn.removeAttribute('hidden'); }, SKIP_AFTER_MS);
+        var sent;
+        try { sent = Promise.resolve(link.send('ask', { round: ctx.roundId, q: key, text: text })); } catch (e) { sent = Promise.resolve(false); }
+        sent.then(function (okSent) { if (okSent === false) unsend(at); }, function () { unsend(at); });
       } else {
         settleUngraded();
       }
+    }
+
+    function clearSkip() { if (skipTimer) { clearTimeout(skipTimer); skipTimer = null; } }
+
+    // The ask never reached Claude: put the question back so the same answer can be sent again.
+    function unsend(at) {
+      if (done || phase !== 'waiting' || qi !== at) return;
+      clearSkip();
+      phase = 'answering';
+      box.removeAttribute('disabled');
+      sendBtn.removeAttribute('hidden');
+      say('bad', "Couldn't reach Claude.", 'Press Send answer to try again.');
+    }
+
+    // Waiting too long: the player moves on and the question counts as a miss.
+    function skip() {
+      if (done || phase !== 'waiting') return;
+      applyGrade('miss');
     }
 
     // File mode (or a lost link): the answer is kept for the result and graded by Claude in chat.
@@ -176,8 +209,11 @@
       if (nextBtn.focus) nextBtn.focus();
     }
 
-    function pollFeedback() {
+    // Called when the link reports a changed data file. A grade only counts if it arrives this way after the ask was sent,
+    // so a grade left over from an earlier attempt at the same round is never applied.
+    function pollFeedback(info) {
       if (done || phase !== 'waiting') return;
+      if (info && typeof info.file === 'string' && info.file.indexOf('feedback-' + ctx.roundId) < 0) return;
       var fb = OwnIt.feedback ? OwnIt.feedback(ctx.roundId) : null;
       var g = gradeFor(fb || ctx.feedback, qk(qi));
       if (g) applyGrade(g);
@@ -185,6 +221,8 @@
 
     function applyGrade(g) {
       var key = qk(qi);
+      clearSkip();
+      skipBtn.setAttribute('hidden', 'hidden');
       phase = 'graded';
       grades[key] = g;
       order.push(key);
@@ -198,8 +236,8 @@
         if (OwnIt.juice) OwnIt.juice.shake(area);
         say('bad', 'Not quite.', 'You lose a flag. Claude explains in the debrief.');
       } else {
-        setHp(hp - HIT[g]);
-        showDamage(HIT[g]);
+        setHp(hp - SCORE[g].hit);
+        showDamage(SCORE[g].hit);
         OwnIt.sound('correct');
         if (g === 'solid' && OwnIt.juice) OwnIt.juice.confetti(hpEl);
         say('good', g === 'solid' ? 'Solid.' : 'Partly right.', g === 'solid' ? 'A clean hit on the boss.' : 'Half a hit. The boss is still standing.');
@@ -224,7 +262,7 @@
       var xp = 0;
       var review = [];
       order.forEach(function (k) {
-        xp += XP[grades[k]];
+        xp += SCORE[grades[k]].xp;
         if (grades[k] !== 'solid') {
           var n = parseInt(k.slice(1), 10);
           review.push({ id: k, text: 'Question ' + n + ': ' + questions[n - 1].q + ' Graded: ' + grades[k] + '.' });
@@ -240,11 +278,11 @@
     }
 
     box.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); e.stopPropagation(); submit(); }
     });
 
     var offs = [];
-    if (link && link.onData) offs.push(link.onData(function () { pollFeedback(); }));
+    if (link && link.onData) offs.push(link.onData(function (info) { pollFeedback(info); }));
     if (link && link.onMode) {
       offs.push(link.onMode(function (m) {
         if (m !== 'live' && phase === 'waiting' && !done) settleUngraded();
@@ -266,6 +304,8 @@
 
     return function () {
       done = true;
+      clearSkip();
+      if (dmgTimer) { clearTimeout(dmgTimer); dmgTimer = null; }
       offs.forEach(function (off) { try { off(); } catch (e) { /* gone */ } });
       shell.destroy();
     };

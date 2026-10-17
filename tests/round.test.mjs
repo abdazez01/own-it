@@ -263,6 +263,7 @@ test('rounds carry plain labels for every referenced model id, never for a find 
   const out = await bld(root, 'screen-tour', t);
   const r = loadRound(root, out.id);
   assert.equal(r.labels.s1.label, 'Trip screen');
+  assert.equal(r.labels.s1.kind, 'surface'); // lets the whiteboard lay out without the answer
   assert.equal(r.labels.s2.label, 'Approvals'); // el1 goes to s2
   assert.equal(r.labels.el1.label, 'el1');      // no label in the model: falls back to the id
   assert.ok(!Object.hasOwn(r.labels, 'el2'), 'the find answer must not be labelled');

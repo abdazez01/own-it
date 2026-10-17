@@ -550,11 +550,8 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .boss-hp-row, .boss-lives-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); position: relative; }
 .boss-damage { display: inline-flex; min-width: 1px; }
 .boss-damage .flap { animation: boss-pop 900ms var(--ease-out) both; }
-.boss-bar { height: 10px; border-radius: var(--r-pill); background: var(--track); border: 1px solid var(--edge); overflow: hidden; }
-.boss-fill { height: 100%; background: var(--salmon); transition: width 420ms var(--ease-out); }
-.boss-lives { display: inline-flex; gap: var(--s-2); }
-.boss-life { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-flap); background: var(--gold); color: var(--gold-ink); transition: opacity 300ms var(--ease-out); }
-.boss-life.lost { background: var(--glass-hi-solid); color: var(--ink-2); opacity: .5; }
+.boss-life svg { width: 1em; height: 1em; }
+.boss-life.lost { opacity: .35; }
 .boss-card { max-width: 920px; margin-inline: auto; display: grid; gap: var(--s-4); min-width: 0; }
 .boss-kind { margin: 0; color: var(--gold); font: 600 var(--fs-13) var(--f-flap); }
 .boss-answer {
@@ -565,4 +562,4 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .boss-answer:focus-visible { border-color: var(--gold); outline: none; box-shadow: 0 0 0 2px var(--gold-a45); }
 .boss-answer[disabled] { opacity: .7; }
 @keyframes boss-pop { from { transform: translateY(8px) scale(.9); opacity: 0; } 30% { opacity: 1; } to { transform: translateY(-10px); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .boss-fill { transition: none; } .boss-damage .flap { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .boss-damage .flap { animation: none; } }

@@ -1,4 +1,4 @@
-import { test, after } from 'node:test';
+import { test, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
@@ -13,7 +13,7 @@ const FILES = ['z.js', 'icons.js', 'router.js', 'flap.js', 'toggle.js', 'juice.j
 const live = [];
 after(() => live.forEach((f) => { try { f(); } catch { /* already cleaned */ } }));
 
-function boot(game, round, { link } = {}) {
+function boot(game, round, { link, beforePlay } = {}) {
   const env = createEnv({ reduced: true });
   env.load(...FILES);
   const w = env.window;
@@ -34,6 +34,7 @@ function boot(game, round, { link } = {}) {
     finish: (p) => finished.push(p), link,
   };
   w.OwnIt.keys.setScope(game);
+  if (beforePlay) beforePlay(w);
   const cleanup = w.OwnIt.games.get(game).play(root, round, ctx);
   live.push(cleanup);
   const key = (k) => env.document.dispatchEvent(env.event('keydown', { key: k }));
@@ -42,7 +43,8 @@ function boot(game, round, { link } = {}) {
 
 // ------------------------------------------------------------------ whiteboard
 
-const CARDS = ['a', 'b', 'c', 'd'].map((id) => ({ id, label: `Part ${id}`, ref: `src/${id}.js:1` }));
+const KIND = { a: 'surface', b: 'actor', c: 'component', d: 'component' };
+const CARDS = ['a', 'b', 'c', 'd'].map((id) => ({ id, label: `Part ${id}`, kind: KIND[id], ref: `src/${id}.js:1` }));
 const EDGES = [
   { id: 'e1', from: 'a', to: 'c' },
   { id: 'e2', from: 'b', to: 'c' },
@@ -55,19 +57,35 @@ const card = (t, id) => t.root.querySelector(`.wb-card[data-id="${id}"]`);
 const edges = (t) => Array.from(t.root.querySelectorAll('.wb-edge'));
 function draw(t, from, to) { card(t, from).click(); card(t, to).click(); }
 
-test('layered layout puts sources left', () => {
+test('layered layout puts sources left, from card kinds and not from the answer', () => {
   const t = boot('whiteboard', wbRound());
-  const lay = t.w.OwnIt.whiteboardLayout(['a', 'b', 'c', 'd'], EDGES);
+  const lay = t.w.OwnIt.whiteboardLayout(CARDS);
   assert.equal(lay.a.layer, 0);
   assert.equal(lay.b.layer, 0);
   assert.equal(lay.c.layer, 1);
-  assert.equal(lay.d.layer, 2);
-  assert.notEqual(lay.a.row, lay.b.row);
-  // deterministic
-  assert.deepEqual(t.w.OwnIt.whiteboardLayout(['a', 'b', 'c', 'd'], EDGES), lay);
-  // cycles do not hang and still place every card
-  const cyc = t.w.OwnIt.whiteboardLayout(['x', 'y'], [{ from: 'x', to: 'y' }, { from: 'y', to: 'x' }]);
-  assert.ok('layer' in cyc.x && 'layer' in cyc.y);
+  assert.equal(lay.d.layer, 1);
+  assert.deepEqual([lay.a.row, lay.b.row, lay.c.row, lay.d.row], [0, 1, 0, 1]); // label order
+  assert.deepEqual(t.w.OwnIt.whiteboardLayout(CARDS), lay); // deterministic
+  assert.equal(t.w.OwnIt.whiteboardLayout([{ id: 'x', label: 'X' }]).x.layer, 1); // unknown kind
+});
+
+test('the answer is decoded only when the map is checked', () => {
+  const env = { n: 0 };
+  const t = boot('whiteboard', wbRound(), { beforePlay: (w) => { const real = w.OwnItCore.decode; w.OwnItCore.decode = (x) => { env.n++; return real(x); }; } });
+  draw(t, 'a', 'c');
+  assert.equal(env.n, 0);
+  t.root.querySelector('.wb-check').click();
+  assert.equal(env.n, 1);
+});
+
+test('an answer that cannot be decoded shows a notice at Check and grades nothing', () => {
+  const t = boot('whiteboard', wbRound({ answer: 'not-an-answer' }));
+  draw(t, 'a', 'c');
+  t.root.querySelector('.wb-check').click();
+  assert.match(t.root.textContent, /This board can't be checked\. Ask Claude to rebuild it\./);
+  assert.equal(t.root.querySelectorAll('.wb-edge.good').length, 0);
+  assert.ok(!t.root.querySelector('.wb-check').hasAttribute('hidden'));
+  assert.equal(t.finished.length, 0);
 });
 
 function withBoardWidth(width, fn) {
@@ -81,14 +99,35 @@ test('cards sit in layer order on the board: sources left of sinks on wide scree
     const t = boot('whiteboard', wbRound());
     const left = (id) => parseFloat(card(t, id).style.left);
     assert.ok(left('a') < left('c'));
-    assert.ok(left('c') < left('d'));
+    assert.ok(left('a') < left('d'));
   });
   withBoardWidth(360, () => {
     const t = boot('whiteboard', wbRound());
     const top = (id) => parseFloat(card(t, id).style.top);
     assert.ok(top('a') < top('c'));
-    assert.ok(top('c') < top('d'));
+    assert.ok(top('a') < top('d'));
     for (const id of ['a', 'b', 'c', 'd']) assert.ok(parseFloat(card(t, id).style.left) + parseFloat(card(t, id).style.width) <= 360);
+  });
+});
+
+test('phone board: five cards in one layer all fit inside 360px, none narrower than 88px', () => {
+  const many = ['m', 'n', 'o', 'p', 'q'].map((id) => ({ id, label: `Surface ${id}`, kind: 'surface' }));
+  withBoardWidth(360, () => {
+    const t = boot('whiteboard', wbRound({ cards: many }));
+    const board = t.root.querySelector('.wb-board');
+    for (const c of many) {
+      const el = card(t, c.id);
+      const x = parseFloat(el.style.left), w = parseFloat(el.style.width), y = parseFloat(el.style.top), h = parseFloat(el.style.height);
+      assert.ok(x >= 0 && x + w <= 360, `${c.id} within width`);
+      assert.ok(w >= 88, `${c.id} wide enough`);
+      assert.ok(y + h <= parseFloat(board.style.height), `${c.id} within height`);
+    }
+    // no two cards overlap
+    const rects = many.map((c) => { const e = card(t, c.id); return [parseFloat(e.style.left), parseFloat(e.style.top), parseFloat(e.style.width), parseFloat(e.style.height)]; });
+    for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+      const [x1, y1, w1, h1] = rects[i], [x2, y2, w2, h2] = rects[j];
+      assert.ok(x1 + w1 <= x2 || x2 + w2 <= x1 || y1 + h1 <= y2 || y2 + h2 <= y1, `${i} and ${j} overlap`);
+    }
   });
 });
 
@@ -175,9 +214,12 @@ function liveLink() {
 }
 const answerBox = (t) => t.root.querySelector('.boss-answer');
 function say(t, text) { answerBox(t).value = text; t.root.querySelector('.boss-send').click(); }
+const FILE = 'data/feedback-trips-boss-battle-1.js';
+// Canonical feedback: window.OWNIT_FEEDBACK[round] = { grades: { q1: 'solid', ... } }, then the link reports the rewritten file.
 function grade(t, q, g, link) {
-  t.w.OWNIT_FEEDBACK = { ...(t.w.OWNIT_FEEDBACK || {}), 'trips-boss-battle-1': { q, grade: g } };
-  link.subs.slice().forEach((f) => f({ file: 'data/feedback-trips-boss-battle-1.js' }));
+  const cur = (t.w.OWNIT_FEEDBACK && t.w.OWNIT_FEEDBACK['trips-boss-battle-1']) || { grades: {} };
+  t.w.OWNIT_FEEDBACK = { ...(t.w.OWNIT_FEEDBACK || {}), 'trips-boss-battle-1': { ...cur, grades: { ...cur.grades, [q]: g } } };
+  link.subs.slice().forEach((f) => f({ file: FILE }));
 }
 
 test('boss applies solid as hit, miss as life loss', () => {
@@ -253,4 +295,65 @@ test('file mode collects text q1..q5 into one result', () => {
   const p = JSON.parse(JSON.stringify(t.finished[0]));
   assert.deepEqual(p.text, { q1: 'typed 1', q2: 'typed 2', q3: 'typed 3', q4: 'typed 4', q5: 'typed 5' });
   assert.equal(p.game, 'boss-battle');
+});
+
+test('boss HP is five flap tiles and lives are three flag tiles', () => {
+  const link = liveLink();
+  const t = boot('boss-battle', BOSS, { link });
+  const tiles = () => Array.from(t.root.querySelector('.boss-hp').children).map((x) => x.textContent);
+  assert.equal(tiles().length, 5);
+  assert.equal(tiles().filter((x) => x === '■').length, 5);
+  say(t, 'x');
+  grade(t, 'q1', 'solid', link);
+  assert.equal(tiles().filter((x) => x === '■').length, 4);
+  assert.equal(t.root.querySelectorAll('.flap-tile.boss-life').length, 3);
+});
+
+test('a grade already in the feedback file is ignored until the link reports new data after the ask', () => {
+  const link = liveLink();
+  const t = boot('boss-battle', BOSS, { link, beforePlay: (w) => { w.OWNIT_FEEDBACK = { 'trips-boss-battle-1': { grades: { q1: 'solid' } } }; } });
+  say(t, 'my answer');
+  assert.match(t.root.querySelector('.boss-hp').getAttribute('aria-label'), /100/);
+  assert.equal(t.root.querySelectorAll('.boss-next').length, 1);
+  assert.ok(t.root.querySelector('.boss-next').hasAttribute('hidden'));
+  link.subs.slice().forEach((f) => f({ file: 'data/other.js' })); // an unrelated file changed
+  assert.match(t.root.querySelector('.boss-hp').getAttribute('aria-label'), /100/);
+  link.subs.slice().forEach((f) => f({ file: FILE }));
+  assert.match(t.root.querySelector('.boss-hp').getAttribute('aria-label'), /80/);
+});
+
+test('a failed ask puts the question back so the answer can be sent again', async () => {
+  const link = liveLink();
+  link.send = () => Promise.resolve(false);
+  const t = boot('boss-battle', BOSS, { link });
+  say(t, 'my answer');
+  await new Promise((r) => setTimeout(r, 5));
+  assert.ok(!answerBox(t).hasAttribute('disabled'));
+  assert.ok(!t.root.querySelector('.boss-send').hasAttribute('hidden'));
+});
+
+test('Enter in the answer box sends once and does not also go to the next question', () => {
+  const t = boot('boss-battle', BOSS, { link: { mode: 'file', send() { return Promise.resolve(true); }, onData() { return () => {}; } } });
+  answerBox(t).value = 'typed 1';
+  answerBox(t).dispatchEvent(t.env.event('keydown', { key: 'Enter' }));
+  assert.match(t.root.textContent, /Boss question 1\?/);
+  assert.ok(!t.root.querySelector('.boss-next').hasAttribute('hidden'));
+  t.root.querySelector('.boss-next').click();
+  assert.match(t.root.textContent, /Boss question 2\?/);
+});
+
+test('after 60 s of waiting a Skip question button appears and counts as a miss', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const link = liveLink();
+    const t = boot('boss-battle', BOSS, { link });
+    say(t, 'my answer');
+    const skip = t.root.querySelector('.boss-skip');
+    assert.ok(skip.hasAttribute('hidden'));
+    mock.timers.tick(60000);
+    assert.ok(!skip.hasAttribute('hidden'));
+    skip.click();
+    assert.equal(t.root.querySelectorAll('.boss-life.lost').length, 1);
+    assert.ok(t.sounds.includes('wrong'));
+  } finally { mock.timers.reset(); }
 });

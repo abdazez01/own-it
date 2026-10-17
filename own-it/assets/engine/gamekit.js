@@ -5,6 +5,8 @@
   var OwnIt = (window.OwnIt = window.OwnIt || {});
   var CHOICE_KEYS = [['1', 0], ['2', 1], ['3', 2], ['4', 3], ['a', 0], ['b', 1], ['c', 2], ['d', 3]];
 
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+
   function has(obj, key) { return !!obj && Object.prototype.hasOwnProperty.call(obj, key); }
 
   // The words a player sees for a model id: the round's label if it has one, else the id with separators turned into spaces.
@@ -114,6 +116,6 @@
     });
   }
 
-  OwnIt.kit = { label: label, note: note, dots: dots, answerButtons: answerButtons, targetIndex: targetIndex, mine: mine,
+  OwnIt.kit = { has: has, plural: plural, label: label, note: note, dots: dots, answerButtons: answerButtons, targetIndex: targetIndex, mine: mine,
     choiceKeys: choiceKeys, onActivate: onActivate, nextLabel: nextLabel, finish: finish, modalOpen: modalOpen };
 })();

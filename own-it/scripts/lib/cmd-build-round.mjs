@@ -22,7 +22,7 @@ const IDS = {
   whiteboard: (r) => r.cards,
 };
 
-const cardOf = (it) => ({ id: it.id, label: it.label ?? it.id, ref: it.ref, conf: it.conf });
+const cardOf = (it) => ({ id: it.id, label: it.label ?? it.id, kind: it.k, ref: it.ref, conf: it.conf });
 
 // A single code-like token (snake_case, a path, a dotted name, camelCase) or backtick-wrapped text.
 function identifierOnly(text) {
@@ -93,6 +93,7 @@ function labelsFor(named, byId) {
     const it = byId.get(id);
     if (!it) continue;
     const entry = { label: typeof it.label === 'string' && it.label ? it.label : it.id };
+    if (typeof it.k === 'string' && it.k) entry.kind = it.k;
     if (typeof it.purpose === 'string' && it.purpose) entry.purpose = it.purpose;
     out[id] = entry;
   }

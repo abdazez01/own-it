@@ -3,85 +3,33 @@
    an arrow from the first to the second. An arrow is removed with Delete or with its Remove button. "Check my map" grades the arrows with
    OwnItCore.gradeComponent and reveals the board: green = right, dashed red ghost = a missing arrow, crossed out = an arrow that does
    not exist. Keys: arrows move between cards, Enter picks a card, Delete removes the selected arrow. DOM via OwnIt.el and createElementNS only.
-   The expected arrows arrive obfuscated; they are decoded once, to lay the board out and to grade. */
+   The expected arrows arrive obfuscated and are decoded only when the player checks (or asks for a hint), never to lay the board out. */
 (function () {
   'use strict';
   var OwnIt = window.OwnIt;
   var kit = OwnIt.kit;
   var NS = 'http://www.w3.org/2000/svg';
   var XP_EDGE = 10, XP_WRONG = 5;
-  var PAD = 16, CARD_H = 52, GAP_FLOW = 64, GAP_ROW = 14, MIN_W = 84, MAX_W = 170, NARROW = 560;
+  var PAD = 16, CARD_H = 52, GAP_FLOW = 64, GAP_ROW = 14, MIN_W = 88, MAX_W = 170, NARROW = 560;
 
-  function own(obj, key) { return !!obj && Object.prototype.hasOwnProperty.call(obj, key); }
-  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+  var own = kit.has, plural = kit.plural;
   function svg(tag, attrs) {
     var n = document.createElementNS ? document.createElementNS(NS, tag) : document.createElement(tag);
     if (attrs) Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
     return n;
   }
 
-  /* Pure. ids: card ids in input order; edges: [{from, to}]. Returns { id: { layer, row } }.
-     Layer = longest path from a source, ignoring back edges so cycles settle. Sinks move to the last layer. Rows within a layer
-     are ordered by the median row of their neighbours (a few sweeps), ties by input order. Deterministic. */
-  function layout(ids, edges) {
-    var index = {}, out = {}, inn = {};
-    ids.forEach(function (id, i) { index[id] = i; out[id] = []; inn[id] = []; });
-    var seen = {};
-    (edges || []).forEach(function (e) {
-      if (!e || !own(index, e.from) || !own(index, e.to) || e.from === e.to) return;
-      var k = e.from + '\u0000' + e.to;
-      if (own(seen, k)) return;
-      seen[k] = 1;
-      out[e.from].push(e.to);
-    });
-    // drop back edges found by a depth-first walk in input order
-    var state = {}, back = {};
-    function visit(id) {
-      state[id] = 1;
-      out[id].forEach(function (to) {
-        if (state[to] === 1) back[id + '\u0000' + to] = 1;
-        else if (!state[to]) visit(to);
-      });
-      state[id] = 2;
-    }
-    ids.forEach(function (id) { if (!state[id]) visit(id); });
-    ids.forEach(function (id) { out[id] = out[id].filter(function (to) { return !own(back, id + '\u0000' + to); }); });
-    ids.forEach(function (id) { out[id].forEach(function (to) { inn[to].push(id); }); });
-
-    var layer = {};
-    ids.forEach(function (id) { layer[id] = 0; });
-    for (var pass = 0; pass < ids.length; pass++) {
-      var moved = false;
-      ids.forEach(function (id) {
-        out[id].forEach(function (to) { if (layer[to] < layer[id] + 1) { layer[to] = layer[id] + 1; moved = true; } });
-      });
-      if (!moved) break;
-    }
-    var last = 0;
-    ids.forEach(function (id) { if (layer[id] > last) last = layer[id]; });
-    ids.forEach(function (id) { if (!out[id].length && inn[id].length) layer[id] = last; });
-
-    var cols = [];
-    for (var l = 0; l <= last; l++) cols.push([]);
-    ids.forEach(function (id) { cols[layer[id]].push(id); });
-    var row = {};
-    cols.forEach(function (col) { col.forEach(function (id, i) { row[id] = i; }); });
-    function median(id) {
-      var ns = inn[id].concat(out[id]).map(function (n) { return row[n]; }).sort(function (a, b) { return a - b; });
-      if (!ns.length) return row[id];
-      var m = ns.length >> 1;
-      return ns.length % 2 ? ns[m] : (ns[m - 1] + ns[m]) / 2;
-    }
-    for (var sweep = 0; sweep < 4; sweep++) {
-      cols.forEach(function (col) {
-        var keyed = col.map(function (id) { return { id: id, m: median(id), i: index[id] }; });
-        keyed.sort(function (a, b) { return a.m - b.m || a.i - b.i; });
-        keyed.forEach(function (k, r) { row[k.id] = r; });
-        cols[cols.indexOf(col)] = keyed.map(function (k) { return k.id; });
-      });
-    }
+  /* Pure. cards: [{id, label, kind}]. Returns { id: { layer, row } }. Uses nothing from the answer, so the layout cannot give it away.
+     Layer 0 (left, or top on phones) holds the parts people meet: surfaces, actors, roles, elements. Layer 1 holds everything else
+     (components, services, stores). Rows follow the label order, ties by id. Deterministic. */
+  var FRONT = { surface: 1, screen: 1, actor: 1, role: 1, element: 1 };
+  function layout(cards) {
     var res = {};
-    ids.forEach(function (id) { res[id] = { layer: layer[id], row: row[id] }; });
+    [0, 1].forEach(function (layer) {
+      cards.filter(function (c) { return (own(FRONT, c.kind) ? 0 : 1) === layer; })
+        .sort(function (x, y) { return String(x.label).localeCompare(String(y.label)) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0); })
+        .forEach(function (c, row) { res[c.id] = { layer: layer, row: row }; });
+    });
     return res;
   }
   OwnIt.whiteboardLayout = layout;
@@ -99,16 +47,23 @@
     var labels = round && round.labels;
     var exam = (round && round.mode === 'exam') || OwnIt.mode === 'exam';
     var mode = exam ? 'exam' : 'practice';
-    var answer = { edges: [] };
-    try {
-      var dec = OwnItCore.decode(round && round.answer);
-      if (dec && Array.isArray(dec.edges)) answer = dec;
-    } catch (e) { /* no usable answer: the board still opens */ }
+    var answer = null;     // decoded on first need
+    function getAnswer() {
+      if (answer) return answer;
+      try {
+        var dec = OwnItCore.decode(round && round.answer);
+        if (dec && Array.isArray(dec.edges)) answer = dec;
+      } catch (e) { /* reported at Check */ }
+      return answer;
+    }
     var ids = cards.map(function (c) { return c.id; });
     var byId = {};
     cards.forEach(function (c) { byId[c.id] = c; });
-    var total = answer.edges.length;
     var L = function (id) { return own(byId, id) && !own(labels, id) && byId[id].label ? byId[id].label : kit.label(id, labels); };
+    var items = cards.map(function (c) {
+      var kind = c.kind || (own(labels, c.id) && labels[c.id] && labels[c.id].kind) || '';
+      return { id: c.id, label: L(c.id), kind: kind };
+    });
 
     var drawn = [];        // [[from, to]]
     var pick = null;       // card id waiting for its target
@@ -116,20 +71,23 @@
     var checked = false;
     var done = false;
     var result = null;     // gradeComponent output
+    var edgesOf = [];      // expected arrows, set at Check
     var pos = {};          // id -> {x, y, w, h}
-    var lay = layout(ids, answer.edges);
+    var lay = layout(items);
 
     var shell = OwnIt.shell(root, ctx, {
-      zone: round && round.zone, total: total, side: true,
+      zone: round && round.zone, total: 0, side: true,
       hint: exam ? null : function () {
-        for (var i = 0; i < answer.edges.length; i++) {
-          var e = answer.edges[i];
+        var ans = getAnswer();
+        if (!ans) return 'This board has no hint. Ask Claude to rebuild it.';
+        for (var i = 0; i < ans.edges.length; i++) {
+          var e = ans.edges[i];
           if (!hasEdge(e.from, e.to)) return L(e.from) + ' sends something onward. Find where it goes.';
         }
         return 'Every arrow is drawn. Press Check my map.';
       }
     });
-    shell.setScore(0, total);
+    shell.setScore(0, '?');
     var area = shell.area, side = shell.side;
     shell.startTimer();
 
@@ -178,29 +136,41 @@
     function relayout() {
       var rect = board.getBoundingClientRect ? board.getBoundingClientRect() : null;
       var W = Math.max(240, Math.round((rect && rect.width) || 640));
-      var layers = 0, rows = 0;
-      ids.forEach(function (id) { layers = Math.max(layers, lay[id].layer + 1); rows = Math.max(rows, lay[id].row + 1); });
-      var perLayer = [];
-      ids.forEach(function (id) { perLayer[lay[id].layer] = (perLayer[lay[id].layer] || 0) + 1; });
+      // only the layers that hold cards take space
+      var used = [0, 1].filter(function (l) { return ids.some(function (id) { return lay[id].layer === l; }); });
+      var groups = used.map(function (l) {
+        return ids.filter(function (id) { return lay[id].layer === l; }).sort(function (x, y) { return lay[x].row - lay[y].row; });
+      });
+      var layers = groups.length, rows = 0;
+      groups.forEach(function (g) { rows = Math.max(rows, g.length); });
       var cw = Math.floor((W - 2 * PAD - (layers - 1) * GAP_FLOW) / Math.max(layers, 1));
       var horizontal = W >= NARROW && cw >= MIN_W;
       var H;
       if (horizontal) {
         cw = Math.min(MAX_W, cw);
-        var colW = cw + GAP_FLOW, used = layers * cw + (layers - 1) * GAP_FLOW, x0 = Math.max(PAD, Math.round((W - used) / 2));
+        var span = layers * cw + (layers - 1) * GAP_FLOW, x0 = Math.max(PAD, Math.round((W - span) / 2));
         H = 2 * PAD + rows * CARD_H + Math.max(rows - 1, 0) * GAP_ROW;
-        ids.forEach(function (id) {
-          var n = perLayer[lay[id].layer], colH = n * CARD_H + (n - 1) * GAP_ROW;
-          pos[id] = { x: x0 + lay[id].layer * colW, y: Math.round((H - colH) / 2) + lay[id].row * (CARD_H + GAP_ROW), w: cw, h: CARD_H };
+        groups.forEach(function (g, gi) {
+          var colH = g.length * CARD_H + (g.length - 1) * GAP_ROW;
+          g.forEach(function (id, r) {
+            pos[id] = { x: x0 + gi * (cw + GAP_FLOW), y: Math.round((H - colH) / 2) + r * (CARD_H + GAP_ROW), w: cw, h: CARD_H };
+          });
         });
       } else {
-        var vw = Math.max(56, Math.min(MAX_W, Math.floor((W - 2 * PAD - (rows - 1) * GAP_ROW) / Math.max(rows, 1))));
-        var rowH = CARD_H + GAP_FLOW / 2;
-        H = 2 * PAD + layers * CARD_H + Math.max(layers - 1, 0) * (GAP_FLOW / 2);
-        ids.forEach(function (id) {
-          var n = perLayer[lay[id].layer], rowW = n * vw + (n - 1) * GAP_ROW;
-          pos[id] = { x: Math.round((W - rowW) / 2) + lay[id].row * (vw + GAP_ROW), y: PAD + lay[id].layer * rowH, w: vw, h: CARD_H };
+        // phones: each layer is a band; a band wraps onto more rows so every card keeps at least MIN_W
+        var perRow = Math.max(1, Math.floor((W - 2 * PAD + GAP_ROW) / (MIN_W + GAP_ROW)));
+        var vw = Math.min(MAX_W, Math.floor((W - 2 * PAD - (perRow - 1) * GAP_ROW) / perRow));
+        var y = PAD;
+        groups.forEach(function (g, gi) {
+          g.forEach(function (id, j) {
+            var r = Math.floor(j / perRow), inRow = Math.min(perRow, g.length - r * perRow), c = j % perRow;
+            var rowW = inRow * vw + (inRow - 1) * GAP_ROW;
+            pos[id] = { x: Math.round((W - rowW) / 2) + c * (vw + GAP_ROW), y: y + r * (CARD_H + GAP_ROW), w: vw, h: CARD_H };
+          });
+          var bandRows = Math.ceil(g.length / perRow);
+          y += bandRows * CARD_H + (bandRows - 1) * GAP_ROW + (gi < groups.length - 1 ? GAP_FLOW / 2 : 0);
         });
+        H = y + PAD;
       }
       board.style.height = H + 'px';
       layer.setAttribute('width', String(W));
@@ -245,10 +215,12 @@
           c.appendChild(svg('path', { d: 'M' + (mx - 7) + ' ' + (my + 7) + 'L' + (mx + 7) + ' ' + (my - 7) }));
           g.appendChild(c);
         }
-        g.setAttribute('role', 'button');
-        g.setAttribute('tabindex', '0');
-        g.setAttribute('aria-label', (kind === 'good' ? 'Right arrow, ' : kind === 'wrong' ? 'Wrong arrow, ' : 'Arrow, ') + name + (kind ? '' : '. Press Delete to remove.'));
-        if (!kind) {
+        if (kind) {
+          g.setAttribute('aria-label', (kind === 'good' ? 'Right arrow, ' : 'Wrong arrow, ') + name);
+        } else {
+          g.setAttribute('role', 'button');
+          g.setAttribute('tabindex', '0');
+          g.setAttribute('aria-label', 'Arrow, ' + name + '. Press Delete to remove.');
           g.addEventListener('click', function () { selectEdge(index); });
           g.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectEdge(index); }
@@ -271,7 +243,7 @@
         if (n) arrowsG.appendChild(n);
       });
       if (checked && result) {
-        answer.edges.filter(function (e) { return result.missed.indexOf(e.id) >= 0; }).forEach(function (e) {
+        edgesOf.filter(function (e) { return result.missed.indexOf(e.id) >= 0; }).forEach(function (e) {
           var n = edgeNode(e.from, e.to, 'ghost', -1, hasEdge(e.to, e.from));
           if (n) arrowsG.appendChild(n);
         });
@@ -358,9 +330,12 @@
     function check() {
       if (checked || done) return;
       if (!drawn.length) { say('Draw at least one arrow first.'); return; }
+      var ans = getAnswer();
+      if (!ans) { say("This board can't be checked. Ask Claude to rebuild it."); return; }
+      edgesOf = ans.edges;
       checked = true;
       pick = null; sel = -1;
-      result = OwnItCore.gradeComponent({ edges: answer.edges }, drawn);
+      result = OwnItCore.gradeComponent({ edges: edgesOf }, drawn);
       var perfect = result.got === result.of && !result.wrong.length;
       OwnIt.sound(perfect ? 'correct' : 'wrong');
       if (perfect && OwnIt.juice) OwnIt.juice.confetti(board);
@@ -378,7 +353,7 @@
       done = true;
       var review = [];
       var byEdge = {};
-      answer.edges.forEach(function (e) { byEdge[e.id] = e; });
+      edgesOf.forEach(function (e) { byEdge[e.id] = e; });
       result.missed.forEach(function (id) {
         if (own(byEdge, id)) review.push({ id: id, text: 'Missing arrow: ' + L(byEdge[id].from) + ' to ' + L(byEdge[id].to) + '.' });
       });
