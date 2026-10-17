@@ -7,7 +7,7 @@
   'use strict';
   var OwnIt = (window.OwnIt = window.OwnIt || {});
 
-  var CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; form-action \'none\'; base-uri \'none\'; navigate-to \'none\'">';
+  var CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; form-action \'none\'; base-uri \'none\'">';
   var DOCTYPE = '<!doctype html>'; // first, so the copy renders in standards mode
   var OUTLINE = '[data-ownit]{cursor:pointer}'
     + '[data-ownit]:hover,[data-ownit]:focus,[data-ownit-hl="1"]{outline:2px solid #E8C26A;outline-offset:2px;border-radius:4px}'

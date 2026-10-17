@@ -269,7 +269,7 @@
       hintsUsed: function () { return hints; },
       result: function (r) {
         r = Object.assign({}, r);
-        if (r.payload) r.payload = Object.assign({}, r.payload, { hintsUsed: hints });
+        if (r.payload) r.payload = Object.assign({ text: {} }, r.payload, { hintsUsed: hints });
         return OwnIt.resultCard(ctx, r);
       },
       destroy: function () {

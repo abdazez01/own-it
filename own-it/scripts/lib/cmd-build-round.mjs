@@ -5,7 +5,7 @@ import { getGame, GAMES_DIR } from './games.mjs';
 import { loadModel } from './model.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import core from './core.mjs';
-import { readJson, writeJson, writeJsRegistry } from './json.mjs';
+import { readJson, writeJson, writeJsRegistry, writeAggregate } from './json.mjs';
 import { ownItPath } from './paths.mjs';
 import { estimate } from './tokens.mjs';
 
@@ -64,8 +64,15 @@ function checkQuest(input, byId) {
   }
   const start = byId.get(input.start);
   if (start.k !== 'surface' || byId.get(input.objectives[0].element).on !== input.start) throw new Error('start must be the screen of the first objective');
-  const { reach } = reachFrom(input.start, [...byId.values()]);
-  for (const o of input.objectives) if (!reach.has(byId.get(o.element).on)) throw new Error(`objective ${o.element} not reachable from start`);
+  const { reach } = reachFrom([input.start], [...byId.values()]);
+  const rolesOf = (it) => (Array.isArray(it.roles) ? it.roles.filter((r) => typeof r === 'string').sort().join(',') : '');
+  input.objectives.forEach((o, i) => {
+    const it = byId.get(o.element);
+    if (reach.has(it.on)) return;
+    // A role switch is the other way in: this step needs a different role than the one before it.
+    const switched = i > 0 && rolesOf(it) !== '' && rolesOf(it) !== rolesOf(byId.get(input.objectives[i - 1].element));
+    if (!switched) throw new Error(`objective ${o.element} not reachable from start`);
+  });
 }
 
 // Surface ids a round shows, so a map-rung pass counts toward coverage.
@@ -116,11 +123,11 @@ function derive(game, round, byId, items) {
   }
 }
 
-// Navigation facts for a quest: every element on a screen the player can reach from `start` by following `goes`.
+// Navigation facts for a quest: every element on a screen the player can reach by following `goes` from `start` or from any objective's screen (a role switch lands there).
 // Plain data (not answers): the game needs them to move between screens and to know who may use what.
-function reachFrom(start, items) {
+function reachFrom(starts, items) {
   const els = items.filter((x) => x.k === 'element' && typeof x.on === 'string');
-  const reach = new Set([start]);
+  const reach = new Set(starts);
   for (let grew = true; grew;) {
     grew = false;
     for (const e of els) if (reach.has(e.on) && typeof e.goes === 'string' && !reach.has(e.goes)) { reach.add(e.goes); grew = true; }
@@ -129,7 +136,9 @@ function reachFrom(start, items) {
 }
 
 function navFor(input, items) {
-  const { els, reach } = reachFrom(input.start, items);
+  const byId = new Map(items.map((x) => [x.id, x]));
+  const screens = [input.start, ...input.objectives.map((o) => byId.get(o.element).on)];
+  const { els, reach } = reachFrom(screens, items);
   return Object.fromEntries(els.filter((e) => reach.has(e.on)).map((e) => {
     const n = { on: e.on };
     if (typeof e.goes === 'string') n.goes = e.goes;
@@ -195,6 +204,7 @@ export async function run(args, ctx) {
     mode: input.mode || session.mode || 'practice', cardIds: shownCards(game, input, byId) } };
   const dataJs = ownItPath(ctx.root, 'data', `${id}.js`);
   writeJsRegistry(dataJs, 'OWNIT_ROUNDS', id, data);
+  writeAggregate(ownItPath(ctx.root, 'data'), ownItPath(ctx.root, 'rounds.js'), 'OWNIT_ROUNDS', (f) => !f.startsWith('feedback-'));
   writeJson(sessionPath, session);
   progress.seq += 1;
   saveProgress(ctx.root, progress);

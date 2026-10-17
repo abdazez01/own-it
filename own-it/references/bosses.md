@@ -23,11 +23,11 @@ No item for a type: use the closest other item, never invent one. Follow `rungs.
 
 ## Live grading
 
-Each answer arrives as an `ask` event `{round, q, text}`. Grade it (`grading.md`), write `build-feedback <round>` with `{grades:{q1:"solid"}, notes?}` for that key, wait again. Solid hits the boss; partial and miss hurt you.
+Each answer arrives as an `ask` event `{round, q, text}`. Grade it (`grading.md`), write `build-feedback <round>` with `{grades:{q1:"solid"}, notes?}` (merged with earlier keys), wait again. Solid hits the boss; partial and miss hurt you.
 
 ## Apply
 
-When all five are graded: `apply <id> --text '{"q1":"solid","q2":"partial","q3":"solid","q4":"miss","q5":"solid"}'`. Pass `q1`..`q5` only. Passing needs board ≥70% (if a whiteboard was played) and at least 3 solid; the result shows `cleared:["boss"]`, `claimed`.
+When all five are graded: `apply <id> --text '{"q1":"solid","q2":"partial","q3":"solid","q4":"miss","q5":"solid"}'`. Pass `q1`..`q5` only. Passing needs the answer's `got/of` ≥70%, at least 3 solid, and every earlier rung cleared (else it is practice, `cleared:[]`); the result shows `cleared:["boss"]`, `claimed`.
 
 - Practice: one debrief, ≤120 words, misses with `file:line`.
 - Exam: nothing until the report card.

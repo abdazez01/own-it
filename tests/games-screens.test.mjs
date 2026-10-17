@@ -10,7 +10,7 @@ const core = require('../own-it/assets/core.js');
 const ASSETS = new URL('../own-it/assets/', import.meta.url);
 const FILES = ['z.js', 'icons.js', 'router.js', 'flap.js', 'toggle.js', 'juice.js', 'keys.js', 'link.js', 'shell.js', 'gamekit.js', 'screenhost.js'];
 const DOC = '<!doctype html>';
-const CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; form-action \'none\'; base-uri \'none\'; navigate-to \'none\'">';
+const CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; form-action \'none\'; base-uri \'none\'">';
 
 const live = [];
 after(() => live.forEach((f) => { try { f(); } catch { /* already cleaned */ } }));

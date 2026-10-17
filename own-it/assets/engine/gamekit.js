@@ -112,7 +112,7 @@
     var xp = Math.max(0, o.xp - shell.hintsUsed() * 15);
     return shell.result({
       got: o.got, total: o.of, xp: xp, missed: o.review,
-      payload: Object.assign({ id: ctx.roundId, game: o.game, mode: o.mode, submittedAt: new Date().toISOString(), got: o.got, of: o.of, missed: o.missed }, o.extra || {})
+      payload: Object.assign({ id: ctx.roundId, game: o.game, mode: o.mode, submittedAt: new Date().toISOString(), got: o.got, of: o.of, missed: o.missed, text: {}, hintsUsed: 0 }, o.extra || {})
     });
   }
 

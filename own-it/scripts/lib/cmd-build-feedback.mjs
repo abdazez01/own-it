@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { readJson, writeJsRegistry } from './json.mjs';
+import { readJson, writeJsRegistry, readJsRegistry, writeAggregate } from './json.mjs';
 import { ownItPath } from './paths.mjs';
 
 const GRADES = ['solid', 'partial', 'miss'];
@@ -45,6 +45,13 @@ export async function run(args, ctx) {
   const session = readJson(ownItPath(ctx.root, 'session.json'), { rounds: {} });
   if (!Object.hasOwn(session.rounds || {}, id)) throw new Error(`unknown round "${id}"`);
   const data = validate(readJson(resolve(ctx.root, arg)));
-  writeJsRegistry(ownItPath(ctx.root, 'data', `feedback-${id}.js`), 'OWNIT_FEEDBACK', id, data);
+  const dir = ownItPath(ctx.root, 'data');
+  const file = ownItPath(ctx.root, 'data', `feedback-${id}.js`);
+  const prior = readJsRegistry(file, 'OWNIT_FEEDBACK')[id] || {};
+  const merged = { ...prior, ...data };
+  if (prior.grades || data.grades) merged.grades = { ...prior.grades, ...data.grades };
+  if (prior.notes || data.notes) merged.notes = { ...prior.notes, ...data.notes };
+  writeJsRegistry(file, 'OWNIT_FEEDBACK', id, merged);
+  writeAggregate(dir, ownItPath(ctx.root, 'feedback.js'), 'OWNIT_FEEDBACK', (f) => f.startsWith('feedback-'));
   return { id };
 }

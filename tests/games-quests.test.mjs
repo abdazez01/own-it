@@ -366,3 +366,41 @@ test('exam mode does not name the required role', () => {
   assert.match(t.root.textContent, /Wrong account for this step\./);
   assert.doesNotMatch(t.root.textContent, /Manager/);
 });
+
+// ---- role switch lands on the right screen (fix wave 16b)
+
+test('switching role loads the first screen of that role when the next objective is not theirs', () => {
+  const t = boot(questRound());
+  t.start();
+  assert.equal(t.frames.length, 1);
+  t.press('Switch role'); t.press('Manager');
+  assert.equal(t.frames.length, 2, 'the manager screen (s2) is mounted');
+  t.load('s2');
+  t.click('el-approve');
+  assert.equal(t.rows()[0].getAttribute('data-state'), 'now', 'approve is not the next step yet, so it is a wrong turn');
+});
+
+test('switching role loads the next objective screen when that objective needs the new role, and not again if already there', () => {
+  const nav = { 'el-open': { on: 's1', roles: ['driver'] }, 'el-help': { on: 's1' }, 'el-approve': { on: 's2', roles: ['manager'] }, 'el-back': { on: 's2', goes: 's1' } };
+  const t = boot(questRound({ nav }));
+  t.start();
+  t.click('el-open');
+  const after = t.frames.length;
+  assert.equal(after, 2, 'the next objective screen was loaded by the tick');
+  t.load('s2');
+  t.press('Switch role'); t.press('Manager');
+  assert.equal(t.frames.length, after, 'already on the right screen: no reload');
+  t.click('el-approve');
+  assert.equal(t.finished.length, 1);
+});
+
+test('leaving with the intro open closes the pop-up, and the page loads rounds.js and feedback.js before boot', () => {
+  const t = boot(questRound());
+  assert.equal(t.env.document.body.querySelectorAll('.dialog').length, 1);
+  t.cleanup();
+  assert.equal(t.env.document.body.querySelectorAll('.dialog').length, 0);
+  assert.deepEqual(t.routed, [], 'closing on leave does not navigate again');
+  const html = readFileSync(new URL('game.html', ASSETS), 'utf8');
+  for (const f of ['rounds.js', 'feedback.js']) assert.ok(html.indexOf(`src="${f}"`) > 0 && html.indexOf(`src="${f}"`) < html.indexOf('OwnIt.router.go'), f);
+  assert.match(readFileSync(new URL('engine/ui.css', ASSETS), 'utf8'), /\.wb-card \{[^}]*overflow-wrap: normal; word-break: normal; hyphens: auto/);
+});

@@ -15,7 +15,7 @@ const TYPES = {
 };
 // Only these top-level names under .own-it/ are ever served (compared lowercased).
 // Everything else (serve.json, inbox/, session.json, answers/, ...) is a 404.
-const SERVED = new Set(['game.html', 'core.js', 'mission.js', 'engine', 'games', 'brand', 'fonts', 'data', 'screens', 'recs.js', 'progress.js', 'screens.js']);
+const SERVED = new Set(['game.html', 'core.js', 'mission.js', 'engine', 'games', 'brand', 'fonts', 'data', 'screens', 'recs.js', 'progress.js', 'screens.js', 'rounds.js', 'feedback.js']);
 
 const send = (res, code, body, type = 'text/plain; charset=utf-8', extra = {}) => {
   res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...extra });
@@ -32,7 +32,7 @@ function versions(base) {
   const out = {};
   const stat = (rel) => { try { out[rel] = statSync(join(base, rel)).mtimeMs; } catch { /* absent */ } };
   try { for (const f of readdirSync(join(base, 'data'))) if (f.endsWith('.js')) stat(`data/${f}`); } catch { /* none */ }
-  for (const f of ['recs.js', 'progress.js', 'screens.js']) stat(f);
+  for (const f of ['recs.js', 'progress.js', 'screens.js', 'rounds.js', 'feedback.js']) stat(f);
   return out;
 }
 

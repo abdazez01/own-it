@@ -272,3 +272,39 @@ test('rounds carry plain labels for every referenced model id, never for a find 
   const q = await bld(root, 'quiz', quiz());
   assert.equal(JSON.stringify(loadRound(root, q.id).labels), '{}');
 });
+
+// ---- fix wave 16b: quests across roles, aggregated registries
+
+test('quests accept an objective on another screen when it needs a different role (role switch)', async () => {
+  const root = await setup();
+  const m = loadModel(root);
+  const it = m.zones.trips.items;
+  it.find((x) => x.id === 'el1').goes = undefined;
+  it.find((x) => x.id === 'el1').roles = ['r1'];
+  it.find((x) => x.id === 'el2').roles = ['r2'];
+  it.push(I({ id: 'r1', k: 'role', label: 'Driver' }), I({ id: 'r2', k: 'role', label: 'Manager' }),
+    I({ id: 's7', k: 'surface', label: 'Tail' }), I({ id: 'el3', k: 'element', on: 's7', does: 'f1' }));
+  saveModel(root, m);
+  const out = await bld(root, 'quests', { zone: 'trips', flow: 'f1', goal: 'g', start: 's1',
+    objectives: [{ text: 'a', element: 'el1' }, { text: 'b', element: 'el2' }] });
+  const r = loadRound(root, out.id);
+  assert.ok(Object.hasOwn(r.nav, 'el2'), 'nav covers the objective screen after the switch');
+  assert.equal(r.nav.el2.goes, 's1');
+  assert.ok(Object.hasOwn(r.nav, 'el1'), 'and screens reachable from it');
+  // same roles on both: still unreachable
+  const m2 = loadModel(root);
+  m2.zones.trips.items.find((x) => x.id === 'el3').roles = ['r1'];
+  saveModel(root, m2);
+  await assert.rejects(bld(root, 'quests', { zone: 'trips', flow: 'f1', goal: 'g', start: 's1',
+    objectives: [{ text: 'a', element: 'el1' }, { text: 'b', element: 'el3' }] }), /objective el3 not reachable from start/);
+});
+
+test('build-round regenerates rounds.js with every round', async () => {
+  const root = await setup();
+  const a = await bld(root, 'quiz', quiz());
+  const b = await bld(root, 'quiz', quiz());
+  const sb = { window: {} };
+  vm.runInNewContext(readFileSync(join(root, '.own-it', 'rounds.js'), 'utf8'), sb);
+  assert.deepEqual(Object.keys(sb.window.OWNIT_ROUNDS).sort(), [a.id, b.id]);
+  assert.ok(existsSync(join(root, '.own-it', 'data', `${a.id}.js`)), 'per-id files are kept');
+});

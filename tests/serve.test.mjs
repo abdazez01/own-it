@@ -301,3 +301,12 @@ test('serve treats a corrupt serve.json as stale and starts fresh', async () => 
     assert.equal(JSON.parse(readFileSync(join(root, '.own-it', 'serve.json'), 'utf8')).port, out.port);
   } finally { await stop({ _: [], flags: {} }, c); }
 });
+
+test('rounds.js and feedback.js are served and versioned in /state', () => withServer(async (s, root) => {
+  writeFileSync(join(root, '.own-it', 'rounds.js'), 'window.OWNIT_ROUNDS={};');
+  writeFileSync(join(root, '.own-it', 'feedback.js'), 'window.OWNIT_FEEDBACK={};');
+  assert.equal((await req(s, { path: '/rounds.js' })).status, 200);
+  assert.equal((await req(s, { path: '/feedback.js' })).status, 200);
+  const st = JSON.parse((await req(s, { path: `/state?t=${s.token}` })).text);
+  assert.ok(st.versions['rounds.js'] && st.versions['feedback.js']);
+}));

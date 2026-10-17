@@ -19,7 +19,7 @@ Rules (hard numbers):
   (high|medium|low). No ref = dropped.
 - Ids unique: letters, digits, _ or -, max 24 chars.
 Kinds (k) and fields:
-- element: on (surface id), does (flow id it belongs to), goes (surface id it leads to), roles (role ids), label, optional purpose (≤160 chars). One per button, link or input that matters.
+- element: on (surface id), does (flow id it belongs to), goes (surface it opens; quests follow it), roles (role ids), label, optional purpose (≤160 chars). One per button, link or input that matters.
 - surface | component: label, actor (app or lane running it, e.g.
   "Driver app"). Outside apps: black-box component.
 - edge: from, to (surface/component ids) = "from calls to".

@@ -197,9 +197,11 @@
       parent.appendChild(ol);
     }
 
+    var introApi = null;
     function openIntro() {
       var begun = false;
       OwnIt.dialog(function (dlg, api) {
+        introApi = api;
         dlg.classList.add('quest-dialog');
         var title = OwnIt.el('div', { 'class': 'banner' });
         dlg.appendChild(title);
@@ -215,6 +217,7 @@
           if (e.key === 'Enter' && e.target !== backBtn) { e.preventDefault(); begin(); }
         });
       }, { label: 'Quest', onClose: function () {
+        introApi = null;
         if (done) return;
         if (begun) { started = true; shell.startTimer(); focusScreen(); } else ctx.router.go('home');
       } });
@@ -231,6 +234,22 @@
       }, { label: 'Quest list' });
     }
 
+    // After a role switch the player lands where that role works: the next objective's screen if it is theirs,
+    // else the first screen that role has an element on.
+    function screenForRole(r) {
+      if (done) return;
+      var next = idx < total && own(nav, objectives[idx].element) ? nav[objectives[idx].element] : null;
+      var dest = null;
+      if (next && next.roles && next.roles.indexOf(r) >= 0) dest = next.on;
+      else {
+        Object.keys(nav).some(function (e) {
+          if (nav[e] && nav[e].roles && nav[e].roles.indexOf(r) >= 0) { dest = nav[e].on; return true; }
+          return false;
+        });
+      }
+      if (dest && dest !== screenId) loadScreen(dest);
+    }
+
     function openRoles() {
       if (!started || done || kit.modalOpen()) return;
       if (!roles.length) { if (ctx.toast) ctx.toast('This quest has no roles to switch.'); return; }
@@ -243,10 +262,12 @@
           b.appendChild(OwnIt.el('span', { 'class': 'answer-text' }, L(r)));
           if (r === role) b.setAttribute('data-autofocus', '1');
           b.addEventListener('click', function () {
+            var changed = r !== role;
             role = r;
             paintRole();
             OwnIt.sound('click');
             say('good', 'Role changed.', 'You are signed in as ' + L(r) + '.');
+            if (changed) screenForRole(r);
             api.close();
           });
           group.appendChild(b);
@@ -287,6 +308,7 @@
 
     return function () {
       done = true;
+      if (introApi) { try { introApi.close(); } catch (e) { /* already closed */ } }
       offs.forEach(function (off) { try { off(); } catch (e) { /* gone */ } });
       if (host) host.destroy();
       shell.destroy();

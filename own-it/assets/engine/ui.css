@@ -514,7 +514,7 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
   position: absolute; z-index: 2; box-sizing: border-box; display: grid; place-items: center; padding: 6px 10px;
   min-height: var(--hit); border: 1px solid var(--edge); border-radius: var(--r-inset);
   background: var(--glass-hi-solid); color: var(--ink); font: 500 var(--fs-13)/1.25 var(--f-ui);
-  text-align: center; overflow-wrap: anywhere; cursor: pointer; touch-action: manipulation;
+  text-align: center; overflow-wrap: normal; word-break: normal; hyphens: auto; cursor: pointer; touch-action: manipulation;
 }
 .wb-card:hover, .wb-card:focus-visible { border-color: var(--gold-a60); }
 .wb-card.picked { border-color: var(--gold); background: var(--gold-a16); box-shadow: 0 0 0 2px var(--gold-a45); }

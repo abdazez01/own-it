@@ -348,3 +348,12 @@ test('no innerHTML in engine sources', () => {
     assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(src), f);
   }
 });
+
+test('link: files written after the page loaded are injected on the first poll', async () => {
+  const fresh = Date.now() + 60000;
+  const fetch = async () => ({ ok: true, json: async () => ({ versions: { 'rounds.js': fresh, 'feedback.js': 5, 'recs.js': 5 } }) });
+  const env = boot({ search: '?t=f', fetch });
+  await env.window.OwnIt.link.ready;
+  const srcs = Array.from(env.document.head.querySelectorAll('script')).map((s) => s.getAttribute('src')).sort();
+  assert.deepEqual(srcs, [`rounds.js?v=${fresh}`]);
+});

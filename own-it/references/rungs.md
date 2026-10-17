@@ -28,7 +28,7 @@ Write a recipe to `.own-it/recipe.json`: `{"mode","missions":[...]}`, max 8. Eac
 | break | component | `cards` and `threats`: 1-4 failure ids on those cards |
 | boss | component | none; over 15 parts: `cards`, 2-15 |
 
-Fogged zone: re-extract `stale`, then one `map` mission with `refresh:true` on cards from `changed` files, padded to 5.
+Fogged zone: re-extract `stale`, then one `map` mission with `refresh:true` (needs `map` cleared) on cards from `changed` files, padded to 5.
 
 Run: `build-missions .own-it/recipe.json`, then `collect <id>`, grade, `apply`. A rebuild forgets unapplied missions.
 

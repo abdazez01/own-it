@@ -18,7 +18,7 @@ function parseAnswer(text) {
 }
 
 // Newest valid inbox result for this mission that is not older than the session.
-function inboxResult(root, id, sessionStart) {
+function inboxResult(root, id, sessionStart, problems) {
   const dir = ownItPath(root, 'inbox');
   let names;
   try { names = readdirSync(dir).filter((n) => /^\d+-result\.json$/.test(n)); } catch { return null; }
@@ -26,7 +26,9 @@ function inboxResult(root, id, sessionStart) {
   for (const n of names) {
     try {
       const { type, ...answer } = JSON.parse(readFileSync(join(dir, n), 'utf8').replace(/^\uFEFF/, ''));
-      if (answer.id !== id || check(answer, ANSWER).length) continue;
+      if (answer.id !== id) continue;
+      const errs = check(answer, ANSWER);
+      if (errs.length) { problems.push(errs.join('; ')); continue; }
       if (!(Date.parse(answer.submittedAt) >= Date.parse(sessionStart))) continue;
       return answer;
     } catch { /* unreadable or invalid: try an older one */ }
@@ -62,11 +64,13 @@ export async function run(args, ctx) {
     missionKnown(wanted);
   } else {
     missionKnown(arg);
-    const fromInbox = inboxResult(ctx.root, arg, session.session);
+    const problems = [];
+    const fromInbox = inboxResult(ctx.root, arg, session.session, problems);
     if (fromInbox) answer = parseAnswer(JSON.stringify(fromInbox));
     else {
       const progress = loadProgress(ctx.root);
-      source = newestDownload(downloadsDir(progress.settings?.downloadDir, ctx.env), arg);
+      try { source = newestDownload(downloadsDir(progress.settings?.downloadDir, ctx.env), arg); }
+      catch (e) { if (problems.length) throw new Error(`invalid answer: ${problems[0]}`); throw e; }
       answer = parseAnswer(readFileSync(source, 'utf8'));
     }
   }

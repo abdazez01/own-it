@@ -8,11 +8,11 @@
 - **partial**: right direction, missing the key piece.
 - **miss**: wrong, empty, or a guess.
 
-`apply <id> --text '{"s-cancel":"solid"}'` with every key graded. Then rebuild recs. `missed` lists ids; `wrong` lists pairs.
+`apply <id> --text '{"s-cancel":"solid"}'` with every key graded. A round `apply` takes no `--got/--of`; those are only for words ids and map missions. Then rebuild recs. `missed` lists ids; `wrong` lists pairs.
 
 ## Feedback file
 
-Write `.own-it/feedback.json` (Exam: only at the report card), run `build-feedback <roundId> .own-it/feedback.json`; the page shows it within seconds. Shape: `{grades?: {q1..q5: solid|partial|miss}, debrief?: string, notes?: {key: string}}`.
+Write `.own-it/feedback.json` (Exam: only at the report card), run `build-feedback <roundId> .own-it/feedback.json`. It merges with the round's existing feedback (grades and notes by key, a new `debrief` replaces), so send only what is new; the page shows it within seconds. Shape: `{grades?: {q1..q5: solid|partial|miss}, debrief?: string, notes?: {key: string}}`.
 
 - Practice: `debrief` ≤120 words, missed and wrong items only, with `file:line`; notes ≤300 chars each. Never restate correct items. Mention bugs, never fix.
 - Exam: no feedback until the report card.
@@ -35,7 +35,7 @@ The page sends `challenge {id, item}`: a model item id or an arrow `A->B`. In fi
 2. User right: write `.own-it/fix-<zone>.json` `{"zone","files":[],"items":[corrected item]}` (same id replaces; one-item extraction), `check-refs` it, then add `--challenge-won 1` to `apply`. To delete an item, list its file in `files` and include that file's other items.
 3. User wrong: `build-feedback` with a note giving `file:line` evidence, ≤300 chars.
 
-Resolve before `apply`; it runs once.
+Resolve before `apply`; it runs once. A challenge that arrives after `apply`: fix the model with `check-refs` if the user is right, no XP.
 
 ## Exam report card
 

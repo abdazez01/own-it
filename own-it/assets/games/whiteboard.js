@@ -133,6 +133,20 @@
     function hasEdge(a, b) { return drawn.some(function (e) { return e[0] === a && e[1] === b; }); }
 
     // ---- geometry
+    // Labels wrap at spaces only, so a card grows to the height its longest label needs at width w (about 7 px a character, 17 px a line).
+    function cardHeight(w) {
+      var perLine = Math.max(4, Math.floor((w - 22) / 7)), most = 1;
+      ids.forEach(function (id) {
+        var lines = 1, used = 0;
+        String(L(id)).split(/\s+/).forEach(function (word) {
+          if (used && used + 1 + word.length > perLine) { lines++; used = 0; }
+          if (word.length > perLine) { lines += Math.ceil(word.length / perLine) - 1; used = word.length % perLine; } else used += (used ? 1 : 0) + word.length;
+        });
+        most = Math.max(most, lines);
+      });
+      return Math.max(CARD_H, most * 17 + 16);
+    }
+
     function relayout() {
       var rect = board.getBoundingClientRect ? board.getBoundingClientRect() : null;
       var W = Math.max(240, Math.round((rect && rect.width) || 640));
@@ -145,30 +159,32 @@
       groups.forEach(function (g) { rows = Math.max(rows, g.length); });
       var cw = Math.floor((W - 2 * PAD - (layers - 1) * GAP_FLOW) / Math.max(layers, 1));
       var horizontal = W >= NARROW && cw >= MIN_W;
-      var H;
+      var H, ch = CARD_H;
       if (horizontal) {
         cw = Math.min(MAX_W, cw);
+        ch = cardHeight(cw);
         var span = layers * cw + (layers - 1) * GAP_FLOW, x0 = Math.max(PAD, Math.round((W - span) / 2));
-        H = 2 * PAD + rows * CARD_H + Math.max(rows - 1, 0) * GAP_ROW;
+        H = 2 * PAD + rows * ch + Math.max(rows - 1, 0) * GAP_ROW;
         groups.forEach(function (g, gi) {
-          var colH = g.length * CARD_H + (g.length - 1) * GAP_ROW;
+          var colH = g.length * ch + (g.length - 1) * GAP_ROW;
           g.forEach(function (id, r) {
-            pos[id] = { x: x0 + gi * (cw + GAP_FLOW), y: Math.round((H - colH) / 2) + r * (CARD_H + GAP_ROW), w: cw, h: CARD_H };
+            pos[id] = { x: x0 + gi * (cw + GAP_FLOW), y: Math.round((H - colH) / 2) + r * (ch + GAP_ROW), w: cw, h: ch };
           });
         });
       } else {
         // phones: each layer is a band; a band wraps onto more rows so every card keeps at least MIN_W
         var perRow = Math.max(1, Math.floor((W - 2 * PAD + GAP_ROW) / (MIN_W + GAP_ROW)));
         var vw = Math.min(MAX_W, Math.floor((W - 2 * PAD - (perRow - 1) * GAP_ROW) / perRow));
+        ch = cardHeight(vw);
         var y = PAD;
         groups.forEach(function (g, gi) {
           g.forEach(function (id, j) {
             var r = Math.floor(j / perRow), inRow = Math.min(perRow, g.length - r * perRow), c = j % perRow;
             var rowW = inRow * vw + (inRow - 1) * GAP_ROW;
-            pos[id] = { x: Math.round((W - rowW) / 2) + c * (vw + GAP_ROW), y: y + r * (CARD_H + GAP_ROW), w: vw, h: CARD_H };
+            pos[id] = { x: Math.round((W - rowW) / 2) + c * (vw + GAP_ROW), y: y + r * (ch + GAP_ROW), w: vw, h: ch };
           });
           var bandRows = Math.ceil(g.length / perRow);
-          y += bandRows * CARD_H + (bandRows - 1) * GAP_ROW + (gi < groups.length - 1 ? GAP_FLOW / 2 : 0);
+          y += bandRows * ch + (bandRows - 1) * GAP_ROW + (gi < groups.length - 1 ? GAP_FLOW / 2 : 0);
         });
         H = y + PAD;
       }

@@ -47,3 +47,18 @@ test('usage and unsafe round id', async () => {
   await assert.rejects(feedback({ _: [], flags: {} }, ctx(root)), /usage: build-feedback/);
   await assert.rejects(feedback({ _: ['__proto__', 'x'], flags: {} }, ctx(root)), /unknown round|missing/);
 });
+
+test('merges with existing feedback for the round and rebuilds feedback.js', async () => {
+  const root = setup();
+  await go(root, 'trips-quiz-1', { grades: { q1: 'solid' }, notes: { a: 'one' }, debrief: 'First.' });
+  await go(root, 'trips-quiz-1', { grades: { q2: 'miss', q1: 'partial' }, notes: { b: 'two' } });
+  let win = {};
+  vm.runInNewContext(readFileSync(out(root, 'trips-quiz-1'), 'utf8'), { window: win });
+  assert.deepEqual(JSON.parse(JSON.stringify(win.OWNIT_FEEDBACK['trips-quiz-1'])),
+    { grades: { q1: 'partial', q2: 'miss' }, notes: { a: 'one', b: 'two' }, debrief: 'First.' });
+  await go(root, 'trips-quiz-1', { debrief: 'Second.' });
+  win = {};
+  vm.runInNewContext(readFileSync(join(root, '.own-it', 'feedback.js'), 'utf8'), { window: win });
+  assert.equal(win.OWNIT_FEEDBACK['trips-quiz-1'].debrief, 'Second.');
+  assert.equal(win.OWNIT_FEEDBACK['trips-quiz-1'].grades.q2, 'miss');
+});

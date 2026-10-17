@@ -13,6 +13,7 @@
   var PROBE_GAP_MS = 300;
   var SAFE_NAME = /^[\w./-]+\.js$/;
 
+  var loadedAt = Date.now();   // file versions are mtimes: anything newer than this was written after the page loaded
   var token = null;
   try {
     var m = /[?&]t=([^&#]+)/.exec((window.location && window.location.search) || '');
@@ -71,8 +72,7 @@
     var names = Object.keys(versions).filter(safeName);
     if (!known) {
       known = {};
-      names.forEach(function (f) { known[f] = versions[f]; });
-      return;
+      names.forEach(function (f) { known[f] = loadedAt < versions[f] ? null : versions[f]; });
     }
     names.forEach(function (file) {
       if (known[file] === versions[file]) return;
