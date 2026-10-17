@@ -4,12 +4,12 @@
 
 `scan --strings <zone>` gives up to 60 terms `{t, kind, n, refs}`. Pick about 10 for the quiz. Unclear names: web search, label "outside knowledge".
 
-## Structure pass (once per zone)
+## Structure pass
 
 Skip if `model.json` has the zone's items and `fog` shows none `stale`. Else give the Agent tool (model `sonnet`) this prompt, or extract inline.
 
 ```
-Extract the truth model of zone "<zone>" from this repo. Read-only.
+Extract the truth model of zone "<zone>" from this repo. Read-only; write nothing outside .own-it/.
 Files: <zone file list>. Scan hits: <scan candidates in these paths>.
 Rules (hard numbers):
 - Locate with grep first. Read line ranges only, at most 80 lines per read.

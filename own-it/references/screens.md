@@ -4,7 +4,7 @@ Screen Tour, Guess the Screen and Quests show rebuilt copies of the user's scree
 
 ## Rebuild (Sonnet subagent, at most 8,000 tokens each)
 
-Give it one screen component (plus direct children if needed): at most 3 files and 400 lines. Ask for one HTML fragment:
+Give it one screen component (plus direct children if needed): at most 3 files and 400 lines. Tell it to change nothing outside `.own-it/`. Ask for one HTML fragment:
 - inline CSS, no JavaScript, no external URLs, no forms with actions;
 - keeps visual hierarchy, labels and interactive elements;
 - `data-ownit="<item id>"` on every button, link or input that matters, using `element` or `surface` ids from the model;
