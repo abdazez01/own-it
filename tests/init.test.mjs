@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
+import { GAMES_DIR } from '../own-it/scripts/lib/games.mjs';
 import { join } from 'node:path';
 import { run as init } from '../own-it/scripts/lib/cmd-init.mjs';
 import { listGames } from '../own-it/scripts/lib/games.mjs';

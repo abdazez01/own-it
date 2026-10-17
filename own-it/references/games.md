@@ -1,15 +1,15 @@
 # Games
 
-Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page data and answers. Fields: `zone`, optional `mode`, and the shape in `assets/games/<game>.schema.json`.
+`build-round <game> <file>` writes page data and answers from JSON. Fields: `zone`, optional `mode`, and the shape in `assets/games/<game>.schema.json`.
 
 | Game | Stage | Fit rule and data shape |
 |---|---|---|
 | `quiz` | 2.0 | Words. `mode` required. `questions` x5: `q`, 4 `options` `{text, why}`, `answer` index 0-3, optional `peek`. |
 | `screen-tour` | 2.0 | Screens with elements. `screen`, `steps` 1-6: `kind` chain/find/role, `prompt`, `element`, `choices`, `answer`. |
-| `guess-the-screen` | 2.0 | Zones with 3+ surfaces (copies optional; wireframe stands in). `screens` 3-8: `screen`, 4 `choices`, `answer`. |
-| `quests` | 2.0 | A flow across screens or roles. `flow`, `goal`, `start`, `objectives` 2-8 `{text, element}`. |
+| `guess-the-screen` | 2.0 | Zones with 3+ surfaces (wireframe stands in for missing copies). `screens` 3-8: `screen`, 4 `choices`, `answer`. |
+| `quests` | 2.0 | Flow across screens or roles. `flow`, `goal`, `start`, `objectives` 2-8 `{text, element}`. |
 | `whiteboard` | 2.0 | Structure. `cards` 2-12 component ids. |
-| `boss-battle` | 2.0 | Final test. `questions` x5 `{q, kind}` why/malicious/structure/fails/term, per `bosses.md`. |
+| `boss-battle` | 2.0 | Final. `questions` x5 `{q, kind}` why/malicious/structure/fails/term, per `bosses.md`. |
 | `memory-match` | 2.0 | Words. `pairs` 4-8 `{term, meaning}`, each said once. |
 | `spot-the-lie` | 2.0 | Any zone. `statements` x5 `{text, why}`, `answer` index 0-4 of the false one. |
 | `chain-reaction` | 2.0 | A flow's step order. `flow` id with 2+ steps. |
@@ -17,26 +17,27 @@ Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page da
 | `blast-radius` | 2.0 | Dependencies. `target` part id. |
 | `pager` | 2.0 | Failures. `failure`, `logs` 4-8, `answer` part id. |
 | `data-detective` | 2.0 | State lifecycles with transitions in the model. `entity`, `states` 3-7 `{state}` in order. |
-| `pipe-plumber` | 2.0 | Button to database data flow. `flow` id, 2-12 steps, the first a surface and the last a component. |
+| `pipe-plumber` | 2.0 | Button to database data flow. `flow` id, 2-12 steps, first a surface, last a component. |
 | `what-if` | 2.0 | Failure at scale. `dials` 3-5 `{label, options, answer, why}`, 4 options, answer 0-3. |
-| `design-duel` | 2.0 | Decisions with a real alternative. `decisions` x3 `{real, alt, reasons, answer}`: 4 `reasons` in words, `answer` index 0-3 of the real one. |
+| `design-duel` | 2.0 | Decisions with a real alternative. `decisions` x3 `{real, alt, reasons, answer}`: 4 `reasons`, `answer` index 0-3 of the real one. |
 | `escape-room` | 2.0 | Mixed boss. `puzzles` x3, one each: role `{role, action, answer allow/deny, why}`, flow `{flow}`, failure `{failure, logs 4-8, answer}`. Needs 3/3. Used puzzles are rejected; vary per replay. |
-| `teach-back` | 2.0 | Explaining a screen. `screen` surface id with a built copy. Curiosity XP only; grade `ask` q1 with `build-feedback`. |
+| `teach-back` | 2.0 | Explaining a screen. `screen` surface id with a built copy. Curiosity XP only; grade `ask` q1 via `build-feedback`. |
 | `case-file` | 2.0 | Bug reports. `case`: `report`, 6 `evidence` `{text, relevant, why}` (exactly 3 relevant), `suspects` 2-5 part ids, `answer`, `why`. Grade `ask` q1 (the motive). |
+| `next-tick` | 2.0 | Predict a flow. `flow` id (2+ steps), `start` `{entity, fields}`, `ticks` 4-6 `{options x4 {text, why}, answer 0-3, changes, step}`, steps in flow order. |
 
-Rungs: words (quiz, memory-match, spot-the-lie), map (whiteboard, screen-tour, guess-the-screen, blast-radius), trace (quests, chain-reaction, data-detective, pipe-plumber, whos-allowed), break (pager, what-if, design-duel, case-file), boss (boss-battle, escape-room).
+Rungs: words (quiz, memory-match, spot-the-lie), map (whiteboard, screen-tour, guess-the-screen, blast-radius), trace (quests, chain-reaction, data-detective, pipe-plumber, whos-allowed, next-tick), break (pager, what-if, design-duel, case-file), boss (boss-battle, escape-room).
 
-Quiz, screen-tour and guess-the-screen need `answer` on every entry. Screen-tour `chain`: `element`, 2-4 `choices` (model ids); `find`: no `choices`, answer an element id; `role`: free-text `choices`. Guess-the-screen `choices` are surface ids. Answer is one of them. A quest step is reachable from `start` by `goes`, or follows a role switch (key R). Ids must exist in the zone. Player-facing text is never a bare identifier.
+Quiz, screen-tour and guess-the-screen need `answer` on every entry. Screen-tour `chain`: `element`, 2-4 `choices` (model ids); `find`: no `choices`, answer an element id; `role`: free-text `choices`. Guess-the-screen `choices` are surface ids. A quest step is reachable from `start` by `goes`, or follows a role switch (key R). Ids must exist. Player text is never a bare identifier. Next-tick `changes` set new values of existing fields.
 
-Answers and layouts are derived. Errors name the bad field; fix and rerun, nothing was written.
+Answers and layouts are derived. Errors name the bad field; fix and rerun.
 
 ## Levels
 
-The player picks on Home:
+The player picks per game on Home:
 - **Easy**: new to the app. Screens and words, no code, free hints. Favor `screen-tour`, `quests`, `quiz`.
 - **Medium**: knows some parts. Data flow, light code names, hints cost 15 XP.
 - **Hard**: knows it well. Code paths, failures, permissions; hints cost 30 XP; Exam default.
-- **Impossible**: edge cases, no hints, timers on. Favor break and boss games.
+- **Impossible**: edge cases, no hints, timers on, boss open. Favor break and boss games.
 - **Other**: describes what they know (`about`); infer the nearest base level.
 
 `build-recs` orders by the last level used (other uses its base). Rounds store their level; the page applies hint and timer policy. `case-file` scales: easy 4 clues, 2 suspects; hard 5 suspects; impossible adds a timer.

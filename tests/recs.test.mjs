@@ -20,7 +20,9 @@ function setup(recs) {
 test('listGames returns every meta file with unique ids', () => {
   const games = listGames();
   const files = readdirSync(GAMES_DIR).filter((f) => f.endsWith('.meta.json'));
+  assert.ok(files.length >= 18);
   assert.ok(games.some((g) => g.id === 'case-file'));
+  assert.ok(games.some((g) => g.id === 'next-tick'));
   assert.equal(games.length, files.length);
   assert.equal(new Set(games.map((g) => g.id)).size, games.length);
 });

@@ -8,10 +8,10 @@ import core from './core.mjs';
 import { readJson, writeJson, writeJsRegistry, writeAggregate } from './json.mjs';
 import { ownItPath } from './paths.mjs';
 import { estimate } from './tokens.mjs';
-import { derive, flowSteps, scaleCase } from './round-derive.mjs';
+import { derive, flowSteps, scaleCase, nextTickRound } from './round-derive.mjs';
 
 // Games whose entries carry a required answer, and the array that holds them.
-const ANSWERED = { quiz: 'questions', 'screen-tour': 'steps', 'guess-the-screen': 'screens' };
+const ANSWERED = { quiz: 'questions', 'screen-tour': 'steps', 'guess-the-screen': 'screens', 'next-tick': 'ticks' };
 
 // Model ids a round names, per game. Every one must exist in the zone.
 const IDS = {
@@ -34,6 +34,7 @@ const IDS = {
   'escape-room': (r) => r.puzzles.flatMap((p) => (p.kind === 'flow' ? [p.flow] : p.kind === 'failure' ? [p.answer] : [])),
   'teach-back': (r) => [r.screen],
   'case-file': (r) => [r.case.answer, ...r.case.suspects],
+  'next-tick': (r) => [r.flow, ...r.ticks.map((t) => t.step)],
 };
 
 
@@ -138,6 +139,57 @@ function checkRepeats(input, used, items) {
   });
 }
 
+// Next tick: a scene of fields, then 4 to 6 ticks along one flow. Steps exist and follow the flow order; changes name real fields and really change them;
+// every sentence a player reads is words. Attaches each tick's code line (`ref`) from the model, to be obfuscated by nextTickRound.
+const FIELD_OK = (v) => (typeof v === 'string' && v.trim() !== '') || (typeof v === 'number' && Number.isFinite(v));
+function checkTicks(input, byId) {
+  const flow = byId.get(input.flow);
+  if (flow.k !== 'flow') throw new Error(`"${input.flow}" is not a flow`);
+  const order = flowSteps(flow, byId);
+  if (order.length < 2) throw new Error(`flow "${input.flow}" needs at least 2 steps in the model`);
+  const { entity, fields } = input.start;
+  if (typeof entity !== 'string' || !entity.trim()) throw new Error('start.entity: expected text');
+  if (identifierOnly(entity)) throw new Error(`identifier-only answer in start.entity; ${HINT}`);
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) throw new Error('start.fields: expected object');
+  const names = Object.keys(fields);
+  if (names.length < 1 || names.length > 8) throw new Error('start.fields: 1 to 8 fields');
+  const words = (where, v) => { if (typeof v === 'string' && identifierOnly(v)) throw new Error(`identifier-only answer in ${where}; ${HINT}`); };
+  for (const f of names) {
+    words(`start.fields name "${f}"`, f);
+    if (!FIELD_OK(fields[f])) throw new Error(`start.fields.${f}: expected a number or a non-empty string`);
+    words(`start.fields.${f}`, fields[f]);
+  }
+  let cur = { ...fields }, at = -1;
+  input.ticks.forEach((t, i) => {
+    const p = `ticks[${i}]`;
+    const pos = order.indexOf(t.step);
+    if (pos < 0) throw new Error(`${p}.step "${t.step}" is not a step of flow "${input.flow}"`);
+    if (pos < at) throw new Error(`${p}.step "${t.step}" comes before the previous tick in flow "${input.flow}"`);
+    at = pos;
+    if (!t.changes || typeof t.changes !== 'object' || Array.isArray(t.changes)) throw new Error(`${p}.changes: expected object`);
+    const keys = Object.keys(t.changes);
+    if (!keys.length) throw new Error(`${p}.changes: at least one field changes`);
+    for (const k of keys) {
+      if (!Object.hasOwn(cur, k)) throw new Error(`${p}.changes.${k}: not a field of the scene`);
+      if (!FIELD_OK(t.changes[k])) throw new Error(`${p}.changes.${k}: expected a number or a non-empty string`);
+      if (t.changes[k] === cur[k]) throw new Error(`${p}.changes.${k}: same value as before, nothing changes`);
+      words(`${p}.changes.${k}`, t.changes[k]);
+    }
+    const seen = new Set();
+    t.options.forEach((o, j) => {
+      words(`${p}.options[${j}].text`, o.text);
+      words(`${p}.options[${j}].why`, o.why);
+      const norm = o.text.trim().toLowerCase();
+      if (seen.has(norm)) throw new Error(`duplicate option in ${p}.options[${j}]`);
+      seen.add(norm);
+    });
+    const it = byId.get(t.step);
+    if (typeof it.ref !== 'string' || !it.ref) throw new Error(`step "${t.step}" has no code reference in the model`);
+    t.ref = it.ref;
+    cur = { ...cur, ...t.changes };
+  });
+}
+
 // Quest objectives are elements of the quest's flow, each used once.
 function checkQuest(input, byId) {
   const flow = byId.get(input.flow);
@@ -168,7 +220,7 @@ function shownCards(game, input, byId) {
   const ids = game === 'screen-tour' ? [input.screen, ...input.steps.map((s) => s.element && byId.get(s.element)?.on)]
     : game === 'guess-the-screen' ? input.screens.map((s) => s.screen)
       : game === 'whiteboard' ? input.cards
-        : game === 'chain-reaction' || game === 'pipe-plumber' ? flowSteps(byId.get(input.flow), byId) : [];
+        : game === 'chain-reaction' || game === 'pipe-plumber' || game === 'next-tick' ? flowSteps(byId.get(input.flow), byId) : [];
   return [...new Set(ids.filter((x) => typeof x === 'string' && byId.has(x)))];
 }
 
@@ -271,6 +323,7 @@ export async function run(args, ctx) {
     if (identifierOnly(input.failure)) throw new Error(`identifier-only answer in failure; ${HINT}`);
     input.logs.forEach((l, i) => { if (identifierOnly(l)) throw new Error(`identifier-only answer in logs[${i}]; ${HINT}`); });
   }
+  if (game === 'next-tick') checkTicks(input, byId);
   if (game === 'chain-reaction') {
     const flow = byId.get(input.flow);
     if (flow.k !== 'flow') throw new Error(`"${input.flow}" is not a flow`);
@@ -310,6 +363,7 @@ export async function run(args, ctx) {
     labelIds.clear(); // only the suspects the page shows get a label
     round.suspects.forEach((c) => labelIds.add(c.id));
   }
+  if (game === 'next-tick') nextTickRound(round, lvl.level === 'custom' ? lvl.levelBase : lvl.level);
   const data = { id, game, zone: input.zone, rung: meta.rung, ...lvl, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.
