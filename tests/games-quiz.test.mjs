@@ -127,7 +127,9 @@ test('payload got/of/missed correct after 5, hintsUsed attached', () => {
   assert.equal(p.hintsUsed, 0);
   assert.equal(p.id, 'trips-quiz-1');
   assert.equal(p.mode, 'practice');
-  assert.ok(t.root.parentNode || t.env.document.body.querySelector('.result-card'));
+  const card = t.env.document.body.querySelector('.result-card');
+  assert.ok(card, 'result card rendered');
+  assert.equal(card.querySelector('.big-score').getAttribute('aria-label'), '3/5');
 });
 
 test('hint is confirmed and counted; exam mode has no hints and no why until the end', () => {
@@ -163,10 +165,37 @@ test('cleanup stops auto advance and unbinds keys', () => {
   assert.equal(t.finished.length, 0);
 });
 
-test('layout hooks: answers grid, one button per option, no innerHTML use', () => {
+test('renders an answers grid, four option buttons, five progress dots, and never uses innerHTML', () => {
   const t = boot();
   assert.equal(t.root.querySelectorAll('.answers').length, 1);
   assert.equal(t.opts().length, 4);
   assert.equal(t.root.querySelectorAll('.qdot').length, 5);
   assert.doesNotMatch(readFileSync(new URL('games/quiz.js', ASSETS), 'utf8'), /innerHTML|outerHTML|insertAdjacentHTML/);
+});
+
+test('zero-question round shows an empty state and sends nothing', () => {
+  const env = createEnv({ reduced: true });
+  env.load(...FILES);
+  env.window.TextDecoder = TextDecoder;
+  vm.runInContext(readFileSync(new URL('core.js', ASSETS), 'utf8'), env.ctx);
+  vm.runInContext(readFileSync(new URL('games/quiz.js', ASSETS), 'utf8'), env.ctx);
+  const root = env.document.createElement('div');
+  env.document.body.appendChild(root);
+  const finished = [];
+  const ctx = { game: 'quiz', roundId: 'x', root, router: { go() {} }, keys: { on: (k, f) => env.window.OwnIt.keys.on(k, f, 'quiz') }, finish: (p) => finished.push(p) };
+  const cleanup = env.window.OwnIt.games.get('quiz').play(root, { zone: 'trips', mode: 'practice', questions: [] }, ctx);
+  live.push(cleanup);
+  assert.match(root.textContent, /no questions/);
+  assert.equal(finished.length, 0);
+});
+
+test('Enter on a focused answer picks it once and is not double-handled', () => {
+  const t = boot();
+  const b = t.opts()[0];
+  b.focus();
+  const ev = t.env.event('keydown', { key: 'Enter' });
+  ev.target = b;
+  t.env.document.dispatchEvent(ev);
+  assert.ok(ev.defaultPrevented);
+  assert.ok(b.classList.contains('picked'));
 });

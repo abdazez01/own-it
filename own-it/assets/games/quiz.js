@@ -153,13 +153,30 @@
     nextBtn.addEventListener('click', function () { next(qi); });
 
     var offs = [];
-    function onKey(fn) { return function () { if (!document.body.querySelector('.scrim')) fn(); }; }
+    function onKey(fn) { return function (e) { if (!document.body.querySelector('.scrim')) fn(e); }; }
     [['1', 0], ['2', 1], ['3', 2], ['4', 3], ['a', 0], ['b', 1], ['c', 2], ['d', 3]].forEach(function (p) {
       offs.push(ctx.keys.on(p[0], onKey(function () { pick(qi, p[1]); })));
     });
-    ['Enter', 'n'].forEach(function (k) { offs.push(ctx.keys.on(k, onKey(function () { next(qi); }))); });
+    offs.push(ctx.keys.on('n', onKey(function () { next(qi); })));
+    offs.push(ctx.keys.on('Enter', onKey(function (e) {
+      if (e && e.preventDefault) e.preventDefault(); // stops the focused button's own click from firing a second time
+      if (!locked) {
+        var btns = answersEl.querySelectorAll('.answer'), at = btns.indexOf(e && e.target);
+        if (at >= 0) pick(qi, at); // Enter on a focused answer picks it
+        return;
+      }
+      next(qi);
+    })));
 
     if (total) render();
+    else {
+      done = true;
+      shell.stopTimer();
+      qText.textContent = 'This round has no questions.';
+      card.appendChild(OwnIt.el('p', { 'class': 'quiz-why' }, 'Ask Claude to build a new quiz round, then pick it again from the board.'));
+      answersEl.setAttribute('hidden', 'hidden');
+      dots.setAttribute('hidden', 'hidden');
+    }
 
     return function () {
       done = true;
