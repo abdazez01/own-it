@@ -1,0 +1,1 @@
+{"type":"object","required":["zone","target"],"props":{"zone":{"type":"string","pattern":"^[a-z0-9-]{1,24}$"},"mode":{"type":"string","enum":["practice","exam"]},"target":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,24}$"}}}

@@ -34,3 +34,15 @@ test('CLI open before init fails cleanly', () => {
   assert.equal(r.status, 1);
   assert.match(r.stderr, /own-it: game page missing; run init first/);
 });
+
+test('open accepts only a local serve URL', async () => {
+  const { isLocalUrl, run: openRun } = await import('../own-it/scripts/lib/cmd-open.mjs');
+  assert.equal(openCommand('linux', 'http://127.0.0.1:5000/game.html?t=ab').args[0], 'http://127.0.0.1:5000/game.html?t=ab');
+  assert.ok(isLocalUrl('http://127.0.0.1:5000/game.html?t=abc123'));
+  assert.ok(isLocalUrl('http://localhost:5000/game.html'));
+  for (const bad of ['https://127.0.0.1:5000/', 'http://example.com:80/', 'http://127.0.0.1/', 'http://127.0.0.1:5000@evil.com/', 'http://127.0.0.1:5000/&calc', 'file:///etc/passwd', 'nope'])
+    assert.equal(isLocalUrl(bad), false, bad);
+  const ctx = { root: tmpProject({}), env: { OWNIT_NO_OPEN: '1' } };
+  assert.deepEqual(await openRun({ _: ['http://127.0.0.1:5000/game.html?t=ab'], flags: {} }, ctx), { opened: 'http://127.0.0.1:5000/game.html?t=ab' });
+  await assert.rejects(openRun({ _: ['http://evil.com:80/'], flags: {} }, ctx), /127\.0\.0\.1/);
+});

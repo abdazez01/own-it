@@ -1,5 +1,6 @@
 import { loadModel, zoneFiles } from './model.mjs';
 import { hashesFor } from './hash.mjs';
+import { readScreens } from './cmd-build-screen.mjs';
 import { loadProgress, saveProgress, RUNGS, defaultZoneProgress } from './progress.mjs';
 
 const MAX_STALE = 20;
@@ -14,7 +15,9 @@ export async function run(_args, ctx) {
   const ids = Object.keys(model.zones);
   const filesOf = new Map(ids.map((id) => [id, zoneFiles(ctx.root, model.zones[id])]));
   const claimedOf = (id) => Object.values(progress.zones[id]?.claimHashes || {}).flatMap((h) => Object.keys(h));
-  const all = new Set(ids.flatMap((id) => [...filesOf.get(id), ...claimedOf(id)]));
+  const screens = readScreens(ctx.root);
+  const screenFiles = Object.values(screens).flatMap((s) => Object.keys(s?.inputs || {}));
+  const all = new Set([...ids.flatMap((id) => [...filesOf.get(id), ...claimedOf(id)]), ...screenFiles]);
   const now = hashesFor(ctx.root, [...all]);
   const git = now.git;
 
@@ -38,6 +41,9 @@ export async function run(_args, ctx) {
       rungs: RUNGS.map((r) => RUNG_CHAR[pz.rungs?.[r]] || '-').join(''),
       fogged,
       stale: stale.slice(0, MAX_STALE),
+      staleScreens: Object.entries(screens)
+        .filter(([, s]) => s?.zone === id && Object.entries(s.inputs || {}).some(([f, h]) => now.hashes[f] !== h))
+        .map(([sid]) => sid),
     };
     if (fogged) zone.changed = changed.slice(0, MAX_STALE);
     zones.push(zone);

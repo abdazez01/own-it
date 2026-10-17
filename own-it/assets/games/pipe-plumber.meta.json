@@ -1,0 +1,12 @@
+{
+  "id": "pipe-plumber",
+  "name": "Pipe Plumber",
+  "rung": "trace",
+  "minutes": 4,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.0",
+  "line": "You rotate the tiles until a button's request reaches the database.",
+  "keys": "Click, Arrows",
+  "logo": "<svg viewBox=\"0 0 24 24\"><path d=\"M4 8h7a5 5 0 0 1 5 5v7\"/><path d=\"M3 5.5v5M13.5 20h5\"/><path stroke=\"#E8C26A\" d=\"M16 3.5v2M20 6.5h-2\"/></svg>"
+}

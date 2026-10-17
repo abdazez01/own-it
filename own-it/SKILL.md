@@ -4,24 +4,27 @@ description: Use when user runs /own-it or asks to be quizzed on, explain, or de
 ---
 # own-it
 
-A game: the user proves they understand their own code.
+A game where the user proves they understand their own code. Follow `references/onboarding.md` first.
 
 ## Hard rules
 
-- Read-only toward source. Write only in `.own-it/` (all scratch files too), plus test files the user approves one by one.
-- Never fix bugs found while playing; only note them.
-- Never skip the fork check, even if asked.
-- Every decision goes through the question tool, all context inside the question, recommended option first. No tool: numbered options in chat.
-- Obey `grading.md` output caps.
-- Run helper commands as `node <skill-dir>/scripts/own-it.mjs <cmd>` from the project root, in a POSIX shell (Bash tool; PowerShell mangles `--text` JSON).
+- Never fix user code; only note bugs.
+- Fork check once per invocation, never again.
+- Never hand-edit `.own-it/*`; use helper commands. Scratch files stay in `.own-it/`.
+- After `open`: one line, then background `wait`.
+- Decisions: question tool, context inside, recommended first.
+- Run `node <skill-dir>/scripts/own-it.mjs <cmd>` from the project root via Bash (PowerShell mangles JSON).
 
-## Phases
+## Load when needed
 
-| Phase | Load |
+| Need | File |
 |---|---|
-| Onboarding, every session | `references/onboarding.md` |
-| Extraction | `references/extraction.md` |
-| Mission build and play | `references/rungs.md` |
-| Grading and debrief | `references/grading.md` |
-| Boss | `references/bosses.md` |
-| Data shapes | `references/examples.md` |
+| Startup and live loop | `onboarding.md` |
+| Model per job | `models.md` |
+| Zone extraction | `extraction.md` |
+| Screen copies | `screens.md` |
+| Games, round data | `games.md` |
+| Questions, missions | `rungs.md` |
+| Grading, feedback | `grading.md` |
+| Boss | `bosses.md` |
+| JSON formats | `examples.md` |

@@ -1,12 +1,14 @@
-import { existsSync, copyFileSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
+import { existsSync, copyFileSync, cpSync, appendFileSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { readJson } from './json.mjs';
+import { readJson, writeJsVar, writeAggregate } from './json.mjs';
+import { listGames } from './games.mjs';
 import { ownItPath, SKILL_DIR } from './paths.mjs';
 import { check, ZONES } from './validate.mjs';
 import { loadModel, saveModel } from './model.mjs';
 import { loadProgress, saveProgress, defaultZoneProgress } from './progress.mjs';
 
-const ASSETS = ['game.html', 'core.js'];
+const FILES = ['game.html', 'core.js'];
+const DIRS = ['engine', 'games', 'brand'];
 
 export async function run(args, ctx) {
   const zf = args.flags.zones;
@@ -25,10 +27,23 @@ export async function run(args, ctx) {
   const created = !existsSync(ownItPath(ctx.root, 'progress.json'));
   mkdirSync(ownItPath(ctx.root), { recursive: true });
 
-  for (const f of ASSETS) {
+  for (const f of FILES) {
     const src = join(SKILL_DIR, 'assets', f);
     if (existsSync(src)) copyFileSync(src, ownItPath(ctx.root, f));
   }
+  for (const d of DIRS) {
+    const src = join(SKILL_DIR, 'assets', d);
+    if (existsSync(src)) cpSync(src, ownItPath(ctx.root, d), { recursive: true });
+  }
+  // The page learns about the games from this generated registry (no fetch of JSON, so file:// works).
+  const registry = ownItPath(ctx.root, 'games', 'registry.js');
+  writeJsVar(registry, 'OWNIT_GAMES', listGames());
+  // The project root lets the page turn file:line refs into editor links.
+  appendFileSync(registry, `window.OWNIT_ROOT = ${JSON.stringify(resolve(ctx.root).split('\\').join('/'))};\n`);
+  // Empty registries the page always loads; build-round and build-feedback regenerate them.
+  const dataDir = ownItPath(ctx.root, 'data');
+  if (!existsSync(ownItPath(ctx.root, 'rounds.js'))) writeAggregate(dataDir, ownItPath(ctx.root, 'rounds.js'), 'OWNIT_ROUNDS', (f) => !f.startsWith('feedback-'));
+  if (!existsSync(ownItPath(ctx.root, 'feedback.js'))) writeAggregate(dataDir, ownItPath(ctx.root, 'feedback.js'), 'OWNIT_FEEDBACK', (f) => f.startsWith('feedback-'));
   const ignore = ownItPath(ctx.root, '.gitignore');
   if (gitTracked) rmSync(ignore, { force: true });
   else writeFileSync(ignore, '*\n');

@@ -1,0 +1,12 @@
+{
+  "id": "boss-battle",
+  "name": "Boss Battle",
+  "rung": "boss",
+  "minutes": 6,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.0",
+  "line": "Answer well to hit the boss. Three wrong answers and you lose.",
+  "keys": "Type, Enter",
+  "logo": "<svg viewBox=\"0 0 24 24\"><path d=\"M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z\"/><path stroke=\"#E8C26A\" d=\"M9 11h6\"/></svg>"
+}

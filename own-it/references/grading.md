@@ -1,50 +1,42 @@
-# Grading and debrief
+# Grading and feedback
 
 ## Free text
 
-`collect` gives `text`: pin answers keyed by card id, Break answers ("what happens, what defends it") keyed `tok:<threatId>`. Grade every key:
+`collect <id>` returns `text`: pin answers by card id, Break answers keyed `tok:<threatId>`. Grade each key:
 
-- **solid**: right, and names the real mechanism the code uses.
-- **partial**: right direction, but vague or missing the key piece.
+- **solid**: right, names the real mechanism.
+- **partial**: right direction, missing the key piece.
 - **miss**: wrong, empty, or a guess.
 
-Pass all grades: `apply <id> --text '{"s-cancel":"solid","tok:x-role":"partial"}'`.
+`apply <id> --text '{"s-cancel":"solid"}'` with every key graded. `--got/--of` are only for words ids and map-rung missions or rounds. Then rebuild recs. `missed` lists ids; `wrong` lists pairs.
 
-Break boards score threat-token placement only; arrows are context. `missed` lists ids; `wrong` lists pairs (map: card ids; boss: box labels; break: threat id, card id; trace: card id, placed lane).
+## Feedback file
+
+Write `.own-it/feedback.json` (Exam: only at the report card), run `build-feedback <roundId> .own-it/feedback.json`. It merges with the round's existing feedback (grades and notes by key, a new `debrief` replaces), so send only what is new; the page shows it within seconds. Shape: `{grades?: {q1..q5: solid|partial|miss}, debrief?: string, notes?: {key: string}}`.
+
+- Practice: `debrief` ≤120 words, missed and wrong items only, with `file:line`; notes ≤300 chars each. Never restate correct items. Mention bugs, never fix.
+- Exam: no feedback until the report card.
+- No em or en dashes; the helper rejects them.
+- Boss and teach-back `ask` events (`{round, q:'q1'..'q5', text}`): grade, write `grades` for that key, wait.
 
 ## Output caps
 
-- Practice debrief: ≤120 words. Missed and wrong items only, with `file:line`. Never restate correct items. Mark low-confidence items. Bugs spotted: mention, never fix.
-- Curiosity answer: ≤80 words each.
-- Exam report card: one line per zone.
-- Hint: one sentence, plus "(prediction, may be wrong)".
+Curiosity answer ≤80 words. Exam report card: one line per zone. Hint: one sentence plus "(prediction, may be wrong)".
 
-## Hints
+## Hints and curiosity
 
-Board hints: the page's Hint button confirms and records the cost. In chat, never hint on a board mission; point to the button. Words (Practice): confirm with the question tool ("Sure? Costs 15 XP"), give one sentence, and score that question as wrong. Exam: no hints.
-
-## Curiosity (Practice only)
-
-A "why?" or follow-up asked after answering counts; asked before submitting, it is a hint request. Count per mission (max 3); `apply` after them with `--curiosity n`.
+The page's Hint button records the cost; in chat never hint on a board. Exam: no hints. A "why?" asked after answering is Curiosity (Practice, max 3 per mission, `--curiosity n`); asked before submitting, it is a hint.
 
 ## Challenge
 
-The user types `challenge <id>`: a model item id, or an arrow `A->B` (card ids on map, box labels on boss).
+The page sends `challenge {id, item}`: a model item id or an arrow `A->B`. In file mode the user types `challenge <id>` instead.
 
 1. Re-read the code at the item's `ref`.
-2. User right: fix the truth model. Write `.own-it/fix-<zone>.json` as `{"zone": "<zone>", "files": [], "items": [<corrected or new item>]}` (same id replaces), run `check-refs` on it, then add `--challenge-won 1` per win to `apply`. To delete an item, put its file in `files` and include that file's other items from `model.json`.
-3. User wrong: show `file:line` evidence, explain in ≤80 words. No XP change.
+2. User right: write `.own-it/fix-<zone>.json` `{"zone","files":[],"items":[corrected item]}` (same id replaces; one-item extraction), `check-refs` it, then add `--challenge-won 1` to `apply`. To delete an item, list its file in `files` and include that file's other items.
+3. User wrong: `build-feedback` with a note giving `file:line` evidence, ≤300 chars.
 
-Resolve challenges before `apply` (runs once).
+Resolve before `apply`; it runs once. A challenge that arrives after `apply`: fix the model with `check-refs` if the user is right, no XP.
 
-## Exam mode
+## Exam report card
 
-No hints, no debriefs, no follow-ups until the end. Still grade text and `apply` each mission. At the end, the report card, one line per zone played:
-
-`<Zone>: defensible | shaky | blind spot — <one reason>`
-
-- **defensible**: every mission ≥70% and text mostly solid.
-- **shaky**: passed some, or text mostly partial.
-- **blind spot**: under 50%, or text mostly miss.
-
-Then answer held follow-ups (≤80 words, no Curiosity XP).
+`<Zone>: defensible | shaky | blind spot, <one reason>`. Defensible: every mission ≥70%, text mostly solid. Shaky: some passed, or text mostly partial. Blind spot: under 50%, or mostly miss. Then answer held follow-ups.

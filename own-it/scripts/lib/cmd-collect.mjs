@@ -17,6 +17,25 @@ function parseAnswer(text) {
   return a;
 }
 
+// Newest valid inbox result for this mission that is not older than the session.
+function inboxResult(root, id, sessionStart, problems) {
+  const dir = ownItPath(root, 'inbox');
+  let names;
+  try { names = readdirSync(dir).filter((n) => /^\d+-result\.json$/.test(n)); } catch { return null; }
+  names.sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
+  for (const n of names) {
+    try {
+      const { type, ...answer } = JSON.parse(readFileSync(join(dir, n), 'utf8').replace(/^\uFEFF/, ''));
+      if (answer.id !== id) continue;
+      const errs = check(answer, ANSWER);
+      if (errs.length) { problems.push(errs.join('; ')); continue; }
+      if (!(Date.parse(answer.submittedAt) >= Date.parse(sessionStart))) continue;
+      return answer;
+    } catch { /* unreadable or invalid: try an older one */ }
+  }
+  return null;
+}
+
 function newestDownload(dir, id) {
   const re = new RegExp(`^own-it-${escapeRe(id)}(?:\\s*\\(\\d+\\))?\\.json$`);
   let files;
@@ -32,7 +51,7 @@ export async function run(args, ctx) {
   if (!arg) throw new Error('usage: collect <missionId> | collect OWNIT:<base64>');
   const session = readJson(ownItPath(ctx.root, 'session.json'));
   const missionKnown = (id) => {
-    if (!Object.hasOwn(session.missions || {}, id)) throw new Error(`unknown mission "${id}" in current session`);
+    if (!Object.hasOwn(session.missions || {}, id) && !Object.hasOwn(session.rounds || {}, id)) throw new Error(`unknown mission "${id}" in current session`);
   };
 
   let answer, source = null, wanted = arg;
@@ -45,9 +64,15 @@ export async function run(args, ctx) {
     missionKnown(wanted);
   } else {
     missionKnown(arg);
-    const progress = loadProgress(ctx.root);
-    source = newestDownload(downloadsDir(progress.settings?.downloadDir, ctx.env), arg);
-    answer = parseAnswer(readFileSync(source, 'utf8'));
+    const problems = [];
+    const fromInbox = inboxResult(ctx.root, arg, session.session, problems);
+    if (fromInbox) answer = parseAnswer(JSON.stringify(fromInbox));
+    else {
+      const progress = loadProgress(ctx.root);
+      try { source = newestDownload(downloadsDir(progress.settings?.downloadDir, ctx.env), arg); }
+      catch (e) { if (problems.length) throw new Error(`invalid answer: ${problems[0]}`); throw e; }
+      answer = parseAnswer(readFileSync(source, 'utf8'));
+    }
   }
 
   if (answer.id !== wanted) throw new Error(`answer file is for "${answer.id}", expected "${wanted}"`);

@@ -1,5 +1,5 @@
 export const XP = { element: 10, half: 5, solid: 20, partial: 10, curiosity: 5, curiosityMax: 3,
-  challenge: 20, hint: -15, rung: 50, claim: 200, fog: 30 };
+  challenge: 20, hint: -15, rung: 50, wrongTurn: 5, cleanRun: 50, claim: 200, fog: 30 };
 
 const TEXT_XP = { solid: XP.solid, partial: XP.partial, miss: 0 };
 

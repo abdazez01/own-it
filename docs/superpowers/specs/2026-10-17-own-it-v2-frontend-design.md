@@ -70,10 +70,10 @@ All tokens live in `assets/engine/tokens.css` as CSS custom properties on `:root
 - **Contrast pairs, which must pass on the darkest glass:**
   - `--ink` on `--glass-deep` is about 15:1.
   - `--ink-2` on `--glass-deep` is about 10:1.
-  - `--gold-ink` on `--gold`, `--sage-ink` on `--sage`, and `--ink` on `--salmon` (bold labels only) are each ≥ 4.5:1.
+  - `--gold-ink` on `--gold`, `--sage-ink` on `--sage`, and `--gold-ink` on `--salmon` (dark text on alert tiles; `--ink` on salmon fails at about 2.2:1) are each ≥ 4.5:1.
   - The build verifies these with a script (section 12).
 - No text is ever placed directly on the background tile field. Text always sits on a glass panel, glass-deep, or a tile.
-- **Reduced transparency fallback** (`prefers-reduced-transparency: reduce`): glass becomes solid `#1B1C20`, and borders stay.
+- **Reduced transparency fallback** (`prefers-reduced-transparency: reduce`, or no `backdrop-filter` support): glass becomes solid `#1B1C20`, raised glass `#25262B`, and inset wells `#0F1012`, and borders stay.
 
 ### 2.2 Type
 
@@ -94,7 +94,14 @@ All tokens live in `assets/engine/tokens.css` as CSS custom properties on `:root
 
 - The spacing base is 4 px. The scale is 4 · 8 · 12 · 16 · 20 · 24 · 32 · 48 · 64.
 - The content width is `min(1180px, 100% - 32px)`, centered, with a 16 px minimum side gutter.
-- The layout is desktop-first. Supported widths are 1024–1920 px. Below 1024 px, a glass notice says "The game board needs a wider window (1024 px or more)." The map screen still renders in a single column for reading.
+- **Fully responsive (user request, 2026-10-17).** Every surface and every game template works from 360 px phone width up to 2560 px ultrawide, with no horizontal page scroll.
+  - Breakpoints: `sm` < 640, `md` 640–1023, `lg` 1024–1599, `xl` ≥ 1600.
+  - **Wide (≥ 1600 px):** the content max-width grows to 1440 px. The library shows more columns, and boards use the extra room instead of stretching cards.
+  - **Small (< 1024 px):** side panels (objectives, tokens, notes) move under the play area or into a bottom sheet. Recommended cards and the library go to 1–2 columns. The departures board scrolls inside its own panel.
+  - **Phones (< 640 px):** the header collapses to the logo, XP, and a menu button holding the toggles. Quiz answers are a single column. Screen copies scale to fit the width with `transform: scale()`, and the hit areas scale with them.
+  - **Touch is a first-class input.** Every drag has a tap-to-select, tap-to-place alternative. Hit targets are ≥ 44 px. Hover-only effects (tilt, hover tick) are skipped on `(hover: none)`.
+  - **Boards:** the whiteboard and pipe grid lay out to the available width and re-run their auto-layout on resize. Swimlanes and timelines stack vertically under `md`.
+  - Text stays ≥ 15 px body on every width. The flap size scales with `clamp()`.
 
 ### 2.4 Radius (one documented system)
 
@@ -203,7 +210,7 @@ All sounds are synthesized, with no files. Each one has pitch variation (±3%) a
 | `toggle` | liquid toggle moves | soft "bloop": sine 520→780 Hz glide + tiny reverb | 160 ms | toggle |
 | `correct` | right answer, objective done | 3-note rising chime (E5–A5–E6), sine, wet | 380 ms | chime |
 | `wrong` | wrong answer, wrong turn | sine 200→120 Hz "bonk" | 240 ms | bonk |
-| `combo-n` | streak step n | `correct` transposed up n semitones, max +7 | 300 ms | chime |
+| `combo` (arg n) | streak step n | `correct` transposed up n semitones, max +7 | 300 ms | chime |
 | `streak-break` | a streak ends | gentle 2-note down-step | 260 ms | chime |
 | `levelup` | rung cleared, badge, quest complete | triad arpeggio (C–E–G triangle) → sustained C–G–C sine chord + one sparkle | ≤ 1.2 s | fanfare |
 | `claim` | zone claimed | `levelup` plus a low C2 swell | ≤ 1.2 s | fanfare |
@@ -228,7 +235,7 @@ The engine is generative, synthesized, and in tune: equal temperament, A4 = 440 
   - Progression B: F → G → Em → Am.
   - Each chord lasts one bar of 4.0 s (8 eighth notes of 0.5 s).
 - **Voices.**
-  - **Pad bed** ("organ hum"): the 4 chord tones, sine plus triangle at the same pitch, attack 1.8 s, through a static 900 Hz low-pass, at gain 0.016 per voice.
+  - **Pad bed** ("organ hum"): the 4 chord tones, sine plus triangle at the same pitch, attack 1.8 s, through a static 800 Hz low-pass (as in the approved mockup), at gain 0.016 per voice.
   - **Bass:** sine root on beat 1 and beat 3, and an octave note on beat 4.
   - **Electric piano (lead):** FM (carrier = modulator frequency, index envelope 2.2f → 0.12f over 0.35 s) plus a faint ×4 bell partial, through a 3.4 kHz low-pass and a quarter-note echo (feedback 0.18, wet low).
   - **Arpeggio:** 8 eighth notes per bar on chord tones `[0,1,2,1,3,1,2,1]`. Each note lasts at most 1.8 beats, so it never rings into the next chord.
@@ -237,7 +244,7 @@ The engine is generative, synthesized, and in tune: equal temperament, A4 = 440 
     - kick (sine 110→42 Hz) on 1, the "and" of 2, and 3,
     - snare (band-passed noise + 196 Hz triangle) on 2 and 4,
     - hats on 8ths.
-- **Timing.** Every note is on the eighth-note grid: no swing, no random timing.
+- **Timing.** Every note is on the eighth-note grid, with no swing and no random timing. Two exceptions come from the approved mockup: the turnaround bell arpeggio steps in sixteenths, and arpeggio notes last 1.8 eighth notes.
 - **Arrangement loop** (4 bars per section, 32 bars per cycle, about 2 min 8 s). Each row adds or removes one layer:
 
   | Section | Progression | Layers |
@@ -665,7 +672,7 @@ own-it/assets/
 
 ## 12. Acceptance checklist (build must pass)
 
-- Every surface in section 5 and 6 renders in the browser check at 1024, 1280, and 1600 px, with no layout overflow.
+- Every surface in sections 5 and 6, and every game template, renders in the browser check at 375, 768, 1280, and 1920 px (plus 2560 for the dashboard), with no horizontal overflow and with touch alternatives working.
 - The contrast script passes for every text/background pair in use.
 - Flaps animate on load and on value change. Only flips the player causes make sound.
 - The liquid toggle squashes and stretches and springs. Every button has press scale, ripple, and sound.

@@ -2,47 +2,37 @@
 
 ## Zone boss (rung 4)
 
-Opens when `break` is cleared. Beating it claims the zone (+200 XP).
+Recommended after `break`; beating it claims the zone (+200 XP) only when every rung is cleared. Two forms:
 
-### 1. Blank board
+1. **Whiteboard**: recipe mission `rung: "boss"`, no pins, blank board; the user draws the zone from memory. Over 15 parts: `cards`, 2-15. `collect <id>`; `wrong` holds box-label pairs.
+2. **Boss Battle** (`boss-battle`, HP bars, 3 lives): `build-round boss-battle <file>` with 5 questions `{q, kind}`.
 
-Recipe mission, no pins. Zones with over 15 surfaces and components need `cards`: pick 2-15 ids to score.
+## Cross-examination
 
-```json
-{"zone": "trips", "rung": "boss", "board": "component",
- "brief": "Blank board. Draw the whole zone from memory: every screen, route and service, and how they connect."}
-```
+Five one-line questions, each from a real model item whose `ref` is your answer key. Never hint the answer.
 
-The user draws from memory. The page matches box names to zone parts and grades the drawing; boxes naming unscored parts are neutral. Showing the card list costs a hint. After "done", `collect <id>`; `wrong` holds box-label pairs. A challenged box naming the right item in other words counts as `--challenge-won`.
-
-### 2. Cross-examination
-
-Then ask 5 questions in chat, one at a time, one line each. Answers are typed in chat, not picked from options. Base each on a real model item, and keep its `ref` as the answer key. Never hint the answer in the question.
-
-| Key | Type | Source item |
+| Key | kind | Source item |
 |---|---|---|
-| q1 | Why X and not Y? | `decision` |
-| q2 | What does a malicious actor try here, and what stops them? | `failure`, `permission` |
-| q3 | Which data structure holds this, and how does it change? | `state`, `transition`, or a store component |
-| q4 | Where does this fail first (timeout, outage, double request, 10x load)? | `failure`, external component |
-| q5 | What does this domain term mean, and why that name? | `term` (lexicon) |
+| q1 | `why`: why X and not Y? | `decision` |
+| q2 | `malicious`: what does an attacker try, what stops them? | `failure`, `permission` |
+| q3 | `structure`: which data structure, how does it change? | `state`, `transition`, store component |
+| q4 | `fails`: where does it fail first? | `failure`, external component |
+| q5 | `term`: what does it mean, why that name? | `term` |
 
-If the zone has no item for a type, use the closest other item; never invent one.
+No item for a type: use the closest other item, never invent one. Follow `rungs.md` question rules.
 
-### 3. Grade and apply
+## Live grading
 
-Grade each answer solid / partial / miss (`grading.md`), then:
+Each answer arrives as an `ask` event `{round, q, text}`. Grade it (`grading.md`), write `build-feedback <round>` with `{grades:{q1:"solid"}, notes?}` (merged with earlier keys), wait again. Solid hits the boss; partial and miss hurt you.
 
-```
-apply <id> --text '{"q1":"solid","q2":"partial","q3":"solid","q4":"miss","q5":"solid"}'
-```
+## Apply
 
-Pass `q1`..`q5` only. The boss passes when the board is ≥70% and at least 3 answers are solid; the result shows `cleared: ["boss"]` and `claimed: true`.
+When all five are graded: `apply <id> --text '{"q1":"solid","q2":"partial","q3":"solid","q4":"miss","q5":"solid"}'`. Pass `q1`..`q5` only. Passing needs the answer's `got/of` ≥70%, at least 3 solid, and every earlier rung cleared (else it is practice, `cleared:[]`); the result shows `cleared:["boss"]`, `claimed`.
 
-- Practice: one debrief (≤120 words) after all five, covering misses with `file:line`.
-- Exam: no feedback until the report card.
-- Failed: name the one or two things to revisit. The rung stays open for another try.
+- Practice: one debrief, ≤120 words, misses with `file:line`.
+- Exam: nothing until the report card.
+- Failed: name one or two things to revisit.
 
 ## Final boss
 
-When every zone is claimed (`fog` shows `ccccc` for each zone), tell the user: "Final boss unlocks, coming in a later version." Do not run it.
+When `fog` shows every zone claimed (`ccccc`): "Final boss unlocks, coming in a later version." Do not run it.

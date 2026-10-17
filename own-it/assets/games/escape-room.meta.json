@@ -1,0 +1,12 @@
+{
+  "id": "escape-room",
+  "name": "Escape Room",
+  "rung": "boss",
+  "minutes": 5,
+  "examReady": true,
+  "usesScreens": false,
+  "stage": "2.0",
+  "line": "You solve three puzzles about roles, flows, and failures to open the door.",
+  "keys": "Click, Enter",
+  "logo": "<svg viewBox=\"0 0 24 24\"><path d=\"M6 21V4h12v17M4 21h16\"/><circle stroke=\"#E8C26A\" cx=\"14.5\" cy=\"11.5\" r=\"1\"/><path stroke=\"#E8C26A\" d=\"M14.5 12.5v2.5\"/></svg>"
+}

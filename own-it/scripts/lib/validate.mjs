@@ -1,3 +1,8 @@
+import { readJson } from './json.mjs';
+
+// Reads a JSON schema file in the mini-schema format used by check().
+export const loadSchema = (path) => readJson(path);
+
 export function check(v, s, at = '') {
   const errs = [];
   const p = (k) => (at ? `${at}.${k}` : k);
@@ -9,6 +14,8 @@ export function check(v, s, at = '') {
   if (s.pattern && !new RegExp(s.pattern).test(v)) errs.push(`${at}: does not match ${s.pattern}`);
   if (s.type === 'string' && s.max !== undefined && v.length > s.max) errs.push(`${at}: at most ${s.max} chars`);
   if (s.type === 'number' && s.min !== undefined && v < s.min) errs.push(`${at}: below ${s.min}`);
+  if (s.type === 'number' && s.max !== undefined && v > s.max) errs.push(`${at}: above ${s.max}`);
+  if (s.type === 'number' && s.int && !Number.isInteger(v)) errs.push(`${at}: expected integer`);
   if (s.type === 'array') {
     if (s.min !== undefined && v.length < s.min) errs.push(`${at}: at least ${s.min} items`);
     if (s.max !== undefined && v.length > s.max) errs.push(`${at}: at most ${s.max} items`);
@@ -25,8 +32,10 @@ const str = { type: 'string' };
 const ids = { type: 'array', items: str };
 export const ITEM = { type: 'object', required: ['id', 'k', 'ref', 'conf'], props: {
   id: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,24}$' },
-  k: { type: 'string', enum: ['surface', 'component', 'edge', 'actor', 'role', 'permission', 'state', 'transition', 'flow', 'decision', 'failure', 'term'] },
+  k: { type: 'string', enum: ['surface', 'component', 'edge', 'actor', 'role', 'permission', 'state', 'transition', 'flow', 'decision', 'failure', 'term', 'element'] },
   label: str, actor: str, from: str, to: str, by: str, card: str, threat: str, role: str, action: str,
+  on: str, does: str, goes: str, roles: ids,
+  purpose: { type: 'string', max: 160 }, reason: { type: 'string', max: 200 },
   steps: { type: 'array', items: ids },
   ref: { type: 'string', pattern: '^[^:]+:\\d+$' },
   conf: { type: 'string', enum: ['high', 'medium', 'low'] },
@@ -44,6 +53,9 @@ export const RECIPE = { type: 'object', required: ['mode', 'missions'], props: {
     brief: { type: 'string', max: 300 }, cards: { type: 'array', items: str, max: 15 },
     flow: str, threats: ids, refresh: { type: 'boolean' },
     pins: { type: 'array', max: 3, items: { type: 'object', required: ['card', 'q'], props: { card: str, q: { type: 'string', max: 160 } } } } } } } } };
+export const RECS = { type: 'object', required: ['recs'], props: { recs: { type: 'array', min: 3, max: 5, items: {
+  type: 'object', required: ['game', 'zone', 'reason'], props: {
+    game: str, zone: str, reason: { type: 'string', max: 120, pattern: '\\S' } } } } } };
 export const ANSWER = { type: 'object', required: ['id', 'submittedAt', 'got', 'of', 'missed', 'text', 'hintsUsed'], props: {
   id: str, submittedAt: str, got: { type: 'number', min: 0 }, of: { type: 'number', min: 0 },
   missed: ids, wrong: { type: 'array', items: { type: 'any' } }, text: { type: 'object' },

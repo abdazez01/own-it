@@ -1,44 +1,41 @@
-# Rungs and missions
+# Rungs, missions and question rules
 
-## Ladder
+## Ladder (recommended, not enforced)
 
-Per zone: `words` → `map` → `trace` → `break` → `boss`. A rung clears at ≥70% on one mission, opening the next. `map` clears once every zone surface was in a passing map mission.
+Per zone: `words`, `map`, `trace`, `break`, `boss`. Every rung and game is playable from the start; locked means "not recommended yet". Clearing needs ≥70% on one mission; map also needs every surface covered. Claiming the zone needs all rungs cleared; an early boss is a practice run.
 
-## Words (rung 0, chat only)
+## Question rules (every game, every mode)
 
-Ask ~10 question-tool questions, one at a time: 4 shuffled options, one correct. Ask what a term means, where it appears (button, DB field, API, enum), or why that name. Then `apply <zone>-words-<n> --got <correct> --of <asked>` (`n` from 1; "already applied": use the next). Add learned terms to `.own-it/lexicon.md`.
+Ask only about: what the product does for a user, what a domain term means and why it has that name, who can do what, what happens when an action is taken, why it was built this way, where it breaks. Never make a function name, variable name, config key or line number the subject or the answer. Identifiers may appear only in a peek or explanation.
 
-## Recipe (rungs 1-4)
+- Bad: "What does `profit_math_version` do?"
+- Good: "An admin re-runs profit for last month after changing the math. What happens to last month's old numbers?"
 
-A session is about 5 missions, usually across several builds. Build what the open rungs allow (map: enough to cover remaining surfaces; trace/break/boss: 1). Apply all, then rebuild.
+Terms with no code meaning: web search, label "outside knowledge".
 
-Write missions (max 8) to `.own-it/recipe.json`: `{"mode":"practice"|"exam","missions":[...]}`. Each mission: `zone`, `rung`, `board`, `brief` (≤300 chars), optional `pins` (≤3 `{card,q}`, q ≤160 chars, card on board).
+## Words
+
+The `quiz` game replaces chat questions. Draft with Haiku (`models.md`), 5 questions, 4 options, a one-line why for each option. Add learned terms to `.own-it/lexicon.md`.
+
+## Board missions (map, trace, break, boss)
+
+Write a recipe to `.own-it/recipe.json`: `{"mode","missions":[...]}`, max 8. Each mission: `zone`, `rung`, `board`, `brief` (≤300 chars), optional `pins` (≤3 `{card, q}`).
 
 | rung | board | fields |
 |---|---|---|
-| map | component | `cards`: 5-10 surfaces/components, uncovered surfaces first (`progress.json` `zones.<z>.surfacesCovered`) |
+| map | component | `cards`: 5-10 surfaces or components, uncovered surfaces first |
 | trace | swimlanes | `flow`: one flow id |
-| break | component | `cards` + `threats`: 1-4 failure ids on those cards |
-| boss | component | none; over 15 surfaces/components: `cards`, 2-15 (`bosses.md`) |
+| break | component | `cards` and `threats`: 1-4 failure ids on those cards |
+| boss | component | none; over 15 parts: `cards`, 2-15 |
 
-Refresh (fogged zone): Re-extract `stale`, then build one `map` mission with `refresh:true`: cards from items whose ref file is in `changed`, padded to 5 with their edge neighbours. Passing clears fog (+30).
+Fogged zone: re-extract `stale`, then one `map` mission with `refresh:true` (needs `map` cleared) on cards from `changed` files, padded to 5.
 
-Rebuilding replaces `session.json`, forgetting unapplied missions.
+Run: `build-missions .own-it/recipe.json`, then `collect <id>`, grade, `apply`. A rebuild forgets unapplied missions.
 
-## Run
+## Fallback without the live link
 
-1. `build-missions .own-it/recipe.json` → `{session,missions:[ids],est}`. Logged tokens are a helper floor ("≈ N tokens"); real cost is ~5-10x (reference reads, chat, debriefs uncounted).
-2. `open` (or a browser tool). Name the first mission.
-3. Per mission, wait for "done", then `collect <id>` → `{id,got,of,missed,text,wrong?}`.
-   - No answer file: ask the download folder (question tool), set `.own-it/progress.json` `settings.downloadDir`, retry.
-   - User pasted `OWNIT:...`: `collect OWNIT:...`.
-4. Grade `text` and debrief (`grading.md`), then `apply <id> --text '<grades>'` plus any `--curiosity n`, `--challenge-won n`, `--tokens in,out` when the harness gives real counts.
-5. `apply` → `{xp,total,ratio,cleared,claimed,badges,weak,fog?}`. Announce clears and badges, one line.
-
-## No browser
-
-Map: build the mission, ask "What does X call?" per card with outgoing arrows (question tool, 4 options), then `apply <id> --got <correct> --of <asked>`. Rungs 2+ need the page; say so.
+`open` the file page; the user downloads the result and types "done". `collect <id>` reads `.own-it/inbox/` first, then Downloads; ask once for the folder (`settings.downloadDir`). A pasted `OWNIT:...` goes to `collect`.
 
 ## End
 
-Update `lexicon.md`, `open` the map, ask "One more?"
+Update `lexicon.md`, offer one more round on the dashboard.

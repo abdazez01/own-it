@@ -1,12 +1,12 @@
 # Extraction
 
-## Words pass (rung 0, no subagent)
+## Words pass (no subagent)
 
-`scan --strings <zone>` → up to 60 terms `{t, kind, n, refs}`. Pick about 10. If code shows what a term is but not why it has that name, web search for the domain meaning; label it "outside knowledge" in questions and `lexicon.md`.
+`scan --strings <zone>` gives up to 60 terms `{t, kind, n, refs}`. Pick about 10 for the quiz. Unclear names: web search, label "outside knowledge".
 
-## Structure pass (rungs 1-4, once per zone)
+## Structure pass (once per zone)
 
-Skip if `model.json` has the zone's items and `fog` shows none `stale`. Else paste into the Agent tool, model `sonnet`, filling `<...>`. No subagent tool? Extract inline, same rules.
+Skip if `model.json` has the zone's items and `fog` shows none `stale`. Else give the Agent tool (model `sonnet`) this prompt, or extract inline.
 
 ```
 Extract the truth model of zone "<zone>" from this repo. Read-only.
@@ -19,6 +19,7 @@ Rules (hard numbers):
   (high|medium|low). No ref = dropped.
 - Ids unique: letters, digits, _ or -, max 24 chars.
 Kinds (k) and fields:
+- element: on (surface id), does (flow id it belongs to), goes (surface it opens; quests follow it), roles (role ids), label, optional purpose (≤160 chars). One per button, link or input that matters.
 - surface | component: label, actor (app or lane running it, e.g.
   "Driver app"). Outside apps: black-box component.
 - edge: from, to (surface/component ids) = "from calls to".
@@ -27,7 +28,7 @@ Kinds (k) and fields:
 - flow: label, steps = ordered groups of card ids, e.g.
   [["a"],["b"],["c","d"],["e"]]; ids in one group may run in any order.
   2-12 cards per flow, each with actor.
-- decision: label (a "why X, not Y?" worth asking).
+- decision: label (a "why X, not Y?" worth asking), reason (one real line, ≤200 chars).
 - failure: card (surface/component id), threat (short attack or fault,
   e.g. "Client forges role header"). Cover validation, auth on mutating
   endpoints, idempotency, retries/timeouts, concurrency, external deps.
@@ -41,8 +42,7 @@ one item per line
 ## Verify
 
 1. Save the reply as `.own-it/extract-<zone>.json`; `check-refs` it → `{kept, dropped[{id, why}], est}`. Items pointing at dropped ids drop as `dangling`.
-2. Spot-check 2-3 random kept items: read each `ref` line, confirm it supports the item. Any failure → re-extract the zone before building missions.
-3. Call low-`conf` items low confidence in debriefs.
+2. Spot-check 2-3 random kept items: read each `ref` line, confirm it supports the item. Failure: re-extract.
 
 ## Partial re-extraction (stale files)
 

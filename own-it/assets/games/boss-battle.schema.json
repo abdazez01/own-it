@@ -1,0 +1,1 @@
+{"type":"object","required":["zone","questions"],"props":{"zone":{"type":"string","pattern":"^[a-z0-9-]{1,24}$"},"mode":{"type":"string","enum":["practice","exam"]},"questions":{"type":"array","min":5,"max":5,"items":{"type":"object","required":["q","kind"],"props":{"q":{"type":"string","max":240},"kind":{"type":"string","enum":["why","malicious","structure","fails","term"]}}}}}}

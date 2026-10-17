@@ -4,7 +4,7 @@ import { check, RECIPE } from './validate.mjs';
 import { loadModel } from './model.mjs';
 import { loadProgress, saveProgress, defaultZoneProgress, RUNGS } from './progress.mjs';
 import core from './core.mjs';
-import { writeJson, writeJsVar } from './json.mjs';
+import { readJson, writeJson, writeJsVar } from './json.mjs';
 import { ownItPath, toPosix } from './paths.mjs';
 import { estimate } from './tokens.mjs';
 
@@ -26,6 +26,7 @@ const shuffled = (missionId, cards) => cards
   .sort((a, b) => a.h - b.h || (a.c.id < b.c.id ? -1 : 1))
   .map((x) => x.c);
 
+// Refresh rules are hard errors. A locked rung is advisory: returns the reason text, or null when recommended.
 function gate(m, pz) {
   if (m.refresh) {
     if (!pz.fogged) throw new Error(`zone "${m.zone}" is not fogged`);
@@ -33,15 +34,15 @@ function gate(m, pz) {
       const cleared = RUNGS.filter((r) => pz.rungs[r] === 'cleared');
       throw new Error(`refresh needs a cleared rung in zone "${m.zone}"; cleared: ${cleared.join(',') || 'none'}`);
     }
-    return;
+    return null;
   }
   const state = Object.hasOwn(pz.rungs, m.rung) ? pz.rungs[m.rung] : 'locked';
-  if (state === 'open' || state === 'cleared') return;
+  if (state === 'open' || state === 'cleared') return null;
   let msg = `rung "${m.rung}" is locked in zone "${m.zone}"`;
   const prev = RUNGS[RUNGS.indexOf(m.rung) - 1];
   if (m.rung === 'trace' && pz.rungs.map !== 'cleared') msg += `; map needs surfaces ${m.__uncovered.join(',')}`;
   else if ((m.rung === 'break' || m.rung === 'boss') && pz.rungs[prev] !== 'cleared') msg += `; clear ${prev} first`;
-  throw new Error(msg);
+  return msg;
 }
 
 function expand(m, i, items, byId) {
@@ -131,6 +132,7 @@ export async function run(args, ctx) {
   const model = loadModel(ctx.root);
   const progress = loadProgress(ctx.root);
   const built = [];
+  const notRecommended = [];
 
   recipe.missions.forEach((m, i) => {
     const at = `missions[${i}]`;
@@ -141,7 +143,7 @@ export async function run(args, ctx) {
     const byId = new Map(items.map((x) => [x.id, x]));
     const pz = Object.hasOwn(progress.zones, m.zone) ? progress.zones[m.zone] : defaultZoneProgress(zone.name);
     const covered = new Set(pz.surfacesCovered || []);
-    gate({ ...m, __uncovered: items.filter((x) => x.k === 'surface' && !covered.has(x.id)).map((x) => x.id) }, pz);
+    const reason = gate({ ...m, __uncovered: items.filter((x) => x.k === 'surface' && !covered.has(x.id)).map((x) => x.id) }, pz);
 
     const x = expand(m, i, items, byId);
     const pins = m.pins || [];
@@ -149,6 +151,7 @@ export async function run(args, ctx) {
     for (const p of pins) if (!shown.has(p.card)) throw new Error(`pin card "${p.card}" not in ${at} cards`);
 
     const id = `${m.zone}-${m.rung}-${progress.seq + 1 + i}`;
+    if (reason) notRecommended.push({ id, rung: m.rung, reason });
     const mission = { id, zone: m.zone, rung: m.rung, board: m.board, brief: m.brief };
     if (x.lanes) mission.lanes = x.lanes;
     mission.cards = shuffled(id, x.cards);
@@ -166,12 +169,13 @@ export async function run(args, ctx) {
   // All validation done; write.
   const session = ctx.now().toISOString();
   const missionIds = built.map((b) => b.mission.id);
+  const prev = readJson(ownItPath(ctx.root, 'session.json'), {});
   const out = { session, mode: recipe.mode, root: toPosix(resolve(ctx.root)), missions: built.map((b) => b.mission) };
   const missionJs = ownItPath(ctx.root, 'mission.js');
   writeJsVar(missionJs, 'OWNIT_MISSIONS', out);
-  writeJson(ownItPath(ctx.root, 'session.json'), { session, mode: recipe.mode,
+  writeJson(ownItPath(ctx.root, 'session.json'), { session, mode: recipe.mode, rounds: prev.rounds || {},
     missions: Object.fromEntries(built.map((b) => [b.mission.id, b.meta])) });
   progress.seq += built.length;
   saveProgress(ctx.root, progress);
-  return { session, missions: missionIds, est: estimate(text, readFileSync(missionJs, 'utf8')) };
+  return { session, missions: missionIds, est: estimate(text, readFileSync(missionJs, 'utf8')), notRecommended };
 }

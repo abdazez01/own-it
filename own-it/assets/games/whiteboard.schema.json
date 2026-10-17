@@ -1,0 +1,1 @@
+{"type":"object","required":["zone","cards"],"props":{"zone":{"type":"string","pattern":"^[a-z0-9-]{1,24}$"},"mode":{"type":"string","enum":["practice","exam"]},"cards":{"type":"array","min":2,"max":12,"items":{"type":"string"}}}}

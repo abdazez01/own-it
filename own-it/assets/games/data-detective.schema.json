@@ -1,0 +1,1 @@
+{"type":"object","required":["zone","entity","states"],"props":{"zone":{"type":"string","pattern":"^[a-z0-9-]{1,24}$"},"mode":{"type":"string","enum":["practice","exam"]},"entity":{"type":"string","max":60},"states":{"type":"array","min":3,"max":7,"items":{"type":"object","required":["state"],"props":{"state":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,24}$"}}}}}}

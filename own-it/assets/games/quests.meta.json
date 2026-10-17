@@ -1,0 +1,12 @@
+{
+  "id": "quests",
+  "name": "Quests",
+  "rung": "trace",
+  "minutes": 6,
+  "examReady": true,
+  "usesScreens": true,
+  "stage": "2.0",
+  "line": "Walk a real flow across your screens and roles, one step at a time.",
+  "keys": "R, Q, Enter",
+  "logo": "<svg viewBox=\"0 0 24 24\"><path d=\"M12 21s-6-5.5-6-10a6 6 0 0 1 12 0c0 4.5-6 10-6 10z\"/><path stroke=\"#E8C26A\" d=\"M10.5 14V8h4l-1 1.5 1 1.5h-4\"/></svg>"
+}

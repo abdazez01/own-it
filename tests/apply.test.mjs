@@ -99,6 +99,20 @@ test('boss needs board ratio and 3 solid answers; claim opens final boss for sin
   assert.equal(loadProgress(root).finalBoss, 'open');
 });
 
+test('boss before rungs cleared is practice, no claim', async () => {
+  const root = await setup();
+  setRungs(root, { words: 'cleared', map: 'cleared', trace: 'open', break: 'open', boss: 'open' });
+  mission(root, 'trips-boss-1', { zone: 'trips', rung: 'boss', board: 'component', cardIds: ['c0', 'c1', 'c2'] }, { got: 4, of: 5 });
+  const out = await apply({ _: ['trips-boss-1'], flags: { text: '{"q1":"solid","q2":"solid","q3":"solid"}' } }, ctx(root));
+  assert.equal(out.claimed, false);
+  assert.equal(out.practice, true);
+  assert.deepEqual(out.cleared, []);
+  assert.equal(out.xp, 40 + 60);
+  const p = loadProgress(root);
+  assert.equal(p.zones.trips.rungs.boss, 'open');
+  assert.equal(p.zones.trips.claimed, false);
+});
+
 test('refresh mission clears fog and re-stamps claim hashes', async () => {
   const root = await setup();
   const p = loadProgress(root);
@@ -289,4 +303,23 @@ test('logged estimate adds the mission floor from build-missions; --tokens repla
   mission(root, 'trips-trace-2', { zone: 'trips', rung: 'trace', board: 'swimlanes', cardIds: ['c0'], est: 1000 }, { got: 1, of: 1 });
   await apply({ _: ['trips-trace-2'], flags: { tokens: '10,5' } }, ctx(root));
   assert.equal(loadProgress(root).tokens.at(-1).est, 15);
+});
+
+test('escape-room is a boss rung: it needs 3/3 and every earlier rung, and no graded text', async () => {
+  const root = await setup();
+  const meta = { zone: 'trips', rung: 'boss', game: 'escape-room', board: 'component', cardIds: [] };
+  setRungs(root, { words: 'cleared', map: 'cleared', trace: 'cleared', break: 'open', boss: 'open' });
+  mission(root, 'trips-escape-room-1', meta, { got: 3, of: 3 });
+  let out = await apply({ _: ['trips-escape-room-1'], flags: {} }, ctx(root));
+  assert.equal(out.claimed, false, 'an unfinished ladder keeps it practice');
+  assert.equal(out.practice, true);
+  setRungs(root, { break: 'cleared' });
+  mission(root, 'trips-escape-room-2', meta, { got: 2, of: 3 });
+  out = await apply({ _: ['trips-escape-room-2'], flags: {} }, ctx(root));
+  assert.equal(out.claimed, false, '2 of 3 leaves the door shut');
+  assert.deepEqual(out.cleared, []);
+  mission(root, 'trips-escape-room-3', meta, { got: 3, of: 3 });
+  out = await apply({ _: ['trips-escape-room-3'], flags: {} }, ctx(root));
+  assert.equal(out.claimed, true);
+  assert.deepEqual(out.cleared, ['boss']);
 });
