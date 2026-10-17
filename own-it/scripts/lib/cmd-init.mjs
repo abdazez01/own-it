@@ -1,4 +1,4 @@
-import { existsSync, copyFileSync, cpSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
+import { existsSync, copyFileSync, cpSync, appendFileSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { readJson, writeJsVar } from './json.mjs';
 import { listGames } from './games.mjs';
@@ -36,7 +36,10 @@ export async function run(args, ctx) {
     if (existsSync(src)) cpSync(src, ownItPath(ctx.root, d), { recursive: true });
   }
   // The page learns about the games from this generated registry (no fetch of JSON, so file:// works).
-  writeJsVar(ownItPath(ctx.root, 'games', 'registry.js'), 'OWNIT_GAMES', listGames());
+  const registry = ownItPath(ctx.root, 'games', 'registry.js');
+  writeJsVar(registry, 'OWNIT_GAMES', listGames());
+  // The project root lets the page turn file:line refs into editor links.
+  appendFileSync(registry, `window.OWNIT_ROOT = ${JSON.stringify(resolve(ctx.root).split('\\').join('/'))};\n`);
   const ignore = ownItPath(ctx.root, '.gitignore');
   if (gitTracked) rmSync(ignore, { force: true });
   else writeFileSync(ignore, '*\n');

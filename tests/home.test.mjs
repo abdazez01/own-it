@@ -10,8 +10,8 @@ const PROGRESS = { xp: 340, zones: {
   locks: { name: 'Locks', rungs: { words: 'cleared', map: 'cleared', trace: 'cleared', break: 'cleared', boss: 'cleared' }, claimed: true, fogged: false, weakSpots: [] },
 } };
 
-function boot({ built = BUILT, progress = PROGRESS, recs, rounds } = {}) {
-  const env = createEnv({ reduced: true });
+function boot({ built = BUILT, progress = PROGRESS, recs, rounds, reduced = true } = {}) {
+  const env = createEnv({ reduced });
   env.load(...FILES);
   const w = env.window;
   w.OWNIT_GAMES = listGames();
@@ -123,4 +123,154 @@ test('shell builds header, area and side; result card sends the result', () => {
   assert.equal(stage.querySelectorAll('.shell-head').length, 1);
   assert.deepEqual(sent, ['result:trips-quiz-1']);
   assert.ok(w.document.body.querySelectorAll('.result-card').length === 1);
+});
+
+// ---- fix round 1
+
+test('footer copy is exact', () => {
+  const { stage, home } = boot();
+  home();
+  const f = stage.querySelector('.foot-note');
+  assert.equal(f.textContent, 'Everything own-it creates lives in .own-it/. Delete it to remove everything.');
+  assert.equal(f.querySelectorAll('code').length, 1);
+});
+
+function countIntervals(w) {
+  const live = new Set();
+  const real = { set: w.setInterval, clear: w.clearInterval };
+  w.setInterval = (fn, ms, ...a) => { const id = real.set(fn, ms, ...a); if (ms === 3800) live.add(id); return id; };
+  w.clearInterval = (id) => { live.delete(id); real.clear(id); };
+  return { live, stop: () => live.forEach((id) => real.clear(id)) };
+}
+
+test('home leaves exactly one idle-shuffle interval across Home, game, Home', () => {
+  const { w, home } = boot({ reduced: false });
+  const t = countIntervals(w);
+  w.OwnIt.register({ id: 'quiz', name: 'Quiz', keys: [], play() {} });
+  home();
+  assert.equal(t.live.size, 1);
+  w.OwnIt.router.go({ game: 'quiz', roundId: 'x' });
+  assert.equal(t.live.size, 0, 'left Home: interval stopped');
+  home();
+  assert.equal(t.live.size, 1);
+  t.stop();
+});
+
+test('building state stops the idle shuffle', () => {
+  const { w, stage, home } = boot({ reduced: false });
+  const t = countIntervals(w);
+  w.OwnIt.link.mode = 'live';
+  w.OwnIt.link.send = () => Promise.resolve(true);
+  w.OwnIt.link.onData = () => () => {};
+  home();
+  stage.querySelectorAll('.tile-game').find((x) => x.getAttribute('data-game') === 'quiz').click();
+  assert.equal(t.live.size, 0);
+  w.OwnIt.stopBuilding();
+  t.stop();
+});
+
+test('offline note lives in the header and follows link mode', () => {
+  const { w, stage, home } = boot();
+  let modeCb = null;
+  w.OwnIt.link.onMode = (cb) => { modeCb = cb; return () => {}; };
+  home();
+  const note = stage.querySelector('.offline-note');
+  assert.ok(note && note.parentNode.classList.contains('header'), 'note is in the header');
+  assert.equal(note.hasAttribute('hidden'), false);
+  assert.match(note.textContent, /Offline mode/);
+  w.OwnIt.link.mode = 'live';
+  modeCb('live');
+  assert.equal(note.hasAttribute('hidden'), true);
+  w.OwnIt.link.mode = 'file';
+  modeCb('file');
+  assert.equal(note.hasAttribute('hidden'), false);
+});
+
+test('shell title reads Game name · Zone', () => {
+  const { w, stage } = boot();
+  w.OwnIt.register({ id: 'quiz', name: 'Quiz', keys: [], play(root, r, ctx) { w.OwnIt.shell(root, ctx, { zone: 'trips', total: 5 }); } });
+  w.OwnIt.router.go({ game: 'quiz', roundId: 'x' });
+  assert.equal(stage.querySelector('.shell-title').textContent, 'Quiz · Trips');
+});
+
+test('building fallback says Use copy and paste instead', () => {
+  const { w, stage } = boot();
+  w.OwnIt.link.onData = () => () => {};
+  w.OwnIt.building(stage, { game: 'quiz', zone: 'trips', name: 'Quiz', onBack() {}, onCopy() {} });
+  assert.equal(stage.querySelectorAll('button').filter((b) => b.textContent === 'Use copy and paste instead').length, 1);
+  w.OwnIt.stopBuilding();
+});
+
+test('hint confirm counts hintsUsed and sends a hint event in live mode', () => {
+  const { w, stage } = boot();
+  const sent = [];
+  w.OwnIt.link.mode = 'live';
+  w.OwnIt.link.send = (type, payload) => { sent.push([type, JSON.parse(JSON.stringify(payload))]); return Promise.resolve(true); };
+  let shell = null;
+  w.OwnIt.register({ id: 'quiz', name: 'Quiz', keys: [], play(root, r, ctx) { shell = w.OwnIt.shell(root, ctx, { zone: 'trips', total: 5, hint: () => 'Think.' }); } });
+  w.OwnIt.router.go({ game: 'quiz', roundId: 'trips-quiz-1' });
+  stage.querySelectorAll('button').find((b) => b.textContent === 'Hint').click();
+  w.document.body.querySelectorAll('button').find((b) => b.textContent === 'Show hint').click();
+  assert.deepEqual(sent, [['hint', { round: 'trips-quiz-1' }]]);
+  assert.equal(shell.hintsUsed(), 1);
+  shell.result({ got: 1, total: 5, xp: 0, payload: { id: 'trips-quiz-1' } });
+  assert.equal(sent[1][0], 'result');
+  assert.equal(sent[1][1].hintsUsed, 1);
+});
+
+test('pick is not resent while that game and zone is building', () => {
+  const { w, stage, home } = boot();
+  const sent = [];
+  w.OwnIt.link.mode = 'live';
+  w.OwnIt.link.send = (t) => { sent.push(t); return Promise.resolve(true); };
+  w.OwnIt.link.onData = () => () => {};
+  home();
+  w.OwnIt.home._pick('quiz', 'trips');
+  w.OwnIt.home._pick('quiz', 'trips');
+  assert.equal(sent.length, 1);
+  w.OwnIt.stopBuilding();
+});
+
+test('re-render after first render flaps instantly (no cascade replay)', () => {
+  const { w, stage, home } = boot({ reduced: false });
+  home();
+  home();
+  const wrap = stage.querySelector('.home');
+  assert.equal(wrap.classList.contains('enter'), false);
+  const xp = stage.querySelector('.flap');
+  assert.equal(xp.textContent, '00340', 'glyphs are final immediately');
+  w.OwnIt.router.go({ game: 'quiz', roundId: 'x' }); // leaving Home stops its timers
+});
+
+test('result card links refs through vscode only when safe', () => {
+  const { w } = boot();
+  w.OWNIT_ROOT = 'C:/proj dir';
+  const ctx = { router: { go() {} }, roundId: 'r' };
+  w.OwnIt.resultCard(ctx, { got: 0, total: 1, xp: 0, missed: [
+    { id: 'a', text: 'A', ref: 'server/x.ts:42' }, { id: 'b', text: 'B', ref: '../../etc/passwd:1' }, { id: 'c', text: 'C', ref: 'javascript:alert(1)' }] });
+  const links = w.document.body.querySelectorAll('a');
+  assert.equal(links.length, 1);
+  assert.equal(links[0].getAttribute('href'), 'vscode://file/C:/proj%20dir/server/x.ts:42');
+  assert.equal(w.document.body.querySelectorAll('code').length, 3); // one inside the link, two plain
+});
+
+test('result card plays one sound on a clear (banner flap is silent)', () => {
+  const { w } = boot({ reduced: false });
+  const played = [];
+  w.OwnIt.sound = (n) => played.push(n);
+  w.OwnIt.resultCard({ router: { go() {} } }, { got: 1, total: 1, xp: 0, banner: 'RUNG CLEARED' });
+  return new Promise((r) => setTimeout(r, 600)).then(() => {
+    assert.deepEqual(played, ['levelup']);
+    w.OwnIt.flap.length; // keep tiles quiet after test
+  });
+});
+
+test('logo parser rejects unsafe paint and numeric values', () => {
+  const { w } = boot();
+  const svg = w.OwnIt.parseSvg('<svg viewBox="0 0 24 24"><path d="M0 0" stroke="url(javascript:x)" fill="red"/><path d="M1 1" stroke="#E8C26A" fill="none"/><circle cx="1" cy="onload" r="3"/></svg>');
+  const [a, b, c] = svg.querySelectorAll('path, circle');
+  assert.equal(a.hasAttribute('stroke'), false);
+  assert.equal(a.hasAttribute('fill'), false);
+  assert.equal(b.getAttribute('stroke'), '#E8C26A');
+  assert.equal(c.hasAttribute('cy'), false);
 });

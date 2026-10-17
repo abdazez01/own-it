@@ -32,12 +32,13 @@
       else if (opts.variant === 'ok') tile.classList.add('ok');
       else if (opts.variant === 'alert') tile.classList.add('alert');
       var steps = flapSteps(ch, i);
+      var still = OwnIt.reduced() || opts.instant;
       var final = steps[steps.length - 1];
-      tile.textContent = OwnIt.reduced() ? final : ' ';
+      tile.textContent = still ? final : ' ';
       el.appendChild(tile);
       tiles.push({ tile: tile, steps: steps, i: i });
     });
-    if (OwnIt.reduced()) return el;
+    if (OwnIt.reduced() || opts.instant) return el;
     tiles.forEach(function (t) {
       var k = 0;
       var timer = setInterval(function () {

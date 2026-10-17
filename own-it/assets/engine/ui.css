@@ -420,3 +420,5 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 @media (max-width: 639.98px) { .wrap > .header[data-open="true"] { position: relative; top: 0; } }
 .word { white-space: nowrap; }
 .recs { grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); }
+.header .offline-note { flex-basis: 100%; margin: 0; color: var(--ink-2); font-size: var(--fs-13); }
+.header.home-head { max-height: none; flex-wrap: wrap; }

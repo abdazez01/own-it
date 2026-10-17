@@ -85,7 +85,8 @@ test('init copies engine and registry', async () => {
   }
   const reg = readFileSync(join(base, 'games', 'registry.js'), 'utf8');
   assert.match(reg, /^window\.OWNIT_GAMES = \[/);
-  const games = JSON.parse(reg.replace(/^window\.OWNIT_GAMES = /, '').replace(/;\s*$/, ''));
+  assert.match(reg, /\nwindow\.OWNIT_ROOT = "/);
+  const games = JSON.parse(reg.split('\n')[0].replace(/^window\.OWNIT_GAMES = /, '').replace(/;\s*$/, ''));
   assert.equal(games.length, 18);
   assert.ok(games.every((g) => g.logo.startsWith('<svg') && g.keys));
   assert.doesNotMatch(readFileSync(join(base, 'game.html'), 'utf8'), /prefers-color-scheme/);

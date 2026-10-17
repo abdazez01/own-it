@@ -13,9 +13,19 @@
   var selectedZone = null;
   var cleanupHome = null;
 
+  function addCleanup(fn) {
+    var prev = cleanupHome;
+    cleanupHome = function () { fn(); if (prev) prev(); };
+  }
+  function runCleanup() { if (cleanupHome) { var c = cleanupHome; cleanupHome = null; c(); } }
+  // Leaving Home for a game stops every Home timer and subscription.
+  if (OwnIt.router && OwnIt.router.onChange) OwnIt.router.onChange(function (st) { if (st !== 'home') runCleanup(); });
+
+  // After the first render, redraws (live data) must not replay the flap cascade.
+  function fopts(extra) { return Object.assign({ instant: entered }, extra || {}); }
+
   // ---------------------------------------------------------------- data
 
-  function own(o, k) { return o && Object.prototype.hasOwnProperty.call(o, k); }
   function games() { return Array.isArray(window.OWNIT_GAMES) ? window.OWNIT_GAMES : []; }
   function progress() { var p = window.OWNIT_PROGRESS; return p && typeof p === 'object' ? p : null; }
   function recs() { return Array.isArray(window.OWNIT_RECS) ? window.OWNIT_RECS : []; }
@@ -94,10 +104,11 @@
     var round = roundFor(zone, game);
     if (round) { OwnIt.router.go({ game: game, roundId: round }); return; }
     if (OwnIt.link && OwnIt.link.mode === 'live') {
-      OwnIt.link.send('pick', { game: game, zone: zone, mode: OwnIt.mode });
-      building[game + '|' + zone] = true;
+      var key = game + '|' + zone;
+      if (!building[key]) OwnIt.link.send('pick', { game: game, zone: zone, mode: OwnIt.mode });
+      building[key] = true;
       var mount = document.getElementById('stage') || document.body;
-      cleanupHome = null;
+      runCleanup();
       OwnIt.building(mount, {
         game: game, zone: zone, name: meta ? meta.name : game,
         isReady: function () { return !!roundFor(zone, game); },
@@ -157,10 +168,10 @@
 
     var xp = statBlock('XP');
     head.appendChild(xp.box);
-    OwnIt.flap(xp.flap, String(Math.max(0, (p && p.xp) | 0)).padStart(5, '0'));
+    OwnIt.flap(xp.flap, String(Math.max(0, (p && p.xp) | 0)).padStart(5, '0'), fopts());
     var cl = statBlock('Claimed', true);
     head.appendChild(cl.box);
-    OwnIt.flap(cl.flap, claimed + '/' + zs.length);
+    OwnIt.flap(cl.flap, claimed + '/' + zs.length, fopts());
 
     var menu = OwnIt.el('button', { type: 'button', 'class': 'icon-btn menu-btn', 'aria-label': 'Menu', 'aria-expanded': 'false', 'data-sound': 'toggle' }, '');
     menu.appendChild(OwnIt.icons.svg('menu'));
@@ -193,6 +204,14 @@
     help.addEventListener('click', function () { OwnIt.keys.help(); });
     tools.appendChild(help);
     head.appendChild(tools);
+    var note = OwnIt.el('p', { 'class': 'offline-note' }, 'Offline mode: answers download to your Downloads folder.');
+    head.appendChild(note);
+    function paintNote() { if (OwnIt.link && OwnIt.link.mode !== 'live') note.removeAttribute('hidden'); else note.setAttribute('hidden', 'hidden'); }
+    paintNote();
+    if (OwnIt.link && OwnIt.link.onMode) {
+      var off = OwnIt.link.onMode(paintNote);
+      addCleanup(function () { if (typeof off === 'function') off(); });
+    }
     return head;
   }
 
@@ -273,7 +292,7 @@
       var name = OwnIt.el('span', { role: 'cell' });
       var nf = OwnIt.el('span');
       name.appendChild(nf);
-      OwnIt.flap(nf, String(zz.z.name || zz.id));
+      OwnIt.flap(nf, String(zz.z.name || zz.id), fopts());
       row.appendChild(name);
       var rc = OwnIt.el('span', { role: 'cell' });
       rc.appendChild(rungCells(zz.z));
@@ -283,7 +302,7 @@
       var sf = OwnIt.el('span', { 'class': zoneStatus(zz.id, zz.z).cls });
       stc.appendChild(sf);
       var stt = zoneStatus(zz.id, zz.z);
-      OwnIt.flap(sf, stt.text, { variant: stt.variant });
+      OwnIt.flap(sf, stt.text, fopts({ variant: stt.variant }));
       statusFlaps.push({ el: sf, text: stt.text, variant: stt.variant });
       row.appendChild(stc);
       row.addEventListener('click', function () { onDetail(zz.id); });
@@ -298,8 +317,7 @@
         var pickOne = statusFlaps[Math.floor(Math.random() * statusFlaps.length)];
         OwnIt.flap(pickOne.el, pickOne.text, { variant: pickOne.variant });
       }, 3800);
-      var prev = cleanupHome;
-      cleanupHome = function () { clearInterval(timer); if (prev) prev(); };
+      addCleanup(function () { clearInterval(timer); });
     }
     return s;
   }
@@ -394,17 +412,14 @@
     var f = OwnIt.el('footer', { 'class': 'foot-note rise' });
     f.appendChild(OwnIt.el('span', null, 'Everything own-it creates lives in '));
     f.appendChild(OwnIt.el('code', null, '.own-it/'));
-    f.appendChild(OwnIt.el('span', null, '. Delete that folder to remove it all.'));
-    if (OwnIt.link && OwnIt.link.mode !== 'live') {
-      f.appendChild(OwnIt.el('p', { 'class': 'offline-note' }, 'Offline mode: answers download to your Downloads folder.'));
-    }
+    f.appendChild(OwnIt.el('span', null, '. Delete it to remove everything.'));
     return f;
   }
 
   // ---------------------------------------------------------------- Home
 
   OwnIt.home = function (mount) {
-    if (cleanupHome) { cleanupHome(); cleanupHome = null; }
+    runCleanup();
     if (OwnIt.stopBuilding) OwnIt.stopBuilding();
     mount.textContent = '';
     var wrap = OwnIt.el('div', { 'class': 'wrap home' + (entered ? '' : ' enter') });

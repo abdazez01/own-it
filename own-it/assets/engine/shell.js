@@ -8,8 +8,10 @@
   // ---------------------------------------------------------------- logo: a tiny safe SVG reader
 
   var TAGS = { path: 1, circle: 1, rect: 1, line: 1, polyline: 1, ellipse: 1, g: 1 };
-  var ATTRS = { d: 1, cx: 1, cy: 1, r: 1, x: 1, y: 1, width: 1, height: 1, rx: 1, ry: 1, x1: 1, y1: 1, x2: 1, y2: 1, points: 1,
-    stroke: 1, fill: 1, 'stroke-dasharray': 1, 'stroke-width': 1, transform: 1 };
+  var HEX = /^(none|currentColor|#[0-9a-fA-F]{3,8})$/, NUM = /^-?[\d.]+%?$/;
+  var ATTRS = { d: /^[\d\sMmLlHhVvCcSsQqTtAaZz.,eE+-]+$/, points: /^[\d\s.,-]+$/, 'stroke-dasharray': /^[\d\s.,]+$/, 'stroke-width': NUM,
+    transform: /^[\w\s().,-]+$/, stroke: HEX, fill: HEX,
+    cx: NUM, cy: NUM, r: NUM, x: NUM, y: NUM, width: NUM, height: NUM, rx: NUM, ry: NUM, x1: NUM, y1: NUM, x2: NUM, y2: NUM };
 
   function svgNode(tag) {
     return document.createElementNS ? document.createElementNS(NS, tag) : document.createElement(tag);
@@ -23,15 +25,14 @@
     svg.setAttribute('focusable', 'false');
     var stack = [svg];
     var re = /<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g, m;
-    var first = true;
     while ((m = re.exec(String(src || '')))) {
       var closing = m[1] === '/', tag = m[2].toLowerCase(), selfClose = m[4] === '/';
-      if (tag === 'svg') { first = false; continue; }
+      if (tag === 'svg') continue;
       if (closing) { if (stack.length > 1) stack.pop(); continue; }
       if (!Object.prototype.hasOwnProperty.call(TAGS, tag)) continue;
       var node = svgNode(tag);
       var ar = /([\w-]+)="([^"]*)"/g, a;
-      while ((a = ar.exec(m[3]))) if (Object.prototype.hasOwnProperty.call(ATTRS, a[1])) node.setAttribute(a[1], a[2]);
+      while ((a = ar.exec(m[3]))) if (Object.prototype.hasOwnProperty.call(ATTRS, a[1]) && ATTRS[a[1]].test(a[2])) node.setAttribute(a[1], a[2]);
       stack[stack.length - 1].appendChild(node);
       if (tag === 'g' && !selfClose) stack.push(node);
     }
@@ -193,7 +194,7 @@
     head.appendChild(OwnIt.logo(meta));
     var title = OwnIt.el('h1', { 'class': 'shell-title' });
     title.appendChild(OwnIt.el('span', null, name));
-    if (opts.zone) title.appendChild(OwnIt.el('span', { 'class': 'zone' }, ' in ' + zoneName(opts.zone)));
+    if (opts.zone) title.appendChild(OwnIt.el('span', { 'class': 'zone' }, ' · ' + zoneName(opts.zone)));
     head.appendChild(title);
     head.appendChild(OwnIt.el('span', { 'class': 'grow' }));
 
@@ -240,9 +241,14 @@
       if (openDialogs.length) return;
       confirmLeave(function () { ctx.router.go('home'); });
     }
+    var hints = 0;
     function openHint() {
       if (!opts.hint || OwnIt.mode === 'exam') return;
-      hintDialog(opts.hint);
+      hintDialog(function () {
+        hints++;
+        if (OwnIt.link && OwnIt.link.mode === 'live') OwnIt.link.send('hint', { round: ctx.roundId });
+        return opts.hint();
+      });
     }
     var offs = [];
     if (ctx.keys) {
@@ -260,7 +266,12 @@
       },
       stopTimer: function () { if (tick) { clearInterval(tick); tick = null; } },
       seconds: function () { return secs; },
-      result: function (r) { return OwnIt.resultCard(ctx, r); },
+      hintsUsed: function () { return hints; },
+      result: function (r) {
+        r = Object.assign({}, r);
+        if (r.payload) r.payload = Object.assign({}, r.payload, { hintsUsed: hints });
+        return OwnIt.resultCard(ctx, r);
+      },
       destroy: function () {
         api.stopTimer();
         offs.forEach(function (off) { try { off(); } catch (e) { /* gone */ } });
@@ -270,6 +281,20 @@
   };
 
   // ---------------------------------------------------------------- result card (5.13)
+
+  var REF = /^[A-Za-z0-9_@./-]+:\d+$/;
+  function encodePath(p) { return p.split('/').map(encodeURIComponent).join('/'); }
+  // 'path:line' becomes a vscode link only when the path is relative, has no '..', and a project root is known.
+  function refNode(ref) {
+    var root = typeof window.OWNIT_ROOT === 'string' ? window.OWNIT_ROOT.replace(/\\/g, '/').replace(/\/+$/, '') : '';
+    var ok = REF.test(ref) && ref.charAt(0) !== '/' && ref.indexOf('..') < 0 && root.length > 0 && !/[\x00-\x1f]/.test(root);
+    if (!ok) return OwnIt.el('code', null, ref);
+    var at = ref.lastIndexOf(':');
+    var href = 'vscode://file/' + encodePath(root).replace(/%3A/g, ':').replace(/^\/+/, '') + '/' + encodePath(ref.slice(0, at)) + ':' + ref.slice(at + 1);
+    var a = OwnIt.el('a', { href: href, 'class': 'ref' });
+    a.appendChild(OwnIt.el('code', null, ref));
+    return a;
+  }
 
   /* r: { got, total, xp, badges: [string], missed: [{id, text, ref}], banner: 'RUNG CLEARED' | 'ZONE CLAIMED',
           payload: object sent with the result event, onNext(), nextLabel } */
@@ -282,7 +307,7 @@
       if (r.banner) {
         var banner = OwnIt.el('div', { 'class': 'banner' });
         dlg.appendChild(banner);
-        OwnIt.flap(banner, r.banner, { variant: 'ok', sound: true });
+        OwnIt.flap(banner, r.banner, { variant: 'ok' });
       }
       var score = OwnIt.el('div', { 'class': 'big-score' });
       dlg.appendChild(score);
@@ -315,7 +340,7 @@
         r.missed.forEach(function (m) {
           var row = OwnIt.el('div', { 'class': 'well missed-row' });
           row.appendChild(OwnIt.el('span', null, m.text));
-          if (m.ref) row.appendChild(OwnIt.el('code', null, m.ref));
+          if (m.ref) row.appendChild(refNode(m.ref));
           if (m.id) {
             row.appendChild(button('Challenge', 'quiet', function () {
               if (OwnIt.link) OwnIt.link.send('challenge', { id: ctx.roundId, item: m.id });
@@ -363,7 +388,7 @@
     var actions = OwnIt.el('div', { 'class': 'actions row' });
     var back = button('Back to board', 'secondary', function () { stop(); opts.onBack(); });
     actions.appendChild(back);
-    var paste = button('Use copy and paste', 'quiet', function () { opts.onCopy(); });
+    var paste = button('Use copy and paste instead', 'quiet', function () { opts.onCopy(); });
     paste.setAttribute('hidden', 'hidden');
     actions.appendChild(paste);
     panel.appendChild(actions);
