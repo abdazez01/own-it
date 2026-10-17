@@ -548,3 +548,15 @@ The Phase 1 targets stay. New items:
 
 - The confetti implementation, the exact layout of the step-picker, and the screen thumbnail rendering.
 - How many distractors to pick, and how (from same-zone model items of the same kind).
+
+## 17. Levels
+
+The player picks how hard own-it asks: easy, medium, hard, impossible, or custom. It is asked once at onboarding and switchable on Home.
+
+- **easy**: the player does not know the app. Screens, buttons and app words, no code. Hints free. Favors screen-tour, quests, quiz, guess-the-screen.
+- **medium**: knows some parts. Data flow and which parts talk, light code names. Hints cost 15 XP.
+- **hard**: knows it inside out. Code paths, failure cases, permissions. Hints cost 30 XP. Exam mode is the default.
+- **impossible**: all-out. Edge cases, races, odd config, "what breaks if". No hints, timers on, boss unlocked. Niche means rare behaviour (retries, timeouts, partial failure), never trivia: no line numbers, exact variable names or file paths as answers.
+- **custom**: the player describes what they know (1 to 300 chars) and Claude maps it to the nearest base level. The base drives mechanics and recommendation order; the text steers zone choice and per-zone depth.
+
+Storage: `level <x>` writes `settings.level` (plus `levelAbout`, `levelBase` for custom) in `.own-it/progress.json`. Unset means not chosen: `build-recs` keeps Claude's order and the page plays at medium. The Home switch sends a `level` live-link event; Claude runs `level`, `build-recs`, then rebuilds page data. Hints and timers are applied centrally by the game shell (`OwnIt.level`, `OwnIt.hintCost`).

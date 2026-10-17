@@ -28,3 +28,14 @@ Rungs: words (quiz, memory-match, spot-the-lie), map (whiteboard, screen-tour, g
 Quiz, screen-tour and guess-the-screen need `answer` on every entry. Screen-tour `chain`: `element`, 2-4 `choices` (model ids), answer one; `find`: no `choices`, answer an element id; `role`: free-text `choices`, answer one. Guess-the-screen: `choices` are surface ids, answer one. Quests and whiteboard carry none. A quest step is reachable from `start` by `goes`, or sits on a screen whose element `roles` differ from the step before (role switch, key R). Ids must exist in the zone. Player-facing text is never a bare identifier.
 
 Errors name the bad field; fix and rerun, nothing was written.
+
+## Levels
+
+Ask with 5 options:
+- **Easy**: I do not know this app. Screens and words, no code, free hints. Favor `screen-tour`, `quests`, `quiz`, `guess-the-screen`.
+- **Medium**: I know some parts. Data flow, light code names, hints cost 15 XP.
+- **Hard**: I know it well. Code paths, failures, permissions; hints cost 30 XP; Exam default.
+- **Impossible**: all-out. Edge cases, no hints, timers on, boss open. Favor break and boss games.
+- **Custom**: Describe what you know. Ask for a short text, pick the nearest base.
+
+`build-recs` orders by level (custom uses its base). The page applies hint and timer policy.

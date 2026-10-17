@@ -25,7 +25,7 @@ Curiosity answer ≤80 words. Exam report card: one line per zone. Hint: one sen
 
 ## Hints and curiosity
 
-The page's Hint button records the cost; in chat never hint on a board. Exam: no hints. A "why?" asked after answering is Curiosity (Practice, max 3 per mission, `--curiosity n`); asked before submitting, it is a hint.
+The page's Hint button records the cost; in chat never hint on a board. Exam and Impossible: no hints. A "why?" asked after answering is Curiosity (Practice, max 3 per mission, `--curiosity n`); asked before submitting, it is a hint.
 
 ## Challenge
 
