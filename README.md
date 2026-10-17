@@ -18,10 +18,10 @@
 
 <p align="center">
   <a href="docs/media/own-it-promo.mp4">
-    <img src="docs/media/own-it-preview.gif" alt="own-it in 20 seconds: split-flap hook, a quiz, a quest on a copied app screen, and the 20-game library" width="88%">
+    <img src="docs/media/own-it-preview.gif" alt="own-it in 30 seconds: split-flap hook, a quiz, a quest on a copied app screen, the 20-game library and the secret level" width="88%">
   </a>
   <br>
-  <sub>▶ <a href="docs/media/own-it-promo.mp4">Watch the 20-second video with sound</a></sub>
+  <sub>▶ <a href="docs/media/own-it-promo.mp4">Watch the 30-second video with sound</a></sub>
 </p>
 
 ---
