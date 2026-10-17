@@ -19,6 +19,8 @@ function world() {
   const env = createEnv({ reduced: true });
   env.load(...FILES);
   const w = env.window;
+  w.TextDecoder = TextDecoder;
+  w.TextEncoder = TextEncoder;
   vm.runInContext(readFileSync(new URL('core.js', ASSETS), 'utf8'), env.ctx, { filename: 'core.js' });
   const sounds = [];
   w.OwnIt.audio = { play: (n) => sounds.push(n) };
@@ -151,4 +153,28 @@ test('the shell timer and fuses wait while a tutorial is open', () => {
   assert.ok(x.w.OwnIt.tutorialOpen > 0);
   buttonNamed(x, 'Got it').click();
   assert.equal(x.w.OwnIt.tutorialOpen, 0);
+});
+
+test('where this lives: shown only after the round finishes, as text without a project root and as editor links with one', () => {
+  const x = world();
+  const list = [{ label: 'Trip service', ref: 'server/trip.ts:12' }, { label: 'Database', ref: 'server/db.ts:3' }];
+  x.w.OWNIT_ROUNDS = { 'z-quiz-1': { where: x.w.OwnItCore.encode(list) } };
+  const root = x.env.document.createElement('div');
+  x.env.document.body.appendChild(root);
+  const ctx = { game: 'quiz', roundId: 'z-quiz-1', keys: { on: () => () => {} }, router: { go() {} }, finish() {} };
+  const shell = x.w.OwnIt.shell(root, ctx, { zone: 'z', total: 1 });
+  assert.ok(!/server\/trip\.ts/.test(x.text()), 'hidden while playing');
+  let decodes = 0;
+  const real = x.w.OwnItCore.decode;
+  x.w.OwnItCore.decode = (s) => { decodes++; return real(s); };
+  x.w.OwnIt.kit.finish(shell, ctx, { game: 'quiz', mode: 'practice', got: 1, of: 1, xp: 10, missed: [], review: [] });
+  assert.equal(decodes, 1);
+  const card = x.all('.result-card')[0];
+  assert.match(card.textContent, /Where this lives in your code/);
+  assert.match(card.textContent, /Trip service.*server\/trip\.ts:12/);
+  assert.equal(card.querySelectorAll('a').length, 0, 'no OWNIT_ROOT: plain text');
+  x.w.OWNIT_ROOT = 'C:/work/app';
+  x.w.OwnIt.kit.finish(shell, ctx, { game: 'quiz', mode: 'practice', got: 1, of: 1, xp: 10, missed: [], review: [] });
+  const links = Array.from(x.all('.result-card')[1].querySelectorAll('a')).filter((a) => /^vscode:\/\/file\/C:\/work\/app\/server\/db\.ts:3$/.test(a.getAttribute('href')));
+  assert.equal(links.length, 1, 'with OWNIT_ROOT the ref opens the editor');
 });

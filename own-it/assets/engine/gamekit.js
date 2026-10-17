@@ -256,6 +256,16 @@
     return { el: bar, stop: stop, remaining: function () { return Math.max(0, ms - elapsed); } };
   }
 
+  // The round's "where this lives" list ([{label, ref}]), decoded here and only when a round ends. Empty when the round has none.
+  function whereLives(roundId) {
+    try {
+      var rd = OwnIt.router && OwnIt.router.resolveRound ? OwnIt.router.resolveRound(roundId) : null;
+      if (!rd || typeof rd.where !== 'string') return [];
+      var list = OwnItCore.decode(rd.where);
+      return (Array.isArray(list) ? list : []).filter(function (x) { return x && typeof x.label === 'string' && typeof x.ref === 'string'; });
+    } catch (e) { return []; }
+  }
+
   /* Ends a round: stops the timer, shows the score and opens the result card with the payload.
      o: { game, mode, got, of, xp, missed: [string], review: [{text}], extra: {…merged into the payload} }. */
   function finish(shell, ctx, o) {
@@ -263,7 +273,7 @@
     shell.setScore(o.got, o.of);
     var xp = Math.max(0, o.xp - shell.hintsUsed() * OwnIt.hintCost(ctx.roundId));
     return shell.result({
-      got: o.got, total: o.of, xp: xp, missed: o.review,
+      got: o.got, total: o.of, xp: xp, missed: o.review, where: whereLives(ctx.roundId),
       payload: Object.assign({ id: ctx.roundId, game: o.game, mode: o.mode, submittedAt: new Date().toISOString(), got: o.got, of: o.of, missed: o.missed, text: {}, hintsUsed: 0 }, o.extra || {})
     });
   }
@@ -490,6 +500,6 @@
 
   OwnIt.kit = { has: has, plural: plural, label: label, note: note, dots: dots, answerButtons: answerButtons, targetIndex: targetIndex, mine: mine,
     choiceKeys: choiceKeys, clock: clock, onActivate: onActivate, arrowKeys: arrowKeys, gridMove: gridMove, timers: timers, release: release, nextLabel: nextLabel, lazy: lazy, verdict: verdict, stepper: stepper,
-    gradeFor: gradeFor, asker: asker, finish: finish, modalOpen: modalOpen,
+    gradeFor: gradeFor, asker: asker, finish: finish, whereLives: whereLives, modalOpen: modalOpen,
     coach: coach, tutorial: tutorial, tutorialSeen: tutorialSeen, markSeen: markSeen };
 })();

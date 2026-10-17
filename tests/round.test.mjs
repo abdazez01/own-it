@@ -480,6 +480,25 @@ test('blast-radius: each broken part carries a one-line reason from its dependen
   assert.deepEqual(core.decode(r.why), { c1: 'Trip service calls Database.', c3: 'Billing calls Database.', s1: 'Trip screen calls Trip service, which breaks too.' });
 });
 
+test('where this lives: every round carries obfuscated file:line refs for the items it uses; blast radius lists the target and what breaks', async () => {
+  const root = await blastSetup();
+  const m = loadModel(root);
+  const byId = Object.fromEntries(m.zones.trips.items.map((x) => [x.id, x]));
+  byId.c2.ref = 'api/db.ts:7'; byId.c1.ref = 'api/trips.ts:3'; byId.c3.ref = 'api/billing.ts:9'; byId.c4.ref = 'api/mail.ts:5';
+  saveModel(root, m);
+  const r = loadRound(root, (await bld(root, 'blast-radius', { zone: 'trips', target: 'c2' })).id);
+  assert.equal(typeof r.where, 'string');
+  assert.ok(!JSON.stringify({ ...r, where: undefined }).includes('api/'), 'no ref in plain data');
+  const list = core.decode(r.where);
+  const refs = Object.fromEntries(list.map((w) => [w.label, w.ref]));
+  assert.equal(refs.Database, 'api/db.ts:7');
+  assert.equal(refs['Trip service'], 'api/trips.ts:3');
+  assert.equal(refs.Billing, 'api/billing.ts:9');
+  assert.ok(!('Mailer' in refs), 'a part that does not break is left out');
+  const quiz = loadRound(root, (await bld(root, 'quiz', { zone: 'trips', mode: 'practice', questions: Array.from({ length: 5 }, (_, i) => ({ q: `Question ${i}?`, options: [0, 1, 2, 3].map((j) => ({ text: `Choice ${i} ${j} here`, why: `Because ${i} ${j}` })), answer: 0 })) })).id);
+  assert.equal(quiz.where, undefined, 'a round that names no model item has none');
+});
+
 test('blast-radius: a target nobody depends on, a non-part target and an unlabeled target are rejected', async () => {
   const root = await blastSetup();
   await assert.rejects(bld(root, 'blast-radius', { zone: 'trips', target: 'c4' }), /nothing depends on/);

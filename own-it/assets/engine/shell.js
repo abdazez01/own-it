@@ -313,7 +313,7 @@
     return a;
   }
 
-  /* r: { got, total, xp, badges: [string], missed: [{id, text, ref}], banner: 'RUNG CLEARED' | 'ZONE CLAIMED',
+  /* r: { got, total, xp, badges: [string], missed: [{id, text, ref}], where: [{label, ref}], banner: 'RUNG CLEARED' | 'ZONE CLAIMED',
           payload: object sent with the result event, onNext(), nextLabel } */
   OwnIt.resultCard = function (ctx, r) {
     r = r || {};
@@ -365,6 +365,17 @@
           }
           dlg.appendChild(row);
         });
+      }
+      if (r.where && r.where.length) {
+        dlg.appendChild(OwnIt.el('h3', { 'class': 'panel-title' }, 'Where this lives in your code'));
+        var where = OwnIt.el('div', { 'class': 'well where-lives' });
+        r.where.forEach(function (w) {
+          var row = OwnIt.el('p', { 'class': 'where-row' });
+          row.appendChild(OwnIt.el('span', null, w.label));
+          row.appendChild(refNode(w.ref));
+          where.appendChild(row);
+        });
+        dlg.appendChild(where);
       }
       var actions = OwnIt.el('div', { 'class': 'actions' });
       actions.appendChild(button('Back to board', 'secondary', function () { api.close(); ctx.router.go('home'); }));

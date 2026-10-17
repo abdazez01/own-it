@@ -203,6 +203,15 @@ function navFor(input, items) {
   }));
 }
 
+// The model items whose code a round is about: the ids it names (decoy choices left out), the steps of any flow, the parts that break.
+function whereIds(game, input, round, named) {
+  const ids = new Set(named);
+  const dropDecoys = (entries) => entries.forEach((e) => (e.choices || []).forEach((c) => { if (c !== e.answer) ids.delete(c); }));
+  if (game === 'screen-tour') dropDecoys(input.steps.filter((s) => s.kind !== 'role'));
+  if (game === 'guess-the-screen') dropDecoys(input.screens);
+  return ids;
+}
+
 export async function run(args, ctx) {
   const [game, arg] = args._;
   if (!game || !arg) throw new Error('usage: build-round <game> <file>');
@@ -282,7 +291,13 @@ export async function run(args, ctx) {
   if (game === 'escape-room') round.puzzles.forEach((pz) => (pz.cards || []).forEach((c) => labelIds.add(c.id)));
   const nav = game === 'quests' ? navFor(input, items) : null;
   if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
-  const data = { id, game, zone: input.zone, rung: meta.rung, ...lvl, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
+  // "Where this lives in your code": file:line for the items the round is about, obfuscated and shown only when the round finishes.
+  const used = whereIds(game, input, round, named);
+  for (const id of [...used]) if (byId.get(id)?.k === 'flow') for (const step of flowSteps(byId.get(id), byId)) used.add(step);
+  if (game === 'blast-radius') for (const id of round.answer) used.add(id);
+  const where = [...used].map((id) => byId.get(id)).filter((it) => it && typeof it.ref === 'string' && it.ref.trim())
+    .map((it) => ({ label: typeof it.label === 'string' && it.label.trim() ? it.label : it.id, ref: it.ref.trim() }));
+  const data = { id, game, zone: input.zone, rung: meta.rung, ...lvl, ...obfuscate(round), ...(where.length ? { where: core.encode(where) } : {}), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.
   const sessionPath = ownItPath(ctx.root, 'session.json');
