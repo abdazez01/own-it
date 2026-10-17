@@ -5,12 +5,12 @@
 
   var TOKENS = [['--gold', '#E8C26A'], ['--steel', '#5A7BA8'], ['--sage', '#8FD3A8'], ['--navy', '#3E5578']];
   var EXTRA = '#C9A24E';
-  var SALMON = '#F08A7A';
-  var GLYPHS = 'OI0123456789ABCDEFGHJKLMNPRSTUVWXYZ/';
+  var SALMON_FALLBACK = '#F08A7A';
+  var GLYPHS = 'OI0123456789ABCDEFGHJKLMNPQRSTUVWXYZ/';
   var INK = '#111214';
 
   var cv = null, g = null, W = 0, H = 0, tiles = [], colors = [];
-  var raf = 0, last = 0, running = false, alert = false, reduced = false;
+  var raf = 0, last = 0, running = false, alert = false, alertMix = 0, reduced = false, salmon = SALMON_FALLBACK;
 
   function cssColor(name, fallback) {
     try {
@@ -23,6 +23,7 @@
   function readColors() {
     colors = TOKENS.map(function (t) { return cssColor(t[0], t[1]); });
     colors.push(EXTRA);
+    salmon = cssColor('--salmon', SALMON_FALLBACK);
   }
 
   function wantedCount() { return Math.min(26, Math.round(W * H / 52000)); }
@@ -65,8 +66,9 @@
       var sy = k.flip > 0 ? Math.abs(Math.cos(k.flip * Math.PI)) : 1;
       g.save();
       g.translate(k.x, k.y); g.rotate(k.r); g.scale(1, Math.max(sy, 0.04));
-      g.globalAlpha = k.a; g.fillStyle = alert ? SALMON : k.c;
-      rr(-w / 2, -h / 2, w, h, w * 0.14); g.fill();
+      rr(-w / 2, -h / 2, w, h, w * 0.14);
+      g.globalAlpha = k.a * (1 - alertMix); g.fillStyle = k.c; g.fill();
+      if (alertMix > 0.001) { g.globalAlpha = k.a * alertMix; g.fillStyle = salmon; g.fill(); } // tint blend toward salmon
       g.globalAlpha = k.a * 0.9; g.fillStyle = INK; g.fillRect(-w / 2, -1, w, 2); // hinge line
       g.globalAlpha = Math.min(1, k.a * 2.2);
       g.font = '600 ' + Math.round(h * 0.55) + 'px "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace';
@@ -96,6 +98,7 @@
   function frame(now) {
     if (!running) return;
     var dt = Math.min(50, now - last); last = now;
+    alertMix += ((alert ? 1 : 0) - alertMix) * Math.min(1, dt / 500);
     stepTiles(dt); draw();
     raf = window.requestAnimationFrame(frame);
   }
@@ -143,7 +146,8 @@
       cv = null; g = null; tiles = [];
     },
     // 3am Pager: tiles tint toward salmon while the alarm lasts.
-    setAlert: function (on) { alert = !!on; if (cv && (!running || reduced)) draw(); },
+    setAlert: function (on) { alert = !!on; if (!running || reduced) alertMix = alert ? 1 : 0; if (cv && (!running || reduced)) draw(); },
+    _glyphs: GLYPHS,
     _count: function () { return tiles.length; }
   };
 })();

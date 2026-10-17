@@ -4,7 +4,7 @@ import { createEnv } from './fake-dom.mjs';
 
 // A generic fake Web Audio graph: every create* returns a chainable node, and we count what is scheduled.
 function fakeAudio(win) {
-  const log = { osc: 0, src: 0, started: 0, ctxs: 0 };
+  const log = { osc: 0, src: 0, started: 0, ctxs: 0, gains: [], delays: 0, convolvers: 0, last: null };
   const node = () => {
     const store = {};
     return new Proxy(function () { return node(); }, {
@@ -21,22 +21,37 @@ function fakeAudio(win) {
     });
   };
   class FakeCtx {
-    constructor() { log.ctxs++; this.currentTime = 0; this.sampleRate = 44100; this.state = 'running'; this.destination = node(); }
+    constructor() { log.ctxs++; log.last = this; this.currentTime = 0; this.sampleRate = 44100; this.state = 'running'; this.destination = node(); }
     createOscillator() { log.osc++; return node(); }
     createBufferSource() { log.src++; return node(); }
     createBuffer(ch, len) { return { getChannelData: () => new Float32Array(Math.min(len, 4096)) }; }
     resume() { this.state = 'running'; return Promise.resolve(); }
     suspend() { this.state = 'suspended'; return Promise.resolve(); }
   }
-  for (const n of ['createGain', 'createBiquadFilter', 'createDynamicsCompressor', 'createConvolver', 'createDelay', 'createStereoPanner', 'createWaveShaper']) {
+  FakeCtx.prototype.createGain = function () {
+    const rec = { events: [], direct: false };
+    const param = {
+      setValueAtTime(v) { rec.events.push(v); },
+      exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {},
+      set value(v) { rec.direct = true; },
+      get value() { return 1; },
+    };
+    log.gains.push(rec);
+    const n = node();
+    return new Proxy(n, { get: (t, p) => (p === 'gain' ? param : t[p]), set: (t, p, v) => { t[p] = v; return true; } });
+  };
+  FakeCtx.prototype.createDelay = function () { log.delays++; return node(); };
+  FakeCtx.prototype.createConvolver = function () { log.convolvers++; return node(); };
+  for (const n of ['createBiquadFilter', 'createDynamicsCompressor', 'createStereoPanner', 'createWaveShaper']) {
     FakeCtx.prototype[n] = function () { return node(); };
   }
   win.AudioContext = FakeCtx;
   return log;
 }
 
-function boot(withAudio) {
+function boot(withAudio, storage) {
   const env = createEnv();
+  if (storage) env.window.localStorage = { getItem: (k) => (k in storage ? storage[k] : null), setItem: (k, v) => { storage[k] = String(v); } };
   const log = withAudio ? fakeAudio(env.window) : null;
   env.load('z.js', 'music.js', 'audio.js');
   return { OwnIt: env.window.OwnIt, win: env.window, log };
@@ -93,8 +108,12 @@ test('clack is rate limited to one per 55 ms', () => {
   OwnIt.audio.settings.music = false;
   OwnIt.audio.play('clack');
   const after1 = log.started;
+  log.last.currentTime = 0.054;
   OwnIt.audio.play('clack');
-  assert.equal(log.started, after1);
+  assert.equal(log.started, after1, '54 ms blocked');
+  log.last.currentTime = 0.056;
+  OwnIt.audio.play('clack');
+  assert.ok(log.started > after1, '56 ms plays');
 });
 
 test('voice cap keeps at most 12 sfx voices', () => {
@@ -136,4 +155,82 @@ test('field draws one static frame under reduced motion and starts/stops cleanly
   assert.ok(fills >= env.window.OwnIt.field._count());
   assert.equal(canvas.getAttribute('aria-hidden'), 'true');
   env.window.OwnIt.field.stop();
+});
+
+test('mute() is one-way and unmute() restores; toggleMute uses them', () => {
+  const { OwnIt } = boot(false);
+  assert.equal(OwnIt.audio.mute(), true);
+  assert.equal(OwnIt.audio.mute(), true);
+  assert.equal(OwnIt.audio.isMuted(), true);
+  OwnIt.audio.unmute();
+  assert.equal(OwnIt.audio.isMuted(), false);
+  assert.equal(OwnIt.audio.toggleMute(), true);
+  assert.equal(OwnIt.audio.toggleMute(), false);
+});
+
+test('mute is persisted separately; M after reload restores sfx/music', () => {
+  const store = {};
+  const a = boot(false, store).OwnIt;
+  a.audio.mute();
+  assert.equal(store['ownit-muted'], '1');
+  assert.equal(store['ownit-sfx'] === 'off', false);
+  const b = boot(false, store).OwnIt; // reload
+  assert.equal(b.audio.isMuted(), true);
+  assert.equal(b.audio.toggleMute(), false);
+  assert.equal(store['ownit-muted'], '0');
+  assert.deepEqual({ ...b.audio.settings }, { sfx: true, music: true, volume: 0.8 });
+});
+
+test('noise bursts start their gain at 0.0001 (no clicks)', () => {
+  const { OwnIt, log } = boot(true);
+  OwnIt.audio.unlock();
+  OwnIt.music.stop();
+  const from = log.gains.length;
+  OwnIt.audio.play('clack');
+  const mine = log.gains.slice(from);
+  assert.ok(mine.length >= 2);
+  for (const g of mine) { assert.equal(g.direct, false); assert.equal(g.events[0], 0.0001); }
+});
+
+test('music snare and hat gains are ramped, not set directly', () => {
+  const direct = (bar) => {
+    const { OwnIt, log } = boot(true);
+    OwnIt.audio.unlock();
+    OwnIt.music.stop();
+    log.gains.length = 0;
+    OwnIt.music.start(bar);
+    const n = log.gains.filter((g) => g.direct).length;
+    OwnIt.music.stop();
+    return n;
+  };
+  assert.equal(direct(8), direct(0));
+});
+
+test('music graph is built once per context and reused across start/stop/start', () => {
+  const { OwnIt, log } = boot(true);
+  OwnIt.audio.unlock();
+  const delays = log.delays;
+  OwnIt.music.stop();
+  OwnIt.music.start();
+  OwnIt.music.stop();
+  OwnIt.music.start();
+  assert.equal(log.delays, delays);
+  assert.equal(delays, 1);
+  OwnIt.music.stop();
+});
+
+test('hidden tab never resumes the context', () => {
+  const { OwnIt, win, log } = boot(true);
+  win.document.hidden = true;
+  OwnIt.audio.unlock();
+  log.last.state = 'suspended';
+  OwnIt.audio.settings.music = false;
+  OwnIt.audio.play('press', 'btn');
+  assert.equal(log.last.state, 'suspended');
+});
+
+test('field glyphs include Q and alert reads the salmon token', () => {
+  const env = createEnv();
+  env.load('z.js', 'field.js');
+  assert.ok(env.window.OwnIt.field._glyphs.includes('Q'));
 });

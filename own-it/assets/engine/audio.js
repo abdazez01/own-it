@@ -13,7 +13,7 @@
   var ctx = null, out = null, verb = null, volGain = null;
   var voices = [];
   var lastPlay = {};
-  var prevBeforeMute = null;
+  var muted = false;
   var buildTimer = null;
   var unlocked = false;
 
@@ -27,6 +27,7 @@
   (function load() {
     if (readKey('ownit-sfx') === 'off') settings.sfx = false;
     if (readKey('ownit-music') === 'off') settings.music = false;
+    if (readKey('ownit-muted') === '1') muted = true;
     var v = readKey('ownit-volume');
     if (v !== null && v !== '' && isFinite(Number(v))) settings.volume = clamp01(v);
   })();
@@ -35,6 +36,7 @@
     writeKey('ownit-sfx', settings.sfx ? 'on' : 'off');
     writeKey('ownit-music', settings.music ? 'on' : 'off');
     writeKey('ownit-volume', String(settings.volume));
+    writeKey('ownit-muted', muted ? '1' : '0');
   }
 
   function applyVolume() {
@@ -78,8 +80,9 @@
     try {
       var t = ctx.currentTime;
       v.g.gain.cancelScheduledValues(t);
-      v.g.gain.setTargetAtTime(0, t, 0.015);
-      if (v.src && v.src.stop) v.src.stop(t + 0.08);
+      v.g.gain.setValueAtTime(Math.max(0.0001, Number(v.g.gain.value) || 0.0001), t);
+      v.g.gain.linearRampToValueAtTime(0, t + 0.015); // 15 ms fade
+      if (v.src && v.src.stop) v.src.stop(t + 0.02);
     } catch (e) { /* already stopped */ }
   }
 
@@ -118,7 +121,7 @@
     for (var i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, pow);
     var f = ctx.createBiquadFilter(), g = ctx.createGain();
     f.type = ftype; f.frequency.value = freq; if (q) f.Q.value = q;
-    g.gain.value = vary(gain, 0.1);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vary(gain, 0.1), t + 0.003);
     n.buffer = b; n.connect(f); f.connect(g); g.connect(out);
     if (wet) g.connect(verb);
     n.start(t);
@@ -207,6 +210,8 @@
 
   function stopBuild() { if (buildTimer) { clearInterval(buildTimer); buildTimer = null; } }
 
+  function wake() { try { if (ctx && ctx.state === 'suspended' && ctx.resume && !(typeof document !== 'undefined' && document.hidden)) ctx.resume(); } catch (e) { /* ignore */ } }
+
   function unref(t) { try { if (t && t.unref) t.unref(); } catch (e) { /* browser timers */ } return t; }
 
   // ---------------------------------------------------------------- public API
@@ -216,14 +221,14 @@
 
     play: function (name, arg) {
       try {
-        if (!ctx || !settings.sfx) return;
-        if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
+        if (!ctx || muted || !settings.sfx) return;
+        wake();
         var t = ctx.currentTime;
         if (name === 'build-wait') {
           stopBuild();
           var runs = 0;
           var step = function () {
-            if (!ctx || !settings.sfx || ++runs > 9) { stopBuild(); return; } // silent after 10 s
+            if (!ctx || muted || !settings.sfx || ++runs > 9) { stopBuild(); return; } // silent after 10 s
             shuffle(ctx.currentTime);
           };
           shuffle(t); runs = 1;
@@ -251,8 +256,8 @@
           if (!createGraph()) return;
           unlocked = true;
         }
-        if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
-        if (settings.music && OwnIt.music) OwnIt.music.start();
+        wake();
+        if (settings.music && !muted && OwnIt.music) OwnIt.music.start();
       } catch (e) { /* no audio available */ }
     },
 
@@ -272,26 +277,26 @@
       settings.music = !!on;
       persist();
       if (!OwnIt.music) return;
-      if (on) OwnIt.music.start(); else OwnIt.music.stop();
+      if (on && !muted) OwnIt.music.start(); else OwnIt.music.stop();
     },
 
-    // M key: mutes everything, pressing again restores the previous state. Returns true when muted.
-    toggleMute: function () {
-      if (!prevBeforeMute) {
-        prevBeforeMute = { sfx: settings.sfx, music: settings.music };
-        settings.sfx = false; settings.music = false;
-        stopBuild();
-        if (OwnIt.music) OwnIt.music.stop();
-        persist();
-        return true;
-      }
-      settings.sfx = prevBeforeMute.sfx; settings.music = prevBeforeMute.music;
-      prevBeforeMute = null;
+    // One-way mute and its inverse. Prefs (sfx/music) stay as they were; the mute flag is stored separately.
+    mute: function () {
+      muted = true;
+      stopBuild();
+      if (OwnIt.music) OwnIt.music.stop();
+      persist();
+      return true;
+    },
+    unmute: function () {
+      muted = false;
       persist();
       if (settings.music && OwnIt.music) OwnIt.music.start();
       return false;
     },
-    isMuted: function () { return !!prevBeforeMute; },
+    // M key. Returns true when muted.
+    toggleMute: function () { return muted ? api.unmute() : api.mute(); },
+    isMuted: function () { return muted; },
 
     duck: function (ms) { try { if (OwnIt.music && OwnIt.music.duck) OwnIt.music.duck(ms); } catch (e) { /* optional */ } },
 
@@ -314,7 +319,7 @@
         if (!ctx) return;
         try {
           if (document.hidden) ctx.suspend(); // music and effects freeze together, so resume stays bar-aligned
-          else ctx.resume();
+          else wake();
         } catch (e) { /* ignore */ }
       });
     }

@@ -108,6 +108,7 @@
   function hz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
 
   var running = null;
+  var graph = null; // built once per AudioContext and reused across start/stop
 
   function unref(t) { try { if (t && t.unref) t.unref(); } catch (e) { /* browser timers have no unref */ } return t; }
 
@@ -115,7 +116,6 @@
     var ctx = g.ctx, out = g.out, verb = g.verb;
     var bus = ctx.createGain(); bus.gain.value = 0; bus.connect(out);
     var send = ctx.createGain(); send.gain.value = 0.6; bus.connect(send); send.connect(verb);
-    bus.gain.setTargetAtTime(BUS_LEVEL, ctx.currentTime, 3);
     var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 800; lp.Q.value = 0.6; lp.connect(bus);
     // quarter-note echo (feedback 0.18, wet low)
     var echo = ctx.createDelay(1); echo.delayTime.value = BEAT * 2;
@@ -182,7 +182,8 @@
     if (v <= 0.001) return;
     var ctx = R.ctx, n = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
     n.buffer = noiseBuf(ctx, 0.18, 4);
-    bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.8; g.gain.value = v;
+    bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.8;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.003);
     n.connect(bp); bp.connect(g); g.connect(R.bus); n.start(t);
     var o = ctx.createOscillator(), og = ctx.createGain();
     o.type = 'triangle'; o.frequency.value = 196;
@@ -194,7 +195,8 @@
     if (lvl <= 0) return;
     var ctx = R.ctx, n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     n.buffer = noiseBuf(ctx, 0.04, 6);
-    f.type = 'highpass'; f.frequency.value = 7000; g.gain.value = 0.05 * lvl * (0.75 + Math.random() * 0.25);
+    f.type = 'highpass'; f.frequency.value = 7000;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05 * lvl * (0.75 + Math.random() * 0.25), t + 0.002);
     n.connect(f); f.connect(g); g.connect(R.bus); n.start(t);
   }
 
@@ -227,16 +229,19 @@
     }
   }
 
-  function wanted() { return !!(OwnIt.audio && OwnIt.audio.settings && OwnIt.audio.settings.music); }
+  function wanted() { return !!(OwnIt.audio && OwnIt.audio.settings && OwnIt.audio.settings.music && !(OwnIt.audio.isMuted && OwnIt.audio.isMuted())); }
 
   OwnIt.music = {
-    start: function () {
+    start: function (fromBar) {
       try {
         if (running || !wanted() || !OwnIt.audio._graph) return;
         var g = OwnIt.audio._graph();
         if (!g) return; // not unlocked yet: audio.unlock() calls start() again
-        var R = build(g);
-        var S = { R: R, bar: 0, next: g.ctx.currentTime + 0.1, timer: null, alive: true };
+        if (!graph || graph.ctx !== g.ctx) graph = build(g);
+        var R = graph;
+        R.bus.gain.cancelScheduledValues(g.ctx.currentTime);
+        R.bus.gain.setTargetAtTime(BUS_LEVEL, g.ctx.currentTime, 3);
+        var S = { R: R, bar: fromBar > 0 ? Math.floor(fromBar) : 0, next: g.ctx.currentTime + 0.1, timer: null, alive: true };
         running = S;
         var tick = function () {
           if (!S.alive) return;
@@ -259,7 +264,6 @@
       try {
         S.R.bus.gain.cancelScheduledValues(S.R.ctx.currentTime);
         S.R.bus.gain.setTargetAtTime(0, S.R.ctx.currentTime, 0.8);
-        unref(setTimeout(function () { try { S.R.bus.disconnect(); } catch (e) { /* already gone */ } }, 4000));
       } catch (e) { /* context closed */ }
     },
     isRunning: function () { return !!running; },
