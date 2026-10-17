@@ -23,7 +23,7 @@ const SCREENS = {
 const TAGS = { s1: ['btn-cancel', 'btn-release'], s2: [], s3: [] };
 
 // A fake document stands in for iframe.contentDocument. Tests fire `load` themselves.
-function boot(game, round, { exam = false } = {}) {
+function boot(game, round, { exam = false, before = null } = {}) {
   const env = createEnv({ reduced: true });
   env.load(...FILES);
   const w = env.window;
@@ -67,6 +67,7 @@ function boot(game, round, { exam = false } = {}) {
     finish: (p) => finished.push(p),
   };
   w.OwnIt.keys.setScope(game);
+  if (before) before(w);
   const cleanup = w.OwnIt.games.get(game).play(root, round, ctx);
   live.push(cleanup);
   const key = (k) => env.document.dispatchEvent(env.event('keydown', { key: k }));
@@ -469,4 +470,38 @@ test('kit: label falls back to a humanised id and ignores inherited keys', () =>
   assert.equal(kit.label('a', { a: { label: 'Alpha' } }), 'Alpha');
   assert.equal(kit.label('constructor', {}), 'constructor');
   assert.equal(kit.label('Ask the manager', {}), 'Ask the manager');
+});
+
+// ---- guess the screen without a built copy
+
+const noCopyRound = () => ({
+  zone: 'trips', mode: 'practice',
+  screens: ['sX', 's2', 's3'].map((s, i) => ({
+    screen: s, choices: ['alpha', 'beta', 'gamma', 'delta'], answer: core.encode(['beta', 'alpha', 'delta'][i]),
+    sketch: s === 'sX' ? [{ label: 'Cancel trip' }, { label: 'Release cable' }] : [],
+  })),
+});
+
+test('guess the screen: no built copy shows a neutral wireframe from the sketch and stays playable', () => {
+  const t = boot('guess-the-screen', noCopyRound());
+  const stage = t.root.querySelector('.guess-screen');
+  assert.ok(!/copy is missing/.test(stage.textContent));
+  const wire = stage.querySelector('.wire');
+  assert.ok(wire, 'wireframe drawn');
+  assert.ok(/Cancel trip/.test(wire.textContent) && /Release cable/.test(wire.textContent));
+  t.key(' ');
+  assert.ok(!t.root.querySelector('.guess-choices').hasAttribute('hidden'));
+  t.key('2');
+  assert.ok(t.sounds.includes('correct'));
+});
+
+test('guess the screen: a copy rebuilt while playing replaces the wireframe through the live link', () => {
+  let fire = null;
+  const t = boot('guess-the-screen', noCopyRound(), { before: (w) => { w.OwnIt.link.onData = (cb) => { fire = cb; return () => { fire = null; }; }; } });
+  assert.ok(fire, 'subscribed to live data');
+  assert.ok(t.root.querySelector('.guess-screen').querySelector('.wire'));
+  t.w.OWNIT_SCREENS.sX = { zone: 'trips', html: '<main><h1>Now built</h1></main>', inputs: {} };
+  fire({ file: 'screens.js', version: 2 });
+  assert.ok(!t.root.querySelector('.guess-screen').querySelector('.wire'));
+  assert.equal(t.frames.length, 1, 'the real iframe is mounted');
 });

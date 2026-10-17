@@ -402,7 +402,7 @@
     var statusFlaps = [];
     zs.forEach(function (zz) {
       var row = OwnIt.el('button', { type: 'button', 'class': 'board-row', 'data-zone': zz.id, role: 'row', 'data-sound': 'tile' });
-      var name = OwnIt.el('span', { role: 'cell' });
+      var name = OwnIt.el('span', { role: 'cell', 'class': 'zone-name', title: String(zz.z.name || zz.id) });
       var nf = OwnIt.el('span');
       name.appendChild(nf);
       OwnIt.flap(nf, String(zz.z.name || zz.id), fopts());

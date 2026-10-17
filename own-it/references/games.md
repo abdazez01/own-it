@@ -6,7 +6,7 @@ Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page da
 |---|---|---|
 | `quiz` | 2.0 | Words. `mode` required. `questions` x5: `q`, 4 `options` `{text, why}`, `answer` index 0-3, optional `peek`. |
 | `screen-tour` | 2.0 | Screens with elements. `screen`, `steps` 1-6: `kind` chain/find/role, `prompt`, `element`, `choices`, `answer`. |
-| `guess-the-screen` | 2.0 | Zones with 3+ surfaces in the model (built copies are optional). `screens` 3-8: `screen`, 4 `choices`, `answer`. |
+| `guess-the-screen` | 2.0 | Zones with 3+ surfaces in the model (copies optional; wireframe stands in). `screens` 3-8: `screen`, 4 `choices`, `answer`. |
 | `quests` | 2.0 | A flow across screens or roles. `flow`, `goal`, `start`, `objectives` 2-8 `{text, element}`. Answers derived. |
 | `whiteboard` | 2.0 | Structure. `cards` 2-12 component ids. Edges derived. |
 | `boss-battle` | 2.0 | Final test. `questions` x5 `{q, kind}` why/malicious/structure/fails/term, per `bosses.md`. |
@@ -20,7 +20,7 @@ Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page da
 | `pipe-plumber` | 2.0 | Button to database data flow. `flow` id, 2-12 steps, the first a surface and the last a component. Grid derived. |
 | `what-if` | 2.0 | Failure at scale. `dials` 3-5 `{label, options, answer, why}`, 4 options, answer 0-3. |
 | `design-duel` | 2.0 | Decisions with a real alternative. `decisions` x3 `{real, alt, reasons, answer}`: 4 `reasons` in words, `answer` index 0-3 of the real one. Sides and order are shuffled. |
-| `escape-room` | 2.0 | Mixed boss. `puzzles` x3, one of each kind: role `{role, action, answer allow/deny, why}`, flow `{flow}` (2+ steps), failure `{failure, logs 4-8, answer}` (3+ labeled parts of its kind). Needs 3/3 to pass; no chat grades. |
+| `escape-room` | 2.0 | Mixed boss. `puzzles` x3, one of each kind: role `{role, action, answer allow/deny, why}`, flow `{flow}` (2+ steps), failure `{failure, logs 4-8, answer}` (3+ labeled parts of its kind). Needs 3/3; no chat grades. Used puzzles are rejected; vary per replay. |
 | `teach-back` | 2.0 | Explaining a screen. `screen` surface id with a built copy. Curiosity XP only; grade the `ask` text q1 with `build-feedback`. |
 
 Rungs: words (quiz, memory-match, spot-the-lie), map (whiteboard, screen-tour, guess-the-screen, blast-radius), trace (quests, chain-reaction, data-detective, pipe-plumber, whos-allowed), break (pager, what-if, design-duel), boss (boss-battle, escape-room).

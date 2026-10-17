@@ -810,12 +810,15 @@ const roomIn = () => ({ zone: 'trips', puzzles: [
 ] });
 
 test('escape-room: one puzzle of each kind, shuffled, flows scrambled, choices derived, every answer and reason obfuscated, labels carried', async () => {
-  const root = await pipeSetup();
   const firsts = new Set();
   for (let k = 0; k < 25; k++) {
-    const out = await bld(root, 'escape-room', roomIn());
+    const root = await pipeSetup();
+    const inp = roomIn();
+    inp.puzzles[0].action = `cancel another rider trip ${k}`;
+    inp.puzzles[2].failure = `Riders see old prices ${k}`;
+    const out = await bld(root, 'escape-room', inp);
     const r = loadRound(root, out.id);
-    if (k === 0) assert.equal(out.id, 'trips-escape-room-1');
+    assert.equal(out.id, 'trips-escape-room-1');
     assert.equal(r.puzzles.length, 3);
     assert.deepEqual(r.puzzles.map((p) => p.kind).sort(), ['failure', 'flow', 'role']);
     firsts.add(r.puzzles[0].kind);
@@ -831,7 +834,6 @@ test('escape-room: one puzzle of each kind, shuffled, flows scrambled, choices d
     ['s1', 'c1', 'c2', 'fp'].forEach((id) => assert.ok(Object.hasOwn(r.labels, id), `label for ${id}`));
   }
   assert.ok(firsts.size > 1, 'the puzzle order is random');
-  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds['trips-escape-room-1'].rung, 'boss');
 });
 
 test('escape-room: missing or repeated kinds, bad ids and identifier-only text are rejected before any write', async () => {
@@ -889,4 +891,34 @@ test('build-round --level stamps the pick level, base and about', async () => {
   assert.match(readFileSync(join(root, '.own-it', 'data', `${out.id}.js`), 'utf8'), /"levelBase": ?"hard"/);
   await assert.rejects(build({ _: ['quiz', put(root, quiz())], flags: { level: 'custom' } }, ctx(root)), /--base/);
   await assert.rejects(build({ _: ['quiz', put(root, quiz())], flags: { level: 'nope' } }, ctx(root)), /--level/);
+});
+
+test('guess-the-screen carries a sketch of labelled elements, never the screen label', async () => {
+  const root = await setup();
+  const m = loadModel(root);
+  m.zones.trips.items.push(I({ id: 'el9', k: 'element', on: 's1', label: 'Cancel trip', does: 'f1' }));
+  saveModel(root, m);
+  const g = await bld(root, 'guess-the-screen', { zone: 'trips', screens: [1, 2, 3].map(() => ({ screen: 's1', choices: ['s1', 's2', 'el1', 'el2'], answer: 's1' })) });
+  const r = loadRound(root, g.id);
+  assert.deepEqual(r.screens[0].sketch, [{ label: 'Cancel trip' }]);
+  assert.ok(!JSON.stringify(r.screens.map((s) => s.sketch)).includes('Trip screen'));
+});
+
+test('escape-room: a puzzle used in an earlier room of the zone is rejected; flows may repeat once every flow has been used', async () => {
+  const root = await pipeSetup();
+  await bld(root, 'escape-room', roomIn());
+  const used = readJson(join(root, '.own-it', 'progress.json')).zones.trips.usedPuzzles;
+  assert.equal(used.length, 3);
+  await assert.rejects(bld(root, 'escape-room', roomIn()), /repeats an earlier room in zone "trips": role/);
+  const fresh = roomIn();
+  fresh.puzzles[0].action = 'edit the price of a trip';
+  await assert.rejects(bld(root, 'escape-room', fresh), /repeats an earlier room in zone "trips": flow fp/);
+  fresh.puzzles[1].flow = 'f1';
+  await assert.rejects(bld(root, 'escape-room', fresh), /repeats an earlier room in zone "trips": failure/);
+  fresh.puzzles[2].failure = 'Receipts go to the wrong rider';
+  assert.equal((await bld(root, 'escape-room', fresh)).id, 'trips-escape-room-2');
+  const third = roomIn();
+  third.puzzles[0].action = 'refund a trip';
+  third.puzzles[2].failure = 'Drivers get no alerts';
+  assert.equal((await bld(root, 'escape-room', third)).id, 'trips-escape-room-3'); // both flows used: the pool is exhausted
 });
