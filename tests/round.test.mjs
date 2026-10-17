@@ -404,3 +404,119 @@ test('chain-reaction: unknown flow, non-flow id and one-step flows are rejected'
   await assert.rejects(bld(root, 'chain-reaction', { zone: 'trips', flow: 's1' }), /"s1" is not a flow/);
   await assert.rejects(bld(root, 'chain-reaction', { zone: 'trips', flow: 'f3' }), /at least 2 steps/);
 });
+
+// ---- v2.1 pack 1b: whos-allowed, blast-radius, pager
+
+const perm = (n = 8, over = {}) => ({ zone: 'trips', cards: Array.from({ length: n }, (_, i) => ({
+  action: `Cancel trip number ${i}`, role: i % 2 ? 'Rider' : 'Driver', answer: i % 2 ? 'deny' : 'allow', why: `Rule ${i} in plain words` })), ...over });
+
+test('whos-allowed: cards shuffled, every answer obfuscated, 8-16 cards with both verdicts', async () => {
+  const root = await setup();
+  const orders = new Set();
+  for (let k = 0; k < 12; k++) {
+    const out = await bld(root, 'whos-allowed', perm(8 + (k % 9)));
+    const r = loadRound(root, out.id);
+    if (k === 0) assert.equal(out.id, 'trips-whos-allowed-1');
+    assert.equal(r.cards.length, 8 + (k % 9));
+    assert.ok(r.cards.every((c) => typeof c.answer === 'string' && !['allow', 'deny'].includes(c.answer)));
+    r.cards.forEach((c) => assert.equal(core.decode(c.answer), Number(c.action.split(' ').pop()) % 2 ? 'deny' : 'allow'));
+    orders.add(r.cards.map((c) => c.action).join());
+  }
+  assert.ok(orders.size > 3, 'card order varies between builds');
+  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds['trips-whos-allowed-1'].rung, 'trace');
+});
+
+test('whos-allowed: size, verdict mix, bad verdicts and identifier-only actions are rejected', async () => {
+  const root = await setup();
+  await assert.rejects(bld(root, 'whos-allowed', perm(7)), /at least 8/);
+  await assert.rejects(bld(root, 'whos-allowed', perm(17)), /at most 16/);
+  const bad = perm(); bad.cards[2].answer = 'maybe';
+  await assert.rejects(bld(root, 'whos-allowed', bad), /expected one of allow,deny/);
+  const skew = perm(); skew.cards.forEach((c) => { c.answer = 'allow'; });
+  await assert.rejects(bld(root, 'whos-allowed', skew), /at least 2 allow and 2 deny/);
+  const code = perm(); code.cards[1].action = 'cancel_trip';
+  await assert.rejects(bld(root, 'whos-allowed', code), /identifier-only answer in cards\[1\]\.action/);
+  await assert.rejects(bld(root, 'whos-allowed', perm(8, { zone: 'nope' })), /unknown zone/);
+});
+
+async function blastSetup() {
+  const root = await setup();
+  const m = loadModel(root);
+  m.zones.trips.items.push(
+    I({ id: 'c1', k: 'component', label: 'Trip service' }), I({ id: 'c2', k: 'component', label: 'Database' }),
+    I({ id: 'c3', k: 'component', label: 'Billing' }), I({ id: 'c4', k: 'component', label: 'Mailer' }), I({ id: 'c5', k: 'component' }),
+    I({ id: 'e2', k: 'edge', from: 's1', to: 'c1' }), I({ id: 'e3', k: 'edge', from: 'c1', to: 'c2' }),
+    I({ id: 'e4', k: 'edge', from: 'c3', to: 'c2' }), I({ id: 'e5', k: 'edge', from: 'c2', to: 'c1' }), I({ id: 'e6', k: 'edge', from: 'c4', to: 'c5' }));
+  saveModel(root, m);
+  return root;
+}
+
+test('blast-radius: damage set is reverse reachability over edges, nearest first, obfuscated', async () => {
+  const root = await blastSetup();
+  const out = await bld(root, 'blast-radius', { zone: 'trips', target: 'c2' });
+  const r = loadRound(root, out.id);
+  assert.equal(out.id, 'trips-blast-radius-1');
+  assert.equal(r.target, 'c2');
+  const dmg = core.decode(r.answer);
+  assert.deepEqual(dmg.slice(0, 2).sort(), ['c1', 'c3'], 'direct dependants come first');
+  assert.deepEqual([...dmg].sort(), ['c1', 'c3', 's1'], 'through a cycle, once each');
+  assert.deepEqual(r.cards.map((c) => c.id).sort(), ['c1', 'c3', 'c4', 's1', 's2']);
+  assert.ok(!r.cards.some((c) => c.id === 'c2' || c.id === 'c5'), 'the target and unlabeled parts are not shown');
+  assert.equal(r.labels.c2.label, 'Database');
+  assert.equal(r.labels.c3.label, 'Billing');
+  const sess = readJson(join(root, '.own-it', 'session.json')).rounds[out.id];
+  assert.equal(sess.rung, 'map');
+  assert.ok(sess.cardIds.includes('c2') && sess.cardIds.includes('c4'));
+  const orders = new Set();
+  for (let k = 0; k < 12; k++) orders.add(loadRound(root, (await bld(root, 'blast-radius', { zone: 'trips', target: 'c2' })).id).cards.map((c) => c.id).join());
+  assert.ok(orders.size > 3, 'card order is shuffled');
+});
+
+test('blast-radius: a target nobody depends on, a non-part target and an unlabeled target are rejected', async () => {
+  const root = await blastSetup();
+  await assert.rejects(bld(root, 'blast-radius', { zone: 'trips', target: 'c4' }), /nothing depends on/);
+  await assert.rejects(bld(root, 'blast-radius', { zone: 'trips', target: 'f1' }), /"f1" is not a surface or component/);
+  await assert.rejects(bld(root, 'blast-radius', { zone: 'trips', target: 'c5' }), /"c5" has no label/);
+  await assert.rejects(bld(root, 'blast-radius', { zone: 'trips', target: 'zzz' }), /ids not in zone/);
+});
+
+async function pagerSetup() {
+  const root = await setup();
+  const m = loadModel(root);
+  m.zones.trips.items.push(...['a', 'b', 'c', 'd', 'e'].map((x) => I({ id: `x${x}`, k: 'component', label: `Part ${x}` })));
+  saveModel(root, m);
+  return root;
+}
+const pagerIn = (over = {}) => ({ zone: 'trips', failure: 'Riders see an empty trip list.', answer: 'xc',
+  logs: ['app opened trips', 'request sent', 'server asked the store', 'store answered slowly'], ...over });
+
+test('pager: choices derived from same-kind parts with the answer among them, random order, answer obfuscated', async () => {
+  const root = await pagerSetup();
+  const orders = new Set();
+  for (let k = 0; k < 16; k++) {
+    const out = await bld(root, 'pager', pagerIn());
+    const r = loadRound(root, out.id);
+    if (k === 0) assert.equal(out.id, 'trips-pager-1');
+    assert.equal(core.decode(r.answer), 'xc');
+    assert.ok(r.cards.length >= 3 && r.cards.length <= 4);
+    assert.ok(r.cards.some((c) => c.id === 'xc'));
+    assert.ok(r.cards.every((c) => /^Part /.test(c.label)));
+    assert.equal(new Set(r.cards.map((c) => c.id)).size, r.cards.length);
+    assert.equal(r.labels.xc.label, 'Part c');
+    orders.add(r.cards.map((c) => c.id).join());
+  }
+  assert.ok(orders.size > 3, 'order and choice set vary');
+  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds['trips-pager-1'].rung, 'break');
+});
+
+test('pager: log count, unknown or unsuitable answers, too few look-alikes and identifier-only text are rejected', async () => {
+  const root = await pagerSetup();
+  await assert.rejects(bld(root, 'pager', pagerIn({ logs: ['a b', 'c d', 'e f'] })), /at least 4/);
+  await assert.rejects(bld(root, 'pager', pagerIn({ logs: Array(9).fill('a b') })), /at most 8/);
+  await assert.rejects(bld(root, 'pager', pagerIn({ answer: 'zzz' })), /ids not in zone/);
+  await assert.rejects(bld(root, 'pager', pagerIn({ answer: 'f1' })), /"f1" is not an element, surface or component/);
+  await assert.rejects(bld(root, 'pager', pagerIn({ answer: 'el1' })), /at least 3 parts of the same kind/);
+  await assert.rejects(bld(root, 'pager', pagerIn({ failure: 'cancel_trip' })), /identifier-only answer in failure/);
+  const code = pagerIn(); code.logs[1] = 'src/api/trips.ts';
+  await assert.rejects(bld(root, 'pager', code), /identifier-only answer in logs\[1\]/);
+});

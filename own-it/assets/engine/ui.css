@@ -614,3 +614,45 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .cr-card.lit .cr-num { color: var(--sage); }
 .cr-card.boom { border-color: var(--salmon); background: var(--salmon-a16); }
 @media (prefers-reduced-motion: reduce) { .cr-spark { animation: none; } .cr-fuse-line { transition: none; } }
+
+/* v2.1 pack 1b: Who's Allowed, Blast Radius, 3am Pager. Fluid from 360px to 2560px; no horizontal scroll. */
+.wa-panel, .br-panel, .pg-panel { max-width: 760px; margin-inline: auto; display: grid; gap: var(--s-4); min-width: 0; }
+.wa-meter { color: var(--ink-2); font-size: var(--fs-15); }
+.wa-card {
+  display: grid; gap: var(--s-2); min-height: 150px; align-content: center; padding: var(--s-5); text-align: center; touch-action: pan-y;
+  background: var(--glass-hi-solid); border: 1px solid var(--edge); border-radius: var(--r-card); overflow-wrap: anywhere;
+}
+.wa-role { color: var(--gold); font-size: var(--fs-15); }
+.wa-action { font: 600 var(--fs-20)/1.35 var(--f-ui); color: var(--ink); }
+.wa-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
+.wa-btn {
+  min-height: 56px; min-width: 0; cursor: pointer; font: 600 var(--fs-17) var(--f-ui); color: var(--ink); touch-action: manipulation;
+  background: var(--glass-hi-solid); border: 1px solid var(--edge); border-radius: var(--r-card);
+  transition: background var(--t-hover), border-color var(--t-hover);
+}
+.wa-btn.deny:hover, .wa-btn.deny:focus-visible { border-color: var(--salmon); background: var(--salmon-a16); }
+.wa-btn.allow:hover, .wa-btn.allow:focus-visible { border-color: var(--sage); background: var(--sage-a16); }
+.br-core {
+  justify-self: center; width: 28px; height: 28px; border-radius: 50%; background: var(--salmon); box-shadow: 0 0 0 6px var(--salmon-a16);
+}
+.br-core.ripple { animation: br-ripple 900ms ease-out 1; }
+@keyframes br-ripple { from { box-shadow: 0 0 0 0 var(--salmon); } to { box-shadow: 0 0 0 48px transparent; } }
+.br-board { display: grid; gap: var(--s-3); grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); }
+.br-part {
+  min-height: var(--hit); min-width: 0; padding: var(--s-3) var(--s-4); cursor: pointer; text-align: center; overflow-wrap: anywhere;
+  color: var(--ink); font: 500 var(--fs-15)/1.35 var(--f-ui); touch-action: manipulation;
+  background: var(--glass-hi-solid); border: 1px solid var(--edge); border-radius: var(--r-inset);
+  transition: background var(--t-hover), border-color var(--t-hover);
+}
+.br-part:hover, .br-part:focus-visible { border-color: var(--gold-a60); }
+.br-part.on { border-color: var(--gold); background: var(--gold-a16); }
+.br-part.fell.hit { border-color: var(--sage); background: var(--sage-a16); }
+.br-part.fell.missed, .br-part.false-alarm { border-color: var(--salmon); background: var(--salmon-a16); }
+.br-part[aria-disabled="true"] { cursor: default; }
+.pg-log {
+  min-height: 120px; max-height: 40vh; overflow-y: auto; padding: var(--s-3) var(--s-4); display: grid; gap: var(--s-2); align-content: start;
+  background: var(--tile-solid); border: 1px solid var(--edge); border-radius: var(--r-inset); font: 500 var(--fs-13)/1.5 var(--f-flap); color: var(--ink);
+}
+.pg-line { overflow-wrap: anywhere; animation: pg-in 220ms ease-out 1; }
+@keyframes pg-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .br-core.ripple, .pg-line { animation: none; } }

@@ -29,6 +29,8 @@ function boot(game, round) {
   w.OwnIt.juice.shake = () => { shakes++; };
   w.OwnIt.juice.confetti = () => {};
   const results = [];
+  const alerts = [];
+  w.OwnIt.field = { setAlert: (on) => alerts.push(on) };
   vm.runInContext(readFileSync(new URL(`games/${game}.js`, ASSETS), 'utf8'), env.ctx, { filename: `${game}.js` });
   w.OwnIt.resultCard = (c, r) => { results.push(r); if (r.payload) c.finish(r.payload); return { sent: true }; };
   const root = env.document.createElement('div');
@@ -43,7 +45,7 @@ function boot(game, round) {
   const cleanup = w.OwnIt.games.get(game).play(root, round, ctx);
   live.push(cleanup);
   const key = (k) => env.document.dispatchEvent(env.event('keydown', { key: k }));
-  return { env, w, root, key, sounds, finished, results, cleanup, decodes: () => decodes, shakes: () => shakes };
+  return { env, w, root, key, alerts, sounds, finished, results, cleanup, decodes: () => decodes, shakes: () => shakes };
 }
 
 const plain = (x) => JSON.parse(JSON.stringify(x));
@@ -285,5 +287,234 @@ test('chain-reaction: cleanup stops the fuse', () => {
     t.cleanup();
     mock.timers.tick(40000);
     assert.equal(t.finished.length, 0);
+  } finally { mock.timers.reset(); }
+});
+
+// ------------------------------------------------------------------ who is allowed
+
+const waRound = () => ({
+  zone: 'trips', mode: 'practice', labels: {},
+  cards: Array.from({ length: 8 }, (_, i) => ({ action: `Do thing ${i}`, role: `role${i}`, answer: core.encode(i % 2 === 0 ? 'allow' : 'deny'), why: `Because ${i} is the rule` })),
+});
+const waBtn = (t, cls) => t.root.querySelector(`.wa-btn.${cls}`);
+const waCard = (t) => t.root.querySelector('.wa-action').textContent;
+
+test('whos-allowed: streak points 10 x (1 + streak/5), rising combo, miss breaks the streak, why after each card', () => {
+  const t = boot('whos-allowed', waRound());
+  assert.equal(t.decodes(), 0);
+  assert.equal(waCard(t), 'Do thing 0');
+  assert.ok(!/Because 0/.test(t.root.textContent));
+  waBtn(t, 'allow').click(); waBtn(t, 'deny').click(); waBtn(t, 'allow').click(); // 10 + 12 + 14
+  assert.equal(t.decodes(), 3);
+  assert.deepEqual(tuples(t, 'combo').map((s) => s[1]), [1, 2, 3]);
+  assert.match(t.root.textContent, /Because 2 is the rule/);
+  waBtn(t, 'allow').click(); // card 3 is deny: miss
+  assert.ok(t.sounds.includes('streak-break'));
+  assert.ok(t.sounds.includes('wrong'));
+  assert.equal(t.shakes(), 1);
+  assert.match(t.root.textContent, /Because 3 is the rule/);
+  assert.equal(t.finished.length, 0);
+  waBtn(t, 'allow').click(); waBtn(t, 'deny').click(); waBtn(t, 'allow').click(); waBtn(t, 'deny').click(); // 10 + 12 + 14 + 16
+  assert.equal(t.finished.length, 1);
+  assert.equal(t.results[0].xp, 36 + 52);
+  assert.equal(t.finished[0].got, 7);
+  assert.equal(t.finished[0].of, 8);
+  assert.equal(t.finished[0].game, 'whos-allowed');
+  assert.deepEqual(plain(t.finished[0].missed), ['3']);
+  assert.match(t.results[0].missed[0].text, /may not.*Do thing 3.*Because 3/);
+});
+
+test('whos-allowed: 60 s clock ticks in the last 5, then cards left unjudged count as missed', () => {
+  mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+  try {
+    const t = boot('whos-allowed', waRound());
+    waBtn(t, 'allow').click();
+    mock.timers.tick(54000);
+    assert.equal(tuples(t, 'tick').length, 0);
+    mock.timers.tick(5000);
+    assert.deepEqual(tuples(t, 'tick').map((s) => s[1]), [5, 4, 3, 2, 1]);
+    assert.equal(t.finished.length, 0);
+    mock.timers.tick(1000);
+    assert.equal(t.finished.length, 1);
+    assert.equal(t.finished[0].got, 1);
+    assert.equal(t.results[0].xp, 10);
+    assert.deepEqual(plain(t.finished[0].missed), ['1', '2', '3', '4', '5', '6', '7']);
+  } finally { mock.timers.reset(); }
+});
+
+test('whos-allowed: left arrow denies, right arrow allows; swipes do the same', () => {
+  const t = boot('whos-allowed', waRound());
+  t.key('ArrowRight'); t.key('ArrowLeft');
+  assert.equal(waCard(t), 'Do thing 2');
+  assert.deepEqual(tuples(t, 'combo').map((s) => s[1]), [1, 2]);
+  const card = t.root.querySelector('.wa-card');
+  const touch = (type, x) => card.dispatchEvent(t.env.event(type, type === 'touchstart' ? { touches: [{ clientX: x }] } : { changedTouches: [{ clientX: x }] }));
+  touch('touchstart', 200); touch('touchend', 120); // swipe left: deny, but card 2 is allow
+  assert.equal(waCard(t), 'Do thing 3');
+  assert.ok(t.sounds.includes('wrong'));
+  touch('touchstart', 100); touch('touchend', 120); // too short: nothing
+  assert.equal(waCard(t), 'Do thing 3');
+  touch('touchstart', 100); touch('touchend', 190); // swipe right: allow, card 3 is deny
+  assert.equal(waCard(t), 'Do thing 4');
+});
+
+test('whos-allowed: cleanup stops the clock and the keys', () => {
+  mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+  try {
+    const t = boot('whos-allowed', waRound());
+    t.cleanup();
+    t.key('ArrowRight');
+    mock.timers.tick(70000);
+    assert.equal(t.finished.length, 0);
+  } finally { mock.timers.reset(); }
+});
+
+// ------------------------------------------------------------------ blast radius
+
+const brRound = () => ({
+  zone: 'trips', mode: 'practice', target: 't', answer: core.encode(['b', 'c']),
+  labels: { t: { label: 'Core service', kind: 'component' } },
+  cards: [{ id: 'a', label: 'Alpha' }, { id: 'b', label: 'Bravo' }, { id: 'c', label: 'Charlie' }, { id: 'd', label: 'Delta' }],
+});
+const brParts = (t) => Array.from(t.root.querySelectorAll('.br-part'));
+const brDone = (t) => Array.from(t.root.querySelectorAll('button')).find((b) => b.textContent === 'Done');
+
+test('blast-radius: score is 10 x the balance of precision and recall, decoded only on Done', () => {
+  const t = boot('blast-radius', brRound());
+  assert.match(t.root.textContent, /Core service breaks/);
+  assert.ok(brParts(t).every((b) => !b.hasAttribute('data-id')), 'no ids in the DOM');
+  brParts(t)[1].click(); brParts(t)[3].click(); // Bravo (right), Delta (false alarm)
+  assert.equal(t.decodes(), 0);
+  brDone(t).click();
+  assert.equal(t.decodes(), 1);
+  assert.equal(t.finished.length, 1);
+  assert.equal(t.results[0].xp, 5); // precision 1/2, recall 1/2
+  assert.equal(t.finished[0].precision, 0.5);
+  assert.equal(t.finished[0].recall, 0.5);
+  assert.match(t.finished[0].formula, /2PR/);
+  assert.equal(t.finished[0].got, 1);
+  assert.equal(t.finished[0].of, 2);
+  assert.deepEqual(plain(t.finished[0].missed), ['c']);
+  assert.deepEqual(plain(t.finished[0].falseAlarms), ['d']);
+  assert.ok(brParts(t)[2].classList.contains('missed'));
+  assert.ok(brParts(t)[1].classList.contains('hit'));
+  assert.ok(brParts(t)[3].classList.contains('false-alarm'));
+});
+
+test('blast-radius: tapping again unmarks; a perfect pick scores 10, nothing picked scores 0', () => {
+  const t = boot('blast-radius', brRound());
+  brParts(t)[0].click(); brParts(t)[0].click();
+  brParts(t)[1].click(); brParts(t)[2].click();
+  brDone(t).click();
+  assert.equal(t.results[0].xp, 10);
+  assert.deepEqual(plain(t.finished[0].missed), []);
+  const none = boot('blast-radius', brRound());
+  brDone(none).click();
+  assert.equal(none.results[0].xp, 0);
+  assert.deepEqual(plain(none.finished[0].missed), ['b', 'c']);
+});
+
+test('blast-radius: arrows move, Space or Enter marks the focused part, D finishes', () => {
+  const t = boot('blast-radius', brRound());
+  t.key('ArrowRight');
+  assert.equal(t.env.document.activeElement, brParts(t)[1]);
+  t.key(' ');
+  assert.ok(brParts(t)[1].classList.contains('on'));
+  t.key('ArrowDown'); t.key('Enter');
+  assert.ok(brParts(t)[2].classList.contains('on'));
+  t.key('ArrowLeft'); t.key('ArrowLeft'); t.key('ArrowLeft');
+  assert.equal(t.env.document.activeElement, brParts(t)[0]);
+  t.key('d');
+  assert.equal(t.finished.length, 1);
+  assert.equal(t.results[0].xp, 10);
+  t.key(' '); // after Done nothing changes
+  assert.ok(!brParts(t)[0].classList.contains('on'));
+});
+
+// ------------------------------------------------------------------ pager
+
+const pgRound = () => ({
+  zone: 'trips', mode: 'practice', failure: 'Riders see an empty trip list.', answer: core.encode('x3'),
+  logs: ['app opened trips screen', 'request sent to server', 'server asked the store', 'store answered slowly', 'server gave up waiting'],
+  cards: ['x1', 'x2', 'x3', 'x4'].map((id, i) => ({ id, label: `Step ${i + 1} label` })),
+  labels: {},
+});
+const pgBtns = (t) => Array.from(t.root.querySelectorAll('.answer'));
+const pgLines = (t) => t.root.querySelectorAll('.pg-line').length;
+
+test('pager: alarm and salmon alert at the start, logs appear one by one, alert clears at the end', () => {
+  mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+  try {
+    const t = boot('pager', pgRound());
+    assert.ok(t.sounds.includes('alarm'));
+    assert.deepEqual(plain(t.alerts), [true]);
+    assert.match(t.root.textContent, /Riders see an empty trip list/);
+    assert.equal(pgLines(t), 1);
+    mock.timers.tick(1500);
+    assert.equal(pgLines(t), 2);
+    mock.timers.tick(10000);
+    assert.equal(pgLines(t), 5);
+    assert.equal(t.decodes(), 0);
+    pgBtns(t)[2].click();
+    assert.equal(t.decodes(), 1);
+    assert.deepEqual(plain(t.alerts), [true, false]);
+    assert.equal(t.finished.length, 1);
+  } finally { mock.timers.reset(); }
+});
+
+test('pager: finding the step fast scores 20 + up to 10 for speed, a wrong pick costs 10', () => {
+  const quick = boot('pager', pgRound());
+  pgBtns(quick)[2].click();
+  assert.ok(quick.sounds.includes('correct'));
+  assert.equal(quick.results[0].xp, 30);
+  assert.equal(quick.finished[0].got, 1);
+  assert.deepEqual(plain(quick.finished[0].missed), []);
+  const slip = boot('pager', pgRound());
+  pgBtns(slip)[0].click();
+  assert.ok(slip.sounds.includes('wrong'));
+  assert.equal(slip.shakes(), 1);
+  assert.equal(slip.finished.length, 0);
+  pgBtns(slip)[0].click(); // the same wrong card again does nothing
+  assert.equal(slip.shakes(), 1);
+  pgBtns(slip)[2].click();
+  assert.equal(slip.results[0].xp, 20);
+  assert.deepEqual(plain(slip.finished[0].missed), ['0']);
+  assert.ok(Array.from(slip.root.querySelectorAll('*')).every((n) => !n.hasAttribute('data-id')), 'no ids in the DOM');
+});
+
+test('pager: 90 s clock with ticks in the last 5, then time is up and the culprit is shown', () => {
+  mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+  try {
+    const t = boot('pager', pgRound());
+    mock.timers.tick(84000);
+    assert.equal(tuples(t, 'tick').length, 0);
+    mock.timers.tick(5000);
+    assert.deepEqual(tuples(t, 'tick').map((s) => s[1]), [5, 4, 3, 2, 1]);
+    assert.equal(t.finished.length, 0);
+    mock.timers.tick(1000);
+    assert.equal(t.finished.length, 1);
+    assert.equal(t.finished[0].got, 0);
+    assert.equal(t.results[0].xp, 0);
+    assert.deepEqual(plain(t.finished[0].missed), ['0']);
+    assert.match(t.results[0].missed[0].text, /Step 3 label/);
+    assert.deepEqual(plain(t.alerts), [true, false]);
+  } finally { mock.timers.reset(); }
+});
+
+test('pager: keys 1-4 pick a card; cleanup clears the alert and stops the clock', () => {
+  const t = boot('pager', pgRound());
+  t.key('1');
+  assert.ok(pgBtns(t)[0].classList.contains('wrong'));
+  t.key('3');
+  assert.equal(t.finished.length, 1);
+  t.key('2'); // after the end picks are ignored
+  assert.ok(!pgBtns(t)[1].classList.contains('wrong'));
+  mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+  try {
+    const u = boot('pager', pgRound());
+    u.cleanup();
+    assert.deepEqual(plain(u.alerts), [true, false]);
+    mock.timers.tick(100000);
+    assert.equal(u.finished.length, 0);
   } finally { mock.timers.reset(); }
 });

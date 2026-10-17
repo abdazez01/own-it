@@ -24,6 +24,9 @@ const IDS = {
   'memory-match': () => [],
   'spot-the-lie': () => [],
   'chain-reaction': (r) => [r.flow],
+  'whos-allowed': () => [],
+  'blast-radius': (r) => [r.target],
+  pager: (r) => [r.answer],
 };
 
 // Fisher-Yates with a cryptographic source, so a shuffled order cannot be predicted.
@@ -72,6 +75,55 @@ function checkPairs(input) {
       seen.add(norm);
     });
   }
+}
+
+// Who's-allowed cards: a mix of verdicts (so tapping one button cannot win) and no bare identifiers in the action.
+function checkPermissions(input) {
+  input.cards.forEach((c, i) => {
+    if (identifierOnly(c.action)) throw new Error(`identifier-only answer in cards[${i}].action; ${HINT}`);
+  });
+  const allows = input.cards.filter((c) => c.answer === 'allow').length;
+  if (allows < 2 || input.cards.length - allows < 2) throw new Error('cards need at least 2 allow and 2 deny answers');
+}
+
+const labeled = (it) => typeof it.label === 'string' && it.label.trim() !== '';
+
+// Blast radius: parts that depend on the target, directly or through others, nearest first.
+// An edge `from` -> `to` means from calls to, so the target breaking takes down everything that can reach it.
+function blastSet(input, byId, items) {
+  const target = byId.get(input.target);
+  if (target.k !== 'surface' && target.k !== 'component') throw new Error(`"${input.target}" is not a surface or component`);
+  if (!labeled(target)) throw new Error(`"${input.target}" has no label in the model`);
+  const callers = new Map();
+  for (const e of items) {
+    if (e.k !== 'edge' || typeof e.from !== 'string' || typeof e.to !== 'string') continue;
+    callers.set(e.to, [...(callers.get(e.to) || []), e.from]);
+  }
+  const seen = new Set([input.target]);
+  const order = [];
+  for (let frontier = [input.target]; frontier.length;) {
+    const next = [];
+    for (const id of frontier) for (const c of callers.get(id) || []) if (!seen.has(c)) { seen.add(c); next.push(c); order.push(c); }
+    frontier = next;
+  }
+  const shown = (id) => { const it = byId.get(id); return !!it && (it.k === 'surface' || it.k === 'component') && labeled(it); };
+  const damaged = order.filter(shown);
+  if (!damaged.length) throw new Error(`nothing depends on "${input.target}" in the model`);
+  const rest = shuffle(items.filter((x) => (x.k === 'surface' || x.k === 'component') && labeled(x) && x.id !== input.target && !seen.has(x.id)).map((x) => x.id));
+  if (!rest.length) throw new Error(`everything depends on "${input.target}"; pick a part with something independent of it`);
+  const kept = damaged.slice(0, 8);
+  return { damaged: kept, shown: [...kept, ...rest.slice(0, 12 - kept.length)] };
+}
+
+// Pager: the breaking step plus up to 3 look-alikes of the same kind, all with player-facing labels.
+function pagerChoices(input, byId, items) {
+  const answer = byId.get(input.answer);
+  if (!['element', 'surface', 'component'].includes(answer.k)) throw new Error(`"${input.answer}" is not an element, surface or component`);
+  const pool = items.filter((x) => x.k === answer.k && labeled(x));
+  if (pool.length < 3) throw new Error(`pager needs at least 3 parts of the same kind as "${input.answer}" with labels in the model`);
+  if (!labeled(answer)) throw new Error(`"${input.answer}" has no label in the model`);
+  const others = shuffle(pool.filter((x) => x.id !== answer.id)).slice(0, 2 + randomInt(2));
+  return shuffle([answer, ...others]);
 }
 
 // Quest objectives are elements of the quest's flow, each used once.
@@ -171,6 +223,15 @@ function derive(game, round, byId, items) {
     scrambled = scrambled.map((id) => cardOf(byId.get(id)));
     round.cards = scrambled;
     round.answer = order;
+  } else if (game === 'whos-allowed') {
+    // Shuffled so the order in the file gives nothing away; each card's verdict is obfuscated by obfuscate().
+    round.cards = shuffle(round.cards);
+  } else if (game === 'blast-radius') {
+    const { damaged, shown } = blastSet(round, byId, items);
+    round.cards = shuffle(shown).map((id) => ({ id, label: byId.get(id).label }));
+    round.answer = damaged;
+  } else if (game === 'pager') {
+    round.cards = pagerChoices(round, byId, items).map((x) => ({ id: x.id, label: x.label }));
   }
 }
 
@@ -240,6 +301,11 @@ export async function run(args, ctx) {
   if (game === 'quests') checkQuest(input, byId);
   if (game === 'memory-match') checkPairs(input);
   if (game === 'spot-the-lie') input.statements.forEach((s, i) => { if (identifierOnly(s.text)) throw new Error(`identifier-only answer in statements[${i}].text; ${HINT}`); });
+  if (game === 'whos-allowed') checkPermissions(input);
+  if (game === 'pager') {
+    if (identifierOnly(input.failure)) throw new Error(`identifier-only answer in failure; ${HINT}`);
+    input.logs.forEach((l, i) => { if (identifierOnly(l)) throw new Error(`identifier-only answer in logs[${i}]; ${HINT}`); });
+  }
   if (game === 'chain-reaction') {
     const flow = byId.get(input.flow);
     if (flow.k !== 'flow') throw new Error(`"${input.flow}" is not a flow`);
@@ -251,7 +317,7 @@ export async function run(args, ctx) {
   derive(game, round, byId, items);
   const labelIds = new Set(named);
   for (const id of named) { const it = byId.get(id); if (it && it.k === 'element') for (const x of [it.on, it.goes]) if (typeof x === 'string') labelIds.add(x); }
-  if (game === 'chain-reaction') round.cards.forEach((c) => labelIds.add(c.id));
+  if (game === 'chain-reaction' || game === 'blast-radius' || game === 'pager') round.cards.forEach((c) => labelIds.add(c.id));
   const nav = game === 'quests' ? navFor(input, items) : null;
   if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
   const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
@@ -260,7 +326,8 @@ export async function run(args, ctx) {
   const sessionPath = ownItPath(ctx.root, 'session.json');
   const session = readJson(sessionPath, { session: ctx.now().toISOString(), mode: 'practice', missions: {} });
   session.rounds = { ...(session.rounds || {}), [id]: { game, zone: input.zone, rung: meta.rung,
-    mode: input.mode || session.mode || 'practice', cardIds: shownCards(game, input, byId) } };
+    mode: input.mode || session.mode || 'practice',
+    cardIds: game === 'blast-radius' ? [round.target, ...round.cards.map((c) => c.id)] : shownCards(game, input, byId) } };
   const dataJs = ownItPath(ctx.root, 'data', `${id}.js`);
   writeJsRegistry(dataJs, 'OWNIT_ROUNDS', id, data);
   writeAggregate(ownItPath(ctx.root, 'data'), ownItPath(ctx.root, 'rounds.js'), 'OWNIT_ROUNDS', (f) => !f.startsWith('feedback-'));

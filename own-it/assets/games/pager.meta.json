@@ -5,7 +5,7 @@
   "minutes": 4,
   "examReady": true,
   "usesScreens": false,
-  "stage": "2.1",
+  "stage": "2.0",
   "line": "An alarm goes off, and you find the step that breaks first on the clock.",
   "keys": "Click, 1-4",
   "logo": "<svg viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"6\" width=\"18\" height=\"12\" rx=\"2.5\"/><path d=\"M6.5 15h3M16 15h1.5\"/><path stroke=\"#E8C26A\" d=\"M7 10h10\"/></svg>"
