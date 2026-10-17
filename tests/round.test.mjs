@@ -100,6 +100,25 @@ test('quests fills expected path from element.does', async () => {
   assert.deepEqual(path.map((p) => p.element), ['el1', 'el2']);
 });
 
+test('quests round carries plain navigation facts (goes, roles) for reachable elements, with labels', async () => {
+  const root = await setup();
+  const m = loadModel(root);
+  const it = m.zones.trips.items;
+  it.find((x) => x.id === 'el2').roles = ['r1'];
+  it.push(I({ id: 'r1', k: 'role', label: 'Manager' }), I({ id: 's9', k: 'surface', label: 'Island' }),
+    I({ id: 'el8', k: 'element', on: 's9', does: 'f1' }), I({ id: 'el7', k: 'element', on: 's2', label: 'Back link', purpose: 'Returns to the trip.' }));
+  saveModel(root, m);
+  const out = await bld(root, 'quests', { zone: 'trips', flow: 'f1', goal: 'g', start: 's1',
+    objectives: [{ text: 'a', element: 'el1' }, { text: 'b', element: 'el2' }] });
+  const r = loadRound(root, out.id);
+  assert.deepEqual(r.nav.el1, { on: 's1', goes: 's2' });
+  assert.deepEqual(r.nav.el2, { on: 's2', goes: 's1', roles: ['r1'] });
+  assert.equal(r.nav.el7.on, 's2');
+  assert.ok(!Object.hasOwn(r.nav, 'el8'), 'unreachable screens are left out');
+  assert.equal(r.labels.r1.label, 'Manager');
+  assert.equal(r.labels.el7.purpose, 'Returns to the trip.');
+});
+
 test('whiteboard derives answer edges; boss-battle has no answer', async () => {
   const root = await setup();
   const w = await bld(root, 'whiteboard', { zone: 'trips', cards: ['s1', 's2'] });

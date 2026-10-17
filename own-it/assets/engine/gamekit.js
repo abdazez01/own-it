@@ -103,14 +103,14 @@
   }
 
   /* Ends a round: stops the timer, shows the score and opens the result card with the payload.
-     o: { game, mode, got, of, xp, missed: [string], review: [{text}] }. */
+     o: { game, mode, got, of, xp, missed: [string], review: [{text}], extra: {…merged into the payload} }. */
   function finish(shell, ctx, o) {
     shell.stopTimer();
     shell.setScore(o.got, o.of);
     var xp = Math.max(0, o.xp - shell.hintsUsed() * 15);
     return shell.result({
       got: o.got, total: o.of, xp: xp, missed: o.review,
-      payload: { id: ctx.roundId, game: o.game, mode: o.mode, submittedAt: new Date().toISOString(), got: o.got, of: o.of, missed: o.missed }
+      payload: Object.assign({ id: ctx.roundId, game: o.game, mode: o.mode, submittedAt: new Date().toISOString(), got: o.got, of: o.of, missed: o.missed }, o.extra || {})
     });
   }
 

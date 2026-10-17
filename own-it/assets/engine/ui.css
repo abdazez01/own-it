@@ -474,3 +474,30 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .buzz-btn { width: 100%; min-height: 64px; font-size: var(--fs-20); }
 .buzz-key { margin-left: var(--s-2); font: 600 var(--fs-13) var(--f-flap); opacity: .8; }
 @media (hover: none) { .buzz-key { display: none; } }
+
+/* Quests: role bar, screen, feedback; the objectives live in the side panel (stacks below 1024px) */
+.quest-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); margin-bottom: var(--s-4); }
+.quest-role { margin: 0; flex: 1 1 auto; min-width: 0; color: var(--ink-2); font-size: var(--fs-15); overflow-wrap: anywhere; }
+.quest-screen { min-width: 0; }
+.quest-fallback { margin-top: var(--s-4); }
+.quest-feedback { margin-top: var(--s-4); min-width: 0; }
+.quest-cost { margin: 0; }
+.quest-goal { margin: 0; color: var(--ink-2); font-size: var(--fs-15); overflow-wrap: anywhere; }
+.quest-list, .quest-intro { margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.quest-list { list-style: none; }
+.quest-intro { padding-left: var(--s-5); color: var(--ink); font-size: var(--fs-15); }
+.quest-row {
+  position: relative; display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3);
+  border: 1px solid var(--edge); border-radius: var(--r-inset); background: var(--glass-deep); min-width: 0;
+}
+.quest-row[data-state="now"] { border-color: var(--gold); }
+.quest-row[data-state="done"] { border-color: var(--sage); background: var(--sage-a16); animation: quest-flash 520ms var(--ease-out); }
+.quest-check { flex: none; width: 20px; height: 20px; border: 1.5px solid var(--edge); border-radius: 6px; color: var(--sage); display: grid; place-items: center; }
+.quest-row[data-state="done"] .quest-check { border-color: var(--sage); }
+.quest-check svg { width: 16px; height: 16px; }
+.quest-text { min-width: 0; font-size: var(--fs-15); overflow-wrap: anywhere; }
+.quest-tally { margin: 0; color: var(--ink-2); font-size: var(--fs-15); }
+.quest-summary { display: grid; gap: var(--s-2); }
+.quest-summary p { margin: 0; font-size: var(--fs-15); }
+@keyframes quest-flash { from { background: var(--sage-a35, var(--sage-a16)); } to { background: var(--sage-a16); } }
+@media (prefers-reduced-motion: reduce) { .quest-row[data-state="done"] { animation: none; } }

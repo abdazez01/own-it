@@ -113,6 +113,23 @@ function derive(game, round, byId, items) {
   }
 }
 
+// Navigation facts for a quest: every element on a screen the player can reach from `start` by following `goes`.
+// Plain data (not answers): the game needs them to move between screens and to know who may use what.
+function navFor(input, items) {
+  const els = items.filter((x) => x.k === 'element' && typeof x.on === 'string');
+  const reach = new Set([input.start]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const e of els) if (reach.has(e.on) && typeof e.goes === 'string' && !reach.has(e.goes)) { reach.add(e.goes); grew = true; }
+  }
+  return Object.fromEntries(els.filter((e) => reach.has(e.on)).map((e) => {
+    const n = { on: e.on };
+    if (typeof e.goes === 'string') n.goes = e.goes;
+    if (Array.isArray(e.roles) && e.roles.length) n.roles = e.roles.filter((r) => typeof r === 'string');
+    return [e.id, n];
+  }));
+}
+
 export async function run(args, ctx) {
   const [game, arg] = args._;
   if (!game || !arg) throw new Error('usage: build-round <game> <file>');
@@ -159,7 +176,9 @@ export async function run(args, ctx) {
   derive(game, round, byId, items);
   const labelIds = new Set(named);
   for (const id of named) { const it = byId.get(id); if (it && it.k === 'element') for (const x of [it.on, it.goes]) if (typeof x === 'string') labelIds.add(x); }
-  const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), labels: labelsFor(labelIds, byId) };
+  const nav = game === 'quests' ? navFor(input, items) : null;
+  if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
+  const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.
   const sessionPath = ownItPath(ctx.root, 'session.json');
