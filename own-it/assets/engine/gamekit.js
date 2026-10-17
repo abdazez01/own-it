@@ -1,5 +1,5 @@
 /* own-it engine: shared scaffolding for question-style game templates (quiz, screen tour, guess the screen).
-   OwnIt.kit: label, note, dots, answerButtons, targetIndex, choiceKeys, clock, onActivate, nextLabel, finish. Load after shell.js. */
+   OwnIt.kit: label, note, dots, answerButtons, targetIndex, choiceKeys, clock, onActivate, arrowKeys, timers, release, nextLabel, finish. Load after shell.js. */
 (function () {
   'use strict';
   var OwnIt = (window.OwnIt = window.OwnIt || {});
@@ -97,6 +97,32 @@
     });
   }
 
+  /* The four arrow keys, paused under dialogs and for events outside the game's area. fn(dx, dy) gets -1, 0 or 1 per axis
+     (right is dx 1, down is dy 1); the default scroll is stopped. Returns the off functions. */
+  function arrowKeys(ctx, area, fn) {
+    return [['ArrowRight', 1, 0], ['ArrowLeft', -1, 0], ['ArrowDown', 0, 1], ['ArrowUp', 0, -1]].map(function (p) {
+      return ctx.keys.on(p[0], function (e) {
+        if (modalOpen() || !mine(e, area)) return;
+        if (e && e.preventDefault) e.preventDefault();
+        fn(p[1], p[2]);
+      });
+    });
+  }
+
+  // Pending timeouts a game owns. later(fn, ms) schedules; clear() cancels every one still waiting.
+  function timers() {
+    var list = [];
+    return {
+      later: function (fn, ms) { var t = setTimeout(function () { fn(); }, ms); list.push(t); return t; },
+      clear: function () { list.forEach(function (t) { clearTimeout(t); }); list = []; }
+    };
+  }
+
+  // Calls every off function a game collected from ctx.keys.on, ignoring ones already gone.
+  function release(offs) {
+    offs.forEach(function (off) { try { off(); } catch (e) { /* gone */ } });
+  }
+
   // Sets the Next/See result caption, shows the button and moves focus to it.
   function nextLabel(btn, current, total) {
     btn.textContent = current + 1 >= total ? 'See result' : 'Next';
@@ -150,5 +176,5 @@
   }
 
   OwnIt.kit = { has: has, plural: plural, label: label, note: note, dots: dots, answerButtons: answerButtons, targetIndex: targetIndex, mine: mine,
-    choiceKeys: choiceKeys, clock: clock, onActivate: onActivate, nextLabel: nextLabel, finish: finish, modalOpen: modalOpen };
+    choiceKeys: choiceKeys, clock: clock, onActivate: onActivate, arrowKeys: arrowKeys, timers: timers, release: release, nextLabel: nextLabel, finish: finish, modalOpen: modalOpen };
 })();

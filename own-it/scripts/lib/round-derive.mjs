@@ -58,6 +58,38 @@ export function flowSteps(flow, byId) {
   return [...seen];
 }
 
+// Data detective: the lifecycle in order, who moved the record at each step (from the model's transitions), and the
+// roles or events offered as "who", in random order. Throws before anything is written if the model cannot back the round.
+export function detectiveSteps(input, byId, items) {
+  const order = input.states.map((s) => s.state);
+  if (new Set(order).size !== order.length) throw new Error('duplicate states in the lifecycle');
+  for (const id of order) {
+    const it = byId.get(id);
+    if (it.k !== 'state') throw new Error(`"${id}" is not a state`);
+    if (!labeled(it)) throw new Error(`"${id}" has no label in the model`);
+  }
+  const by = [];
+  for (let i = 1; i < order.length; i++) {
+    const t = items.find((x) => x.k === 'transition' && x.from === order[i - 1] && x.to === order[i]);
+    if (!t) throw new Error(`no transition from "${order[i - 1]}" to "${order[i]}" in the model`);
+    if (typeof t.by !== 'string' || !t.by.trim()) throw new Error(`transition from "${order[i - 1]}" to "${order[i]}" has no by in the model`);
+    by.push(t.by);
+  }
+  const named = (id) => {
+    const it = byId.get(id);
+    if (!it) return { id, label: id };
+    if (it.k !== 'role') throw new Error(`"${id}" is not a role`);
+    if (!labeled(it)) throw new Error(`"${id}" has no label in the model`);
+    return { id, label: it.label };
+  };
+  const chosen = [...new Set(by)].map(named);
+  if (chosen.length > 6) throw new Error(`too many different movers (${chosen.length}); use a shorter lifecycle`);
+  const spare = shuffle(items.filter((x) => x.k === 'role' && labeled(x) && !chosen.some((c) => c.id === x.id)));
+  const who = shuffle([...chosen, ...spare.slice(0, Math.max(0, 4 - chosen.length))].map((c) => ({ id: c.id, label: c.label })));
+  if (who.length < 2) throw new Error('data detective needs at least 2 roles or events to choose from');
+  return { order, by, who };
+}
+
 // Fills in answers the model already knows, so Claude never has to write them.
 export function derive(game, round, byId, items) {
   if (game === 'quests') {
@@ -99,6 +131,14 @@ export function derive(game, round, byId, items) {
     round.answer = damaged;
   } else if (game === 'pager') {
     round.cards = pagerChoices(round, byId, items).map((x) => ({ id: x.id, label: x.label }));
+  } else if (game === 'data-detective') {
+    const { order, by, who } = detectiveSteps(round, byId, items);
+    let scrambled = shuffle(order);
+    while (scrambled.every((id, i) => id === order[i])) scrambled = shuffle(order);
+    round.cards = scrambled.map((id) => ({ id, label: byId.get(id).label }));
+    round.who = who;
+    round.answer = { order, by };
+    delete round.states;
   }
 }
 

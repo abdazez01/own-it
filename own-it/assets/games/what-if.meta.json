@@ -5,7 +5,7 @@
   "minutes": 3,
   "examReady": true,
   "usesScreens": false,
-  "stage": "2.2",
+  "stage": "2.0",
   "line": "You turn up the traffic or the timeouts and predict what fails first.",
   "keys": "Left, Right",
   "logo": "<svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"13\" r=\"7\"/><path d=\"M5 5l1.5 1.5M19 5l-1.5 1.5M12 2.5v2\"/><path stroke=\"#E8C26A\" d=\"M12 13l3-4\"/></svg>"

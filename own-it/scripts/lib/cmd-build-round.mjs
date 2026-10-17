@@ -27,6 +27,7 @@ const IDS = {
   'whos-allowed': () => [],
   'blast-radius': (r) => [r.target],
   pager: (r) => [r.answer],
+  'data-detective': (r) => r.states.map((x) => x.state),
 };
 
 
@@ -212,13 +213,17 @@ export async function run(args, ctx) {
     if (flow.k !== 'flow') throw new Error(`"${input.flow}" is not a flow`);
     if (flowSteps(flow, byId).length < 2) throw new Error(`flow "${input.flow}" needs at least 2 steps in the model`);
   }
+  if (game === 'data-detective' && identifierOnly(input.entity)) throw new Error(`identifier-only answer in entity; ${HINT}`);
   const progress = loadProgress(ctx.root);
   const id = `${input.zone}-${game}-${progress.seq + 1}`;
   const round = { ...input };
   derive(game, round, byId, items);
+  // Movers that are not model roles are shown as written, so they must read as words.
+  if (game === 'data-detective') round.who.forEach((w) => { if (!byId.has(w.id) && identifierOnly(w.label)) throw new Error(`identifier-only answer in a transition "by"; ${HINT}`); });
   const labelIds = new Set(named);
   for (const id of named) { const it = byId.get(id); if (it && it.k === 'element') for (const x of [it.on, it.goes]) if (typeof x === 'string') labelIds.add(x); }
-  if (game === 'chain-reaction' || game === 'blast-radius' || game === 'pager') round.cards.forEach((c) => labelIds.add(c.id));
+  if (['chain-reaction', 'blast-radius', 'pager', 'data-detective'].includes(game)) round.cards.forEach((c) => labelIds.add(c.id));
+  if (game === 'data-detective') round.who.forEach((c) => labelIds.add(c.id));
   const nav = game === 'quests' ? navFor(input, items) : null;
   if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
   const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };

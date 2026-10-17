@@ -5,7 +5,7 @@
   "minutes": 4,
   "examReady": true,
   "usesScreens": false,
-  "stage": "2.2",
+  "stage": "2.0",
   "line": "You stamp each status on a record's timeline and name who moved it.",
   "keys": "Click, Enter",
   "logo": "<svg viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"16\" width=\"10\" height=\"4\" rx=\"1\"/><path d=\"M6 16v-4a2 2 0 1 1 4 0v4\"/><circle stroke=\"#E8C26A\" cx=\"16\" cy=\"8.5\" r=\"4\"/><path stroke=\"#E8C26A\" d=\"M19 11.5l2.5 2.5\"/></svg>"

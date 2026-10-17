@@ -561,3 +561,68 @@ test('blast-radius: more than 8 dependents is refused, an unlabeled dependent is
   const r = loadRound(root, (await bld(root, 'blast-radius', { zone: 'trips', target: 'core' })).id);
   assert.equal(core.decode(r.answer).length, 7, 'all seven dependents are in the damage set');
 });
+
+// ---- v2.2 pack 2: data-detective, pipe-plumber, what-if
+
+async function lifeSetup() {
+  const root = await setup();
+  const m = loadModel(root);
+  m.zones.trips.items.push(
+    I({ id: 'st1', k: 'state', label: 'Requested' }), I({ id: 'st2', k: 'state', label: 'Active' }), I({ id: 'st3', k: 'state', label: 'Done' }),
+    I({ id: 'st4', k: 'state', label: 'Paid' }),
+    I({ id: 'r1', k: 'role', label: 'Rider' }), I({ id: 'r2', k: 'role', label: 'Driver' }), I({ id: 'r3', k: 'role', label: 'Admin' }),
+    I({ id: 'tr1', k: 'transition', from: 'st1', to: 'st2', by: 'r2' }), I({ id: 'tr2', k: 'transition', from: 'st2', to: 'st3', by: 'r2' }),
+    I({ id: 'tr3', k: 'transition', from: 'st3', to: 'st4', by: 'Payment webhook' }));
+  saveModel(root, m);
+  return root;
+}
+const life = (over = {}) => ({ zone: 'trips', entity: 'A trip', states: [{ state: 'st1' }, { state: 'st2' }, { state: 'st3' }], ...over });
+
+test('data-detective: cards shuffled, order and movers only in the obfuscated answer, roles padded and shuffled, labels', async () => {
+  const root = await lifeSetup();
+  const out = await bld(root, 'data-detective', life());
+  const r = loadRound(root, out.id);
+  assert.equal(out.id, 'trips-data-detective-1');
+  assert.equal(r.states, undefined, 'the ordered input is dropped');
+  assert.deepEqual(core.decode(r.answer), { order: ['st1', 'st2', 'st3'], by: ['r2', 'r2'] });
+  assert.deepEqual(r.cards.map((c) => c.id).sort(), ['st1', 'st2', 'st3']);
+  assert.equal(r.entity, 'A trip');
+  assert.ok(r.who.length >= 3 && r.who.some((w) => w.id === 'r2' && w.label === 'Driver'), 'the real mover plus other roles');
+  assert.equal(r.labels.st2.label, 'Active');
+  assert.equal(r.labels.r2.label, 'Driver');
+  const orders = new Set(), whos = new Set();
+  for (let k = 0; k < 25; k++) {
+    const x = loadRound(root, (await bld(root, 'data-detective', life())).id);
+    assert.notDeepEqual(x.cards.map((c) => c.id), ['st1', 'st2', 'st3']);
+    orders.add(x.cards.map((c) => c.id).join());
+    whos.add(x.who.map((w) => w.id).join());
+  }
+  assert.ok(orders.size > 1 && whos.size > 1, 'card and role order are shuffled');
+  const sess = readJson(join(root, '.own-it', 'session.json')).rounds[out.id];
+  assert.equal(sess.rung, 'trace');
+});
+
+test('data-detective: a mover that is not a role is shown as written', async () => {
+  const root = await lifeSetup();
+  const r = loadRound(root, (await bld(root, 'data-detective', life({ states: [{ state: 'st2' }, { state: 'st3' }, { state: 'st4' }] }))).id);
+  assert.deepEqual(core.decode(r.answer).by, ['r2', 'Payment webhook']);
+  assert.ok(r.who.some((w) => w.id === 'Payment webhook' && w.label === 'Payment webhook'));
+});
+
+test('data-detective: missing transitions, repeats, non-states and identifier-only text are rejected before any write', async () => {
+  const root = await lifeSetup();
+  await assert.rejects(bld(root, 'data-detective', life({ states: [{ state: 'st1' }, { state: 'st3' }, { state: 'st4' }] })), /no transition from "st1" to "st3"/);
+  await assert.rejects(bld(root, 'data-detective', life({ states: [{ state: 'st1' }, { state: 'st2' }, { state: 'st1' }] })), /duplicate states/);
+  await assert.rejects(bld(root, 'data-detective', life({ states: [{ state: 'st1' }, { state: 'st2' }, { state: 's1' }] })), /"s1" is not a state/);
+  await assert.rejects(bld(root, 'data-detective', life({ states: [{ state: 'st1' }, { state: 'st2' }, { state: 'zzz' }] })), /ids not in zone/);
+  await assert.rejects(bld(root, 'data-detective', life({ states: [{ state: 'st1' }, { state: 'st2' }] })), /at least 3/);
+  await assert.rejects(bld(root, 'data-detective', life({ entity: 'trip_row' })), /identifier-only answer in entity/);
+  const m = loadModel(root);
+  m.zones.trips.items.find((x) => x.id === 'tr3').by = 'payment_webhook';
+  saveModel(root, m);
+  await assert.rejects(bld(root, 'data-detective', life({ states: [{ state: 'st2' }, { state: 'st3' }, { state: 'st4' }] })), /identifier-only answer in a transition "by"/);
+  delete m.zones.trips.items.find((x) => x.id === 'st2').label;
+  saveModel(root, m);
+  await assert.rejects(bld(root, 'data-detective', life()), /"st2" has no label/);
+  assert.ok(!existsSync(join(root, '.own-it', 'data')) || readdirSync(join(root, '.own-it', 'data')).length === 0, 'nothing written');
+});

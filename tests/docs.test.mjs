@@ -28,6 +28,7 @@ test('reference budgets and set of files', () => {
     const s = read('references', f);
     if (f === 'examples.md') assert.ok(s.split(/\r?\n/).length <= 90, `${f} lines`);
     else if (f === 'models.md') assert.ok(words(s) <= 150, `${f} has ${words(s)} words`);
+    else if (f === 'games.md') assert.ok(words(s) <= 650, `${f} has ${words(s)} words`);
     else assert.ok(words(s) <= 400, `${f} has ${words(s)} words`);
   }
 });
