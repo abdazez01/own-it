@@ -120,11 +120,12 @@
       els.forEach(function (b, i) {
         if (Object.prototype.hasOwnProperty.call(from, i) && !(hidden && i === start && !turned)) b.classList.add('reached'); else b.classList.remove('reached');
       });
-      var count = Math.min(Object.keys(from).length, pathLen);
-      reachedMost = Math.max(reachedMost, count);
+      // Water also runs into decoy branches, so the count is not progress along the path: the score stays at 0 until the end tile is reached.
+      var wet = Object.keys(from).length;
+      reachedMost = Math.max(reachedMost, Math.min(wet, pathLen));
       if (moves) moves.textContent = 'Moves: ' + turns + ' (par ' + par + ')';
-      shell.setScore(count, pathLen);
-      live.textContent = 'The water reaches ' + count + ' of ' + pathLen + ' tiles.';
+      shell.setScore(0, pathLen);
+      live.textContent = 'The water reaches ' + wet + (wet === 1 ? ' tile' : ' tiles') + '. Get it to the green tile.';
       return from;
     }
 

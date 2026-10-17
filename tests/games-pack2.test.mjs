@@ -211,7 +211,8 @@ test('pipe-plumber: tiles turn on a tap, the water reaches the end, +10 per tile
   assert.equal(ppTiles(t)[0].getAttribute('data-turn'), '1');
   ppTurn(t, 1); ppTurn(t, 2, 2);
   assert.equal(t.finished.length, 0);
-  assert.match(t.root.querySelector('.pp-live').textContent, /3 of 4/, 'live count of the tiles the water has reached');
+  assert.match(t.root.querySelector('.pp-live').textContent, /reaches 3 tiles/, 'live count of the tiles the water has reached');
+  assert.ok(!/of 4/.test(t.root.querySelector('.pp-live').textContent), 'no path-progress count: decoys get wet too');
   ppTurn(t, 5, 3);
   assert.equal(t.decodes(), 1);
   assert.equal(t.finished.length, 1);
