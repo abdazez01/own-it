@@ -422,3 +422,31 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .recs { grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); }
 .header .offline-note { flex-basis: 100%; margin: 0; color: var(--ink-2); font-size: var(--fs-13); }
 .header.home-head { max-height: none; flex-wrap: wrap; }
+
+/* Quiz template: progress dots, question card, answer rows (2x2 from 640px via .answers above) */
+.quiz-card { max-width: 920px; margin-inline: auto; display: grid; gap: var(--s-4); }
+.qdots { display: flex; gap: var(--s-2); }
+.qdot { width: 28px; height: 8px; border-radius: var(--r-pill); background: var(--track); border: 1px solid var(--edge); }
+.qdot.now { border-color: var(--gold); background: var(--gold-a35); }
+.qdot.ok { background: var(--sage); border-color: var(--sage); }
+.qdot.bad { background: var(--salmon); border-color: var(--salmon); }
+.qdot.set { background: var(--gold); border-color: var(--gold); }
+.quiz-q { font: 600 var(--fs-20)/var(--lh-display) var(--f-ui); overflow-wrap: anywhere; }
+@media (min-width: 1280px) { .quiz-q { font-size: var(--fs-26); } }
+.answer {
+  display: flex; align-items: flex-start; gap: var(--s-3); min-height: var(--hit); width: 100%; padding: var(--s-3) var(--s-4);
+  text-align: left; cursor: pointer; color: var(--ink); font: 500 var(--fs-15)/1.4 var(--f-ui); overflow-wrap: anywhere;
+  background: var(--glass-deep); border: 1px solid var(--edge); border-radius: var(--r-inset);
+  transition: background var(--t-hover), border-color var(--t-hover);
+}
+.answer-key { flex: none; font: 600 var(--fs-13) var(--f-flap); color: var(--gold); padding-top: 2px; }
+.answer:hover, .answer:focus-visible { background: var(--glass-hi); border-color: var(--gold-a60); }
+.answer[aria-disabled="true"] { cursor: default; }
+.answer.picked { border-color: var(--gold); }
+.answer.right { border-color: var(--sage); background: var(--sage-a16); }
+.answer.wrong { border-color: var(--salmon); background: var(--salmon-a16); }
+.quiz-feedback { display: grid; gap: var(--s-2); min-height: 1px; }
+.quiz-why { color: var(--ink-2); font-size: var(--fs-15); overflow-wrap: anywhere; }
+.quiz-why strong { color: var(--ink); }
+.quiz-xp { color: var(--sage); font: 600 var(--fs-15) var(--f-flap); }
+.quiz-actions { justify-content: flex-end; }
