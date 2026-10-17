@@ -27,6 +27,7 @@ const IDS = {
   'whos-allowed': () => [],
   'blast-radius': (r) => [r.target],
   pager: (r) => [r.answer],
+  'what-if': () => [],
   'data-detective': (r) => r.states.map((x) => x.state),
 };
 
@@ -77,6 +78,20 @@ function checkPermissions(input) {
   });
   const allows = input.cards.filter((c) => c.answer === 'allow').length;
   if (allows < 2 || input.cards.length - allows < 2) throw new Error('cards need at least 2 allow and 2 deny answers');
+}
+
+// What-if dials: the prompt and every option are words, and no two options read the same.
+function checkDials(input) {
+  input.dials.forEach((d, i) => {
+    if (identifierOnly(d.label)) throw new Error(`identifier-only answer in dials[${i}].label; ${HINT}`);
+    const seen = new Set();
+    d.options.forEach((o, j) => {
+      if (identifierOnly(o)) throw new Error(`identifier-only answer in dials[${i}].options[${j}]; ${HINT}`);
+      const norm = o.trim().toLowerCase();
+      if (seen.has(norm)) throw new Error(`duplicate option in dials[${i}].options[${j}]`);
+      seen.add(norm);
+    });
+  });
 }
 
 // Quest objectives are elements of the quest's flow, each used once.
@@ -204,6 +219,7 @@ export async function run(args, ctx) {
   if (game === 'memory-match') checkPairs(input);
   if (game === 'spot-the-lie') input.statements.forEach((s, i) => { if (identifierOnly(s.text)) throw new Error(`identifier-only answer in statements[${i}].text; ${HINT}`); });
   if (game === 'whos-allowed') checkPermissions(input);
+  if (game === 'what-if') checkDials(input);
   if (game === 'pager') {
     if (identifierOnly(input.failure)) throw new Error(`identifier-only answer in failure; ${HINT}`);
     input.logs.forEach((l, i) => { if (identifierOnly(l)) throw new Error(`identifier-only answer in logs[${i}]; ${HINT}`); });

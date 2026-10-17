@@ -131,6 +131,12 @@ export function derive(game, round, byId, items) {
     round.answer = damaged;
   } else if (game === 'pager') {
     round.cards = pagerChoices(round, byId, items).map((x) => ({ id: x.id, label: x.label }));
+  } else if (game === 'what-if') {
+    // Each dial's options are permuted, so the position Claude wrote the answer at gives nothing away.
+    round.dials = round.dials.map((d) => {
+      const perm = shuffle(d.options.map((_, i) => i));
+      return { ...d, options: perm.map((i) => d.options[i]), answer: perm.indexOf(d.answer) };
+    });
   } else if (game === 'data-detective') {
     const { order, by, who } = detectiveSteps(round, byId, items);
     let scrambled = shuffle(order);

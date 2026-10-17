@@ -122,3 +122,64 @@ test('data-detective: keys 1-9 stamp or pick, arrows move, Enter activates', () 
   t.key('Enter'); // the focused who choice
   assert.equal(t.finished.length, 1);
 });
+
+// ------------------------------------------------------------------ what-if dial
+
+const wiDial = (n, right) => ({
+  label: `Dial ${n}: traffic grows tenfold`, options: [`A${n}`, `B${n}`, `C${n}`, `D${n}`],
+  answer: core.encode(right), why: core.encode(`Because of rule ${n}.`),
+});
+const wiRound = () => ({ zone: 'trips', mode: 'practice', dials: [wiDial(1, 2), wiDial(2, 0), wiDial(3, 3)], labels: {} });
+const wiOpts = (t) => all(t, '.wi-opt');
+const wiLock = (t) => t.root.querySelector('.wi-lock');
+const wiNext = (t) => t.root.querySelector('.wi-next');
+
+test('what-if: turn the dial to a prediction, lock it in, 10 per right call, the reason shows after', () => {
+  const t = boot('what-if', wiRound());
+  assert.equal(wiOpts(t).length, 4);
+  assert.match(t.root.textContent, /Dial 1/);
+  assert.ok(wiOpts(t).every((o) => !o.hasAttribute('data-i') && !o.hasAttribute('data-answer')), 'nothing about the answer in the DOM');
+  assert.equal(t.decodes(), 0, 'nothing decoded before a lock');
+  wiOpts(t)[2].click(); // select C1
+  assert.equal(t.decodes(), 0);
+  wiLock(t).click();
+  assert.equal(t.decodes(), 2, 'answer and reason decoded on the lock');
+  assert.match(t.root.textContent, /Because of rule 1/);
+  assert.equal(wiOpts(t).filter((o) => o.classList.contains('fell')).length, 4, 'the cascade reaches every option');
+  wiLock(t).click(); // a second lock does nothing
+  assert.equal(t.decodes(), 2);
+  wiNext(t).click();
+  wiOpts(t)[3].click(); wiLock(t).click(); // wrong: the answer is A2
+  assert.equal(t.shakes(), 1);
+  assert.ok(wiOpts(t)[0].classList.contains('first'), 'the thing that fails first is marked');
+  wiNext(t).click();
+  wiOpts(t)[3].click(); wiLock(t).click();
+  assert.equal(t.finished.length, 0, 'the result waits for the last reveal to be read');
+  wiNext(t).click();
+  assert.equal(t.finished.length, 1);
+  assert.equal(t.finished[0].got, 2);
+  assert.equal(t.finished[0].of, 3);
+  assert.equal(t.results[0].xp, 20);
+  assert.deepEqual(plain(t.finished[0].missed), ['1']);
+  assert.match(t.results[0].missed.map((m) => m.text).join(' '), /Dial 2.*A2.*Because of rule 2/);
+});
+
+test('what-if: arrows turn the dial and wrap, a number picks, Enter locks then moves on', () => {
+  const t = boot('what-if', wiRound());
+  const on = () => wiOpts(t).findIndex((o) => o.getAttribute('aria-checked') === 'true');
+  assert.equal(on(), 0);
+  t.key('ArrowLeft');
+  assert.equal(on(), 3, 'wraps');
+  t.key('ArrowRight'); t.key('ArrowRight'); t.key('ArrowRight');
+  assert.equal(on(), 2);
+  t.key('Enter'); // lock C1: right
+  assert.equal(tuples(t, 'combo').length, 1);
+  t.key('ArrowRight'); // the dial is locked while the reason shows
+  assert.equal(on(), 2);
+  t.key('Enter'); // next
+  assert.match(t.root.textContent, /Dial 2/);
+  t.key('1'); t.key('Enter'); t.key('Enter'); // A2, locked, next
+  t.key('4'); t.key('Enter'); t.key('Enter'); // D3, locked, result
+  assert.equal(t.finished.length, 1);
+  assert.equal(t.results[0].xp, 30);
+});

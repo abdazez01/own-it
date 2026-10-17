@@ -626,3 +626,43 @@ test('data-detective: missing transitions, repeats, non-states and identifier-on
   await assert.rejects(bld(root, 'data-detective', life()), /"st2" has no label/);
   assert.ok(!existsSync(join(root, '.own-it', 'data')) || readdirSync(join(root, '.own-it', 'data')).length === 0, 'nothing written');
 });
+
+const dialIn = (n = 3) => ({ zone: 'trips', dials: Array.from({ length: n }, (_, i) => ({
+  label: `Traffic grows tenfold at step ${i}`, options: ['The database pool', 'The map service', 'The login page', 'The push sender'], answer: 0, why: `Reason ${i} in plain words` })) });
+
+test('what-if: options permuted per dial, answer remapped and obfuscated, reasons obfuscated, no ids needed', async () => {
+  const root = await setup();
+  const seen = new Set();
+  for (let k = 0; k < 20; k++) {
+    const out = await bld(root, 'what-if', dialIn(4));
+    const r = loadRound(root, out.id);
+    if (k === 0) assert.equal(out.id, 'trips-what-if-1');
+    assert.equal(r.dials.length, 4);
+    r.dials.forEach((d, i) => {
+      assert.equal(typeof d.answer, 'string');
+      assert.equal(d.options[core.decode(d.answer)], 'The database pool', 'the answer follows its option');
+      assert.ok(!/^Reason/.test(d.why));
+      assert.equal(core.decode(d.why), `Reason ${i} in plain words`);
+      assert.deepEqual([...d.options].sort(), ['The database pool', 'The login page', 'The map service', 'The push sender']);
+      seen.add(core.decode(d.answer));
+    });
+  }
+  assert.ok(seen.size > 1, 'the right option does not stay at the written index');
+  assert.equal(readJson(join(root, '.own-it', 'session.json')).rounds['trips-what-if-1'].rung, 'break');
+});
+
+test('what-if: wrong counts, bad answers, repeated options and identifier-only text are rejected', async () => {
+  const root = await setup();
+  await assert.rejects(bld(root, 'what-if', dialIn(2)), /at least 3/);
+  await assert.rejects(bld(root, 'what-if', dialIn(6)), /at most 5/);
+  const a = dialIn(); a.dials[1].answer = 4;
+  await assert.rejects(bld(root, 'what-if', a), /above 3/);
+  const b = dialIn(); b.dials[0].options = b.dials[0].options.slice(0, 3);
+  await assert.rejects(bld(root, 'what-if', b), /at least 4/);
+  const c = dialIn(); c.dials[2].options[1] = 'the database pool ';
+  await assert.rejects(bld(root, 'what-if', c), /duplicate option in dials\[2\]\.options\[1\]/);
+  const d = dialIn(); d.dials[0].options[3] = 'trips_table';
+  await assert.rejects(bld(root, 'what-if', d), /identifier-only answer in dials\[0\]\.options\[3\]/);
+  const e = dialIn(); e.dials[1].label = 'src/api/trips.ts';
+  await assert.rejects(bld(root, 'what-if', e), /identifier-only answer in dials\[1\]\.label/);
+});

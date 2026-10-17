@@ -686,3 +686,23 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .dd-whos { display: grid; gap: var(--s-3); }
 .dd-whos[hidden] { display: none; }
 .dd-ask { font: 600 var(--fs-17)/1.4 var(--f-ui); color: var(--ink); overflow-wrap: anywhere; }
+.wi-knob {
+  position: relative; justify-self: center; width: 96px; height: 96px; border-radius: 50%; background: var(--tile-solid); border: 2px solid var(--edge);
+}
+.wi-needle {
+  position: absolute; left: 50%; bottom: 50%; width: 4px; height: 38px; margin-left: -2px; border-radius: 2px; background: var(--gold);
+  transform-origin: 50% 100%; transition: transform var(--t-press);
+}
+.wi-opts { display: grid; gap: var(--s-3); grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+.wi-opt {
+  display: flex; align-items: flex-start; gap: var(--s-3); min-height: var(--hit); min-width: 0; padding: var(--s-3) var(--s-4); text-align: left; cursor: pointer;
+  color: var(--ink); font: 500 var(--fs-15)/1.4 var(--f-ui); overflow-wrap: anywhere; touch-action: manipulation;
+  background: var(--glass-hi-solid); border: 1px solid var(--edge); border-radius: var(--r-inset);
+  transition: background var(--t-hover), border-color var(--t-hover), transform var(--t-press);
+}
+.wi-opt:hover, .wi-opt:focus-visible { border-color: var(--gold-a60); }
+.wi-opt.on { border-color: var(--gold); background: var(--gold-a16); }
+.wi-opt[aria-disabled="true"] { cursor: default; }
+.wi-opt.fell { border-color: var(--salmon); background: var(--salmon-a16); transform: translateY(6px); }
+.wi-opt.first { border-width: 2px; }
+@media (prefers-reduced-motion: reduce) { .wi-needle, .wi-opt { transition: none; } }
