@@ -315,3 +315,10 @@ test('pick with about but no level is rejected', () => withServer(async (s) => {
   assert.equal((await post(s, '{"type":"pick","about":"x"}')).status, 400);
   assert.equal((await post(s, '{"type":"pick","game":"quiz"}')).status, 204);
 }));
+
+test('pick accepts level secret only for games that offer it', () => withServer(async (s) => {
+  assert.equal((await post(s, '{"type":"pick","game":"quests","level":"secret"}')).status, 204);
+  assert.equal((await post(s, '{"type":"pick","game":"quiz","level":"secret"}')).status, 400);
+  assert.equal((await post(s, '{"type":"pick","level":"secret"}')).status, 400);
+  assert.equal((await post(s, '{"type":"pick","game":"quests","level":"secret","about":"x"}')).status, 400);
+}));

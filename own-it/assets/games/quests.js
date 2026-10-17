@@ -15,6 +15,7 @@
   function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
 
   function play(root, round, ctx) {
+    if (round && round.secret && OwnIt.secret) return playSecret(root, round, ctx);
     var objectives = (round && round.objectives) || [];
     var total = objectives.length;
     var nav = (round && round.nav) || {};
@@ -309,6 +310,206 @@
 
     return function () {
       done = true;
+      if (introApi) { try { introApi.close(); } catch (e) { /* already closed */ } }
+      offs.forEach(function (off) { try { off(); } catch (e) { /* gone */ } });
+      if (host) host.destroy();
+      shell.destroy();
+    };
+  }
+
+  /* Secret level ("break it", see OwnIt.secret): the same screens and roles, but the goal is to find the one weakness Claude
+     recorded for this flow. The steps are hidden and the weakness stays obfuscated until the break or Reveal. Normal valid
+     flow taps still work; anything else is a wrong turn. It ends on the break, on Reveal, or after 3 minutes. */
+  function playSecret(root, round, ctx) {
+    var S = OwnIt.secret;
+    var nav = round.nav || {};
+    var labels = round.labels;
+    var L = function (id) { return kit.label(id, labels); };
+    var objectives = round.objectives || [];
+    var kind = round.secret.kind;
+    var roles = [];
+    Object.keys(nav).forEach(function (id) {
+      ((nav[id] && nav[id].roles) || []).forEach(function (r) { if (roles.indexOf(r) < 0) roles.push(r); });
+    });
+    var firstNav = objectives.length && own(nav, objectives[0].element) ? nav[objectives[0].element] : null;
+    var role = (firstNav && firstNav.roles && firstNav.roles[0]) || roles[0] || '';
+    var idx = 0, wrong = [], taps = [], started = false, done = false, screenId = round.start, host = null, pending = null;
+
+    var shell = OwnIt.shell(root, ctx, { zone: round.zone, total: 1, side: true });
+    shell.setScore(0, 1);
+    var area = shell.area, side = shell.side;
+    var bar = OwnIt.el('div', { 'class': 'quest-bar' });
+    var roleLine = OwnIt.el('p', { 'class': 'quest-role', 'aria-live': 'polite' });
+    var roleBtn = OwnIt.button('Switch role', 'secondary', function () { openRoles(); });
+    var revealBtn = OwnIt.button('Reveal', 'quiet', function () { giveUp('revealed'); });
+    if (!roles.length) roleBtn.setAttribute('hidden', 'hidden');
+    [roleLine, roleBtn, revealBtn].forEach(function (n) { bar.appendChild(n); });
+    var screenBox = OwnIt.el('section', { 'class': 'quest-screen', 'aria-label': 'Screen copy' });
+    var banner = OwnIt.el('div', { 'class': 'banner secret-banner' });
+    var feedback = OwnIt.el('div', { 'class': 'panel quest-feedback quiz-feedback', 'aria-live': 'polite' });
+    [bar, screenBox, feedback, banner].forEach(function (n) { area.appendChild(n); });
+    area.classList.add('quest-area');
+    area.setAttribute('tabindex', '-1');
+
+    side.appendChild(OwnIt.el('h2', { 'class': 'panel-title' }, 'Break it'));
+    side.appendChild(OwnIt.el('p', { 'class': 'quest-goal' }, round.goal || ''));
+    var chip = OwnIt.el('p', { 'class': 'chip secret-chip' }, 'Hint: ' + (S ? S.hintLabel(kind) : ''));
+    var tally = OwnIt.el('p', { 'class': 'quest-tally' });
+    var summary = OwnIt.el('div', { 'class': 'quest-summary', 'aria-live': 'polite' });
+    [chip, tally, summary].forEach(function (n) { side.appendChild(n); });
+
+    function paintRole() {
+      roleLine.textContent = role ? 'Signed in as ' + L(role) + '.' : '';
+      if (!role) roleLine.setAttribute('hidden', 'hidden'); else roleLine.removeAttribute('hidden');
+    }
+    function paintTally() { tally.textContent = plural(wrong.length, 'wrong turn', 'wrong turns') + '.'; }
+    paintRole();
+    paintTally();
+
+    function loadScreen(id) {
+      if (host) host.destroy();
+      screenId = id;
+      host = OwnIt.screenhost.mount(screenBox, id, { reserve: 185 });
+      var mine = host;
+      mine.onPick(function (eid) { if (mine === host) tapped(eid); });
+    }
+    function say(cls, lead, text) { feedback.textContent = ''; kit.note(feedback, cls, lead, text); }
+    function wrongTurn(text) {
+      wrong.push(1);
+      OwnIt.sound('wrong');
+      OwnIt.juice.shake(feedback);
+      paintTally();
+      say('bad', 'Nothing broke.', text);
+    }
+
+    function info() { return S ? S.decode(round) : null; }
+
+    // Did this tap, with the taps before it, perform the weakness?
+    function hits(w) {
+      if (!S.triggered(kind, w.steps, taps)) return false;
+      if (kind !== 'order') return true;
+      // Skipping: the last step must be a later objective than the one the player is on.
+      var last = w.steps[w.steps.length - 1].element;
+      var at = -1;
+      objectives.forEach(function (o, i) { if (o.element === last) at = i; });
+      return at > idx;
+    }
+
+    function tapped(id) {
+      if (done || !started || kit.modalOpen()) return;
+      var w = info();
+      if (!w) return;
+      taps.push({ id: id, role: role, t: S.now() });
+      if (taps.length > 8) taps.shift();
+      if (hits(w)) return finish(true, w);
+      var path = OwnItCore.decode(round.answer);
+      var step = path && path[idx];
+      if (!step || id !== step.element) { wrongTurn('That is not part of the normal flow, and it did not break anything.'); return; }
+      var needs = own(nav, id) && nav[id].roles;
+      if (needs && needs.length && needs.indexOf(role) < 0) { wrongTurn('You are signed in as ' + L(role) + '. That account is not allowed here, and the app said no.'); return; }
+      idx++;
+      OwnIt.sound('click');
+      say('good', 'That works as designed.', 'Keep poking. Something here can be broken.');
+      var nxt = path[idx];
+      var dest = (own(nav, id) && nav[id].goes) || step.goes || (nxt && own(nav, nxt.element) && nav[nxt.element].on !== screenId ? nav[nxt.element].on : null);
+      if (dest && dest !== screenId) {
+        // After a double-tap target, hold the screen briefly so a quick second tap still lands.
+        if (kind === 'double' && w.steps[0].element === id) pending = setTimeout(function () { pending = null; if (!done) loadScreen(dest); }, S.DOUBLE_MS + 40);
+        else loadScreen(dest);
+      }
+    }
+
+    function finish(found, w, why) {
+      if (done) return;
+      done = true;
+      if (pending) { clearTimeout(pending); pending = null; }
+      var secs = shell.seconds();
+      shell.stopTimer();
+      var xp = found ? S.xp(secs, wrong.length) : 0;
+      shell.setScore(found ? 1 : 0, 1);
+      if (found) S.broken(banner);
+      summary.textContent = '';
+      summary.appendChild(OwnIt.el('p', null, found ? 'Broken in ' + clock(secs) + '.' : (why === 'time' ? 'Time is up.' : 'Revealed.')));
+      S.report(summary, w, !found);
+      var payload = { id: ctx.roundId, game: 'quests', mode: round.mode || 'practice', submittedAt: new Date().toISOString(), got: found ? 1 : 0, of: 1,
+        missed: [], text: {}, hintsUsed: 0, wrong: wrong, found: found, kind: kind };
+      if (ctx.finish) ctx.finish(payload);
+      var again = OwnIt.button('See result', 'primary', function () { shell.result({ got: found ? 1 : 0, total: 1, xp: xp, missed: [] }); }, { 'data-autofocus': '1' });
+      summary.appendChild(again);
+    }
+
+    function giveUp(why) {
+      if (done || !started || kit.modalOpen()) return;
+      var w = info();
+      if (w) finish(false, w, why);
+    }
+
+    var watch = setInterval(function () { if (started && !done && shell.seconds() >= S.GIVE_UP_S) giveUp('time'); }, 1000);
+
+    function openRoles() {
+      if (!started || done || kit.modalOpen() || !roles.length) return;
+      OwnIt.dialog(function (dlg, api) {
+        dlg.appendChild(OwnIt.el('h2', null, 'Switch role'));
+        var group = OwnIt.el('div', { 'class': 'answers', role: 'group', 'aria-label': 'Roles' });
+        roles.forEach(function (r) {
+          var b = OwnIt.el('button', { type: 'button', 'class': 'answer', 'aria-pressed': r === role ? 'true' : 'false' });
+          b.appendChild(OwnIt.el('span', { 'class': 'answer-text' }, L(r)));
+          if (r === role) b.setAttribute('data-autofocus', '1');
+          b.addEventListener('click', function () {
+            role = r;
+            paintRole();
+            OwnIt.sound('click');
+            say('good', 'Role changed.', 'You are signed in as ' + L(r) + '.');
+            api.close();
+          });
+          group.appendChild(b);
+        });
+        dlg.appendChild(group);
+        dlg.appendChild(OwnIt.button('Cancel', 'quiet', function () { api.close(); }));
+      }, { label: 'Switch role' });
+    }
+
+    var introApi = null;
+    function openIntro() {
+      var begun = false;
+      OwnIt.dialog(function (dlg, api) {
+        introApi = api;
+        dlg.classList.add('quest-dialog');
+        var title = OwnIt.el('div', { 'class': 'banner' });
+        dlg.appendChild(title);
+        OwnIt.flap(title, 'SECRET', { variant: 'alert' });
+        dlg.appendChild(OwnIt.el('p', { 'class': 'quest-goal' }, round.goal || ''));
+        dlg.appendChild(OwnIt.el('p', null, 'Hint: ' + S.hintLabel(kind) + '. Three minutes. No other hints.'));
+        var actions = OwnIt.el('div', { 'class': 'actions' });
+        actions.appendChild(OwnIt.button('Back', 'quiet', function () { api.close(); }));
+        actions.appendChild(OwnIt.button('Start', 'primary', function () { begun = true; api.close(); }, { 'data-autofocus': '1' }));
+        dlg.appendChild(actions);
+      }, { label: 'Secret quest', onClose: function () {
+        introApi = null;
+        if (done) return;
+        if (begun) { started = true; shell.startTimer(); if (area.focus) { try { area.focus(); } catch (e) { /* not focusable */ } } } else ctx.router.go('home');
+      } });
+    }
+
+    var offs = [];
+    offs.push(kit.onActivate(ctx, area, 'r', openRoles));
+    [['ArrowRight', 1], ['ArrowDown', 1], ['ArrowLeft', -1], ['ArrowUp', -1]].forEach(function (p) {
+      offs.push(ctx.keys.on(p[0], function (e) {
+        if (!started || done || kit.modalOpen() || !kit.mine(e, area) || !host) return;
+        if (e && e.preventDefault) e.preventDefault();
+        host.move(p[1]);
+      }));
+    });
+    offs.push(kit.onActivate(ctx, area, 'Enter', function () { if (started && !done && host) host.pickCurrent(); }));
+
+    loadScreen(screenId);
+    say('good', 'Goal.', (round.goal || '') + ' Walk the flow, switch roles, tap around.');
+    openIntro();
+
+    return function () {
+      done = true;
+      clearInterval(watch);
+      if (pending) clearTimeout(pending);
       if (introApi) { try { introApi.close(); } catch (e) { /* already closed */ } }
       offs.forEach(function (off) { try { off(); } catch (e) { /* gone */ } });
       if (host) host.destroy();

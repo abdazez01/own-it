@@ -9,6 +9,7 @@ import { readJson, writeJson, writeJsRegistry, writeAggregate } from './json.mjs
 import { ownItPath } from './paths.mjs';
 import { estimate } from './tokens.mjs';
 import { derive, flowSteps } from './round-derive.mjs';
+import { SECRET_GAMES } from './secret-games.mjs';
 
 // Games whose entries carry a required answer, and the array that holds them.
 const ANSWERED = { quiz: 'questions', 'screen-tour': 'steps', 'guess-the-screen': 'screens' };
@@ -46,6 +47,7 @@ function identifierOnly(text) {
 }
 
 const HINT = 'use the name a person would say';
+const LEVELS = ['easy', 'medium', 'hard', 'impossible'];
 
 // Player-facing lists: answers must be one of the choices; free-text choices obey the identifier-only ban.
 function checkChoices(game, input, byId) {
@@ -203,11 +205,43 @@ function navFor(input, items) {
   }));
 }
 
+export const SECRET_GOAL = 'Claude found a way to break this. Find it.';
+
+// The Secret level: the round plays one real weakness Claude recorded for the zone. It must be backed by the model, and its
+// steps must be things the player can actually tap on this quest's screens.
+function pickWeakness(zone, input, game, nav) {
+  if (!SECRET_GAMES.has(game)) throw new Error(`--level secret is not available for ${game}`);
+  const list = Array.isArray(zone.weaknesses) ? zone.weaknesses : [];
+  if (!list.length) throw new Error(`zone "${input.zone}" has no recorded weaknesses; the secret level needs one`);
+  const w = input.weakness === undefined ? list[0] : list.find((x) => x.id === input.weakness);
+  if (!w) throw new Error(`unknown weakness "${input.weakness}" in zone "${input.zone}"`);
+  return w;
+}
+
+function checkWeakness(w, input, byId, nav) {
+  for (const s of w.steps) {
+    if (!Object.hasOwn(nav, s.element)) throw new Error(`weakness step "${s.element}" is not on the screens of this quest`);
+    if (s.role !== undefined && byId.get(s.role)?.k !== 'role') throw new Error(`weakness role "${s.role}" is not a role`);
+  }
+  const last = w.steps[w.steps.length - 1];
+  if (w.kind === 'role') {
+    const roles = byId.get(last.element).roles;
+    if (!last.role || !Array.isArray(roles) || !roles.length || roles.includes(last.role)) throw new Error('a role weakness needs a final step by a role the element does not allow');
+  } else if (w.kind === 'double') {
+    if (w.steps.length !== 1) throw new Error('a double weakness has exactly one step');
+  } else if (w.kind === 'order') {
+    const at = input.objectives.findIndex((o) => o.element === last.element);
+    if (at < 1) throw new Error('an order weakness must end on a flow objective after the first');
+  }
+}
+
 export async function run(args, ctx) {
   const [game, arg] = args._;
   if (!game || !arg) throw new Error('usage: build-round <game> <file>');
   const meta = getGame(game);
   if (!meta) throw new Error(`unknown game "${game}"`);
+  const secret = args.flags.level === 'secret';
+  if (secret && !SECRET_GAMES.has(game)) throw new Error(`--level secret is not available for ${game}`);
   const schemaPath = join(GAMES_DIR, `${game}.schema.json`);
   if (!existsSync(schemaPath)) throw new Error(`game "${game}" has no round schema yet`);
 
@@ -273,21 +307,30 @@ export async function run(args, ctx) {
   if (game === 'escape-room') round.puzzles.forEach((pz) => (pz.cards || []).forEach((c) => labelIds.add(c.id)));
   const nav = game === 'quests' ? navFor(input, items) : null;
   if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
+  if (secret) {
+    const w = pickWeakness(model.zones[input.zone], input, game, nav);
+    checkWeakness(w, input, byId, nav);
+    delete round.weakness;
+    round.goal = SECRET_GOAL;
+    round.secret = { kind: w.kind, answer: { steps: w.steps, text: w.text, why: w.why, ref: w.ref } };
+    for (const s of w.steps) if (s.role) labelIds.add(s.role);
+  } else if (input.weakness !== undefined) throw new Error('weakness needs --level secret');
   // The pick's level (--level, --base, --about) wins; else the level stored by the `level` command.
   const fl = args.flags;
   let st = progress.settings;
   if (fl.level !== undefined) {
-    if (!['easy', 'medium', 'hard', 'impossible', 'custom'].includes(fl.level)) throw new Error('--level must be easy, medium, hard, impossible or custom');
+    if (![...LEVELS, 'custom', 'secret'].includes(fl.level)) throw new Error('--level must be easy, medium, hard, impossible, custom or secret');
     if (fl.level === 'custom' && !['easy', 'medium', 'hard', 'impossible'].includes(fl.base)) throw new Error('--base <easy|medium|hard|impossible> is required for custom');
     st = { level: fl.level, levelBase: fl.base, levelAbout: typeof fl.about === 'string' ? fl.about.trim() : undefined };
   }
   const lvl = st.level ? { level: st.level, ...(st.level === 'custom' ? { about: st.levelAbout, levelBase: st.levelBase } : {}) } : {};
-  const data = { id, game, zone: input.zone, rung: meta.rung, ...lvl, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
+  const rung = secret ? 'break' : meta.rung; // a find is a claim on the Break rung
+  const data = { id, game, zone: input.zone, rung, ...lvl, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.
   const sessionPath = ownItPath(ctx.root, 'session.json');
   const session = readJson(sessionPath, { session: ctx.now().toISOString(), mode: 'practice', missions: {} });
-  session.rounds = { ...(session.rounds || {}), [id]: { game, zone: input.zone, rung: meta.rung,
+  session.rounds = { ...(session.rounds || {}), [id]: { game, zone: input.zone, rung,
     mode: input.mode || session.mode || 'practice', ...lvl,
     cardIds: game === 'blast-radius' ? [round.target, ...round.cards.map((c) => c.id)] : shownCards(game, input, byId) } };
   const dataJs = ownItPath(ctx.root, 'data', `${id}.js`);

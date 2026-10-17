@@ -196,6 +196,18 @@
       tone(null, vary(f, 0.02), 'triangle', t, 0.04, 0.09, false, 0.003);
       noise(null, t, 0.012, 4, 'bandpass', 2200, 1.5, 0.05, false);
     },
+    rumble: function (t) { // low C, soft
+      tone('rumble', 65.41, 'sine', t, 1.1, 0.06, true, 0.25);
+      tone('rumble', 130.81, 'triangle', t + 0.05, 0.8, 0.018, false, 0.2);
+    },
+    crackle: function (t) {
+      for (var i = 0; i < 4; i++) noise('crackle', t + i * 0.045 + Math.random() * 0.02, 0.012, 4, 'highpass', vary(3800, 0.1), 0, 0.035, false);
+    },
+    glass: function (t) { // soft shatter: a short noise burst and a few high C partials
+      noise('glass', t, 0.09, 3, 'highpass', 2800, 0, 0.09, true);
+      [1046.5, 2093, 3135.96].forEach(function (f, i) { tone('glass', vary(f, 0.01), 'sine', t + i * 0.025, 0.28, 0.03, true, 0.004); });
+      tone('glass', 65.41, 'sine', t, 0.5, 0.05, false, 0.02);
+    },
     alarm: function (t) {
       for (var i = 0; i < 3; i++) {
         tone('alarm', 880, 'square', t + i * 0.3, 0.12, 0.035, false, 0.006);
@@ -241,7 +253,7 @@
           if (lastPlay[name] !== undefined && t - lastPlay[name] < RATE[name]) return;
           lastPlay[name] = t;
         }
-        var group = { press: 'press', clack: 'clack', toggle: 'toggle', correct: 'chime', combo: 'chime', 'streak-break': 'chime', hint: 'chime', wrong: 'bonk', levelup: 'fanfare', claim: 'fanfare', 'fog-lift': 'whoosh', alarm: 'alarm' }[name];
+        var group = { press: 'press', clack: 'clack', toggle: 'toggle', correct: 'chime', combo: 'chime', 'streak-break': 'chime', hint: 'chime', wrong: 'bonk', levelup: 'fanfare', claim: 'fanfare', 'fog-lift': 'whoosh', alarm: 'alarm', rumble: 'rumble', crackle: 'crackle', glass: 'glass' }[name];
         choke(group);
         fn(t, arg);
       } catch (e) { /* sound never breaks the UI */ }

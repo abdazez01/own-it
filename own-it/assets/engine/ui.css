@@ -794,3 +794,39 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
   .quest-screen { display: grid; justify-items: center; }
   .quest-screen .screen-frame { width: fit-content; }
 }
+
+/* Secret level: hidden picker option, scare, shatter, darkness. Motion only without reduced motion. */
+.secret-opt { position: relative; text-align: left; }
+.secret-opt .secret-desc { opacity: 0; transition: opacity 200ms; }
+.secret-opt.revealed { box-shadow: 0 0 0 1px var(--salmon); background: var(--salmon-a16); }
+.secret-opt.revealed .secret-desc { opacity: 1; }
+.secret-tiles { display: inline-block; }
+.secret-appear { animation: secret-glitch 520ms steps(6, end); }
+@keyframes secret-glitch {
+  0% { transform: translateX(0); opacity: 0; } 20% { transform: translateX(-5px); opacity: 1; } 40% { transform: translateX(6px) skewX(8deg); }
+  60% { transform: translateX(-3px); opacity: .4; } 80% { transform: translateX(2px); opacity: 1; } 100% { transform: none; }
+}
+.secret-shake { animation: secret-shake 400ms linear; }
+@keyframes secret-shake {
+  0% { transform: translate(0, 0); } 10% { transform: translate(-7px, 3px); } 22% { transform: translate(6px, -4px); } 35% { transform: translate(-4px, -5px); }
+  50% { transform: translate(5px, 4px); } 66% { transform: translate(-3px, 2px); } 82% { transform: translate(2px, -2px); } 100% { transform: translate(0, 0); }
+}
+.secret-veil { position: fixed; inset: 0; pointer-events: none; z-index: 70; }
+.secret-veil.flicker { background: var(--salmon-a16); animation: secret-flicker 600ms steps(5, end) forwards; }
+.secret-veil.scan { background-image: repeating-linear-gradient(0deg, rgba(240,138,122,.10) 0 1px, transparent 1px 4px); }
+.secret-veil.strong { background-color: rgba(240,138,122,.28); }
+@keyframes secret-flicker { 0% { opacity: 0; } 15% { opacity: 1; } 35% { opacity: .2; } 55% { opacity: .9; } 100% { opacity: 0; } }
+.secret-veil.dim { background: #000; animation: secret-dim 1200ms ease-in-out forwards; }
+@keyframes secret-dim { 0% { opacity: 0; } 35% { opacity: 1; } 65% { opacity: 1; } 100% { opacity: 0; } }
+.secret-cracks { z-index: 75; animation: secret-flicker 700ms linear forwards; }
+.secret-crack { position: absolute; height: 2px; transform-origin: 0 50%; background: linear-gradient(90deg, #fff, rgba(255,255,255,0)); }
+.secret-shard { z-index: 74; }
+.secret-report { display: grid; gap: var(--s-2); border: 1px solid var(--salmon); background: var(--salmon-a16); border-radius: var(--r-inset); padding: var(--s-3) var(--s-4); }
+.secret-row { margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .secret-appear, .secret-shake { animation: none; }
+  .secret-veil.flicker { animation-duration: 250ms; }
+  .secret-veil.dim { animation-duration: 400ms; }
+}
+.secret-banner:empty { display: none; }
+@media (min-width: 1024px) { .quest-area > .secret-banner { grid-column: 2; margin-top: 0; } }

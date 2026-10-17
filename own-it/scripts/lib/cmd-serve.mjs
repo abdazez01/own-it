@@ -6,12 +6,14 @@ import { resolve, sep, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ownItPath } from './paths.mjs';
 import { readJson, writeJson } from './json.mjs';
+import { SECRET_GAMES } from './secret-games.mjs';
 
 const MAX_BODY = 256 * 1024;
 // A pick may carry the chosen level; custom needs a 1..300 char description.
 const PICK_LEVELS = ['easy', 'medium', 'hard', 'impossible', 'custom'];
 function validLevel(ev) {
   if (ev.level === undefined) return ev.about === undefined;
+  if (ev.level === 'secret') return SECRET_GAMES.has(ev.game) && ev.about === undefined;
   if (!PICK_LEVELS.includes(ev.level)) return false;
   if (ev.level !== 'custom') return ev.about === undefined;
   return typeof ev.about === 'string' && ev.about.trim().length >= 1 && ev.about.length <= 300;
