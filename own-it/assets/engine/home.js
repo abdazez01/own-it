@@ -215,6 +215,31 @@
     return head;
   }
 
+  var LEVELS = [{ id: 'easy', label: 'Easy' }, { id: 'medium', label: 'Medium' }, { id: 'hard', label: 'Hard' }, { id: 'impossible', label: 'Impossible' }, { id: 'custom', label: 'Custom' }];
+  var LEVEL_NOTE = { easy: 'New to this app: screens and words, free hints.', medium: 'Know some parts: how data flows.', hard: 'Know it well: code paths and failures.', impossible: 'All-out test: edge cases, no hints, timers on.', custom: 'Your own description. Claude will ask what you know.' };
+  function currentLevel() {
+    var p = progress(), st = p && p.settings ? p.settings : {};
+    var v = OwnIt.chosenLevel || st.level;
+    return LEVELS.some(function (l) { return l.id === v; }) ? v : 'medium';
+  }
+
+  // Level switch: sends a live-link level event; Claude stores it and re-orders the recommendations.
+  function levelBar() {
+    var s = OwnIt.el('section', { 'class': 'panel rise level-bar', 'aria-labelledby': 'level-h' });
+    s.appendChild(OwnIt.el('h2', { id: 'level-h' }, 'Level'));
+    var sw = OwnIt.el('div', { 'aria-label': 'Level' });
+    var note = OwnIt.el('p', { 'class': 'level-note' }, LEVEL_NOTE[currentLevel()]);
+    OwnIt.toggle(sw, LEVELS, currentLevel(), function (id) {
+      OwnIt.chosenLevel = id;
+      note.textContent = LEVEL_NOTE[id];
+      if (OwnIt.link && OwnIt.link.mode === 'live') OwnIt.link.send('level', { level: id });
+      else OwnIt.toast('Offline mode: tell Claude your level in the chat.');
+    });
+    s.appendChild(sw);
+    s.appendChild(note);
+    return s;
+  }
+
   function panel(title, id) {
     var s = OwnIt.el('section', { 'class': 'panel rise', 'aria-labelledby': id });
     s.appendChild(OwnIt.el('h2', { id: id }, title));
@@ -429,7 +454,7 @@
       detailSlot.textContent = '';
       if (selectedZone) detailSlot.appendChild(zoneDetail(selectedZone));
     });
-    var parts = [header(), recommended(), boardPanel, library(), footer()];
+    var parts = [header(), levelBar(), recommended(), boardPanel, library(), footer()];
     boardPanel.appendChild(detailSlot);
     parts.forEach(function (p, i) {
       if (!entered) p.style.animationDelay = (i * 80) + 'ms';

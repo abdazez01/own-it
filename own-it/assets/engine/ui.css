@@ -748,3 +748,12 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 @media (prefers-reduced-motion: reduce) { .er-leaf { transition: none; } }
 /* The hidden attribute must win over component display values (buttons are inline-flex), or Next and Skip show before they are due. */
 [hidden] { display: none !important; }
+
+/* Level switch on Home: five segments, wraps on narrow screens */
+.level-bar .toggle { max-width: 100%; }
+.level-bar .toggle button { padding: 0 12px; }
+.level-note { color: var(--ink-2); margin-top: var(--s-2); }
+@media (max-width: 639.98px) {
+  .level-bar .toggle { display: flex; }
+  .level-bar .toggle button { flex: 1 1 auto; padding: 0 8px; font-size: var(--fs-12, 12px); }
+}

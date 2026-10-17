@@ -135,10 +135,22 @@
     }, { label: 'Leave this game' });
   }
 
+  // Difficulty level: the dashboard stores it in progress settings. Custom plays at its base level. Absent means medium.
+  var LEVEL_IDS = ['easy', 'medium', 'hard', 'impossible'];
+  var HINT_COST = { easy: 0, medium: 15, hard: 30, impossible: 0 };
+  OwnIt.level = function () {
+    var p = window.OWNIT_PROGRESS, st = p && p.settings ? p.settings : {};
+    var id = st.level === 'custom' ? st.levelBase : st.level;
+    return LEVEL_IDS.indexOf(id) >= 0 ? id : 'medium';
+  };
+  // XP one hint costs at the current level.
+  OwnIt.hintCost = function () { return HINT_COST[OwnIt.level()]; };
+
   // Hint (5.16): costs XP, answer is one sentence labelled as a prediction.
   function hintDialog(getHint) {
     return dialog(function (dlg, api) {
-      dlg.appendChild(OwnIt.el('h2', null, 'Use a hint? It costs 15 XP.'));
+      var cost = OwnIt.hintCost();
+      dlg.appendChild(OwnIt.el('h2', null, cost ? 'Use a hint? It costs ' + cost + ' XP.' : 'Use a hint? It is free.'));
       var actions = OwnIt.el('div', { 'class': 'actions' });
       actions.appendChild(button('Not now', 'quiet', function () { api.close(); }));
       var show = button('Show hint', 'primary', function () {
@@ -199,7 +211,7 @@
     head.appendChild(OwnIt.el('span', { 'class': 'grow' }));
 
     var timerEl = null, scoreEl = null;
-    if (opts.timer !== false) {
+    if (opts.timer !== false || OwnIt.level() === 'impossible') {
       var tw = OwnIt.el('div', { 'class': 'flap-label' });
       tw.appendChild(OwnIt.el('span', null, 'Time'));
       timerEl = OwnIt.el('span');
@@ -214,8 +226,8 @@
     head.appendChild(sw);
     OwnIt.flap(scoreEl, '0/' + (opts.total != null ? opts.total : 0));
 
-    var exam = OwnIt.mode === 'exam';
-    var hintBtn = button('Hint', 'secondary', function () { openHint(); }, exam ? { disabled: 'disabled', title: 'Hints are off in Exam mode.' } : null);
+    var noHints = OwnIt.mode === 'exam' || OwnIt.level() === 'impossible';
+    var hintBtn = button('Hint', 'secondary', function () { openHint(); }, noHints ? { disabled: 'disabled', title: 'Hints are off in this mode.' } : null);
     if (!opts.hint) hintBtn.setAttribute('hidden', 'hidden');
     head.appendChild(hintBtn);
     var helpBtn = OwnIt.el('button', { type: 'button', 'class': 'icon-btn', 'aria-label': 'Keyboard help' });
@@ -243,7 +255,7 @@
     }
     var hints = 0;
     function openHint() {
-      if (!opts.hint || OwnIt.mode === 'exam') return;
+      if (!opts.hint || OwnIt.mode === 'exam' || OwnIt.level() === 'impossible') return;
       hintDialog(function () {
         hints++;
         if (OwnIt.link && OwnIt.link.mode === 'live') OwnIt.link.send('hint', { round: ctx.roundId });

@@ -8,7 +8,7 @@ import { ownItPath } from './paths.mjs';
 import { readJson, writeJson } from './json.mjs';
 
 const MAX_BODY = 256 * 1024;
-const EVENT_TYPES = ['pick', 'result', 'challenge', 'hint', 'ask'];
+const EVENT_TYPES = ['pick', 'result', 'challenge', 'hint', 'ask', 'level'];
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2',
