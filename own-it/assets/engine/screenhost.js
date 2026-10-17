@@ -32,7 +32,9 @@
   function mount(container, screenId, opts) {
     opts = opts || {};
     var W = opts.width || DEFAULT_W, H = opts.height || DEFAULT_H;
-    var maxScale = opts.maxScale || 1;
+    // Wide desktop windows may enlarge the screen copy (up to 1.5x), but never past the window height, so it stays in view without page scroll.
+    var wideWin = typeof window !== 'undefined' && window.innerWidth >= 1600;
+    var maxScale = opts.maxScale || (wideWin ? 1.5 : 1);
     var screen = lookup(screenId);
     var picks = [];
     var tagged = [];     // [{id, el}] in document order, filled on load
@@ -106,6 +108,7 @@
       if (gone) return;
       var avail = container.clientWidth || (container.getBoundingClientRect && container.getBoundingClientRect().width) || W;
       var s = Math.min(maxScale, Math.max(0.2, avail / W));
+      if (s > 1 && typeof window !== 'undefined' && window.innerHeight) s = Math.max(1, Math.min(s, (window.innerHeight - 350) / H));
       vp.style.width = Math.round(W * s) + 'px';
       vp.style.height = Math.round(H * s) + 'px';
       if (api.iframe) api.iframe.style.transform = 'scale(' + s + ')';

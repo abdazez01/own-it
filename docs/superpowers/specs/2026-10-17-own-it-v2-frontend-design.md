@@ -93,10 +93,16 @@ All tokens live in `assets/engine/tokens.css` as CSS custom properties on `:root
 ### 2.3 Spacing and layout
 
 - The spacing base is 4 px. The scale is 4 · 8 · 12 · 16 · 20 · 24 · 32 · 48 · 64.
-- The content width is `min(1180px, 100% - 32px)`, centered, with a 16 px minimum side gutter.
+- The content width is `min(1180px, 100% - 32px)`, centered, with a 16 px minimum side gutter (see Wide below for 1600 px and up).
 - **Fully responsive (user request, 2026-10-17).** Every surface and every game template works from 360 px phone width up to 2560 px ultrawide, with no horizontal page scroll.
   - Breakpoints: `sm` < 640, `md` 640–1023, `lg` 1024–1599, `xl` ≥ 1600.
-  - **Wide (≥ 1600 px):** the content max-width grows to 1440 px. The library shows more columns, and boards use the extra room instead of stretching cards.
+  - **Wide (≥ 1600 px, amended 2026-10-17):** the shell is centered and its max-width is `min(92vw, 2200px)`.
+    - The root font scales with `clamp(16px, .55vw + 7px, 20px)`, so type and controls grow slightly at 1920 and 2560.
+    - The library uses `auto-fill` with a `clamp(250px, 14vw, 340px)` minimum card width (6 columns at 1920 and 2560). Recommended cards grow the same way.
+    - Game panels widen from 920 px to `min(1480px, 100%)`. Boards and canvases widen: the whiteboard scales cards, gaps and type with its width, the pipe grid tiles grow up to 220 px, and screen copies scale up to 1.5x.
+    - Prose blocks (questions, hints, live regions) stay at 75 ch or less. The boards widen, the paragraphs do not.
+    - On 1080 px tall windows the pipe grid and screen copies are capped by `100vh`, so the main board stays in view without page scroll.
+    - A game without a side panel uses the full shell width; no empty side column is reserved.
   - **Small (< 1024 px):** side panels (objectives, tokens, notes) move under the play area or into a bottom sheet. Recommended cards and the library go to 1–2 columns. The departures board scrolls inside its own panel.
   - **Phones (< 640 px):** the header collapses to the logo, XP, and a menu button holding the toggles. Quiz answers are a single column. Screen copies scale to fit the width with `transform: scale()`, and the hit areas scale with them.
   - **Touch is a first-class input.** Every drag has a tap-to-select, tap-to-place alternative. Hit targets are ≥ 44 px. Hover-only effects (tilt, hover tick) are skipped on `(hover: none)`.

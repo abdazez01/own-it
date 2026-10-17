@@ -51,7 +51,11 @@
     area.appendChild(panel);
     board.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
     var rows = tiles.length / cols;
-    board.style.maxWidth = cols * 120 + 'px';
+    // Wide screens get bigger tiles, capped so the whole grid still fits a 1080px-tall window without page scroll.
+    var wide = typeof window !== 'undefined' && window.innerWidth >= 1600;
+    board.style.maxWidth = wide
+      ? 'min(' + cols * 220 + 'px, max(' + cols * 64 + 'px, calc((100vh - 330px) * ' + cols + ' / ' + rows + ')))'
+      : cols * 120 + 'px';
 
     var pipes = [];
     var els = tiles.map(function (t, i) {

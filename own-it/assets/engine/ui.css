@@ -22,7 +22,7 @@ img, svg, canvas, iframe { max-width: 100%; }
   width: var(--content); padding-inline: 0; margin: 0 auto; padding-block: var(--s-6) var(--s-12);
   display: grid; gap: var(--s-5);
 }
-@media (min-width: 1600px) { .wrap { width: min(1440px, 100% - 64px); } }
+@media (min-width: 1600px) { .wrap { width: min(92vw, 2200px); } }
 .prose { max-width: 65ch; }
 
 /* 5.2 Glass panel (glass-1) with sheen */
@@ -432,7 +432,9 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .qdot.bad { background: var(--salmon); border-color: var(--salmon); }
 .qdot.set { background: var(--gold); border-color: var(--gold); }
 .quiz-q { font: 600 var(--fs-20)/var(--lh-display) var(--f-ui); overflow-wrap: anywhere; }
-@media (min-width: 1280px) { .quiz-q { font-size: var(--fs-26); } }
+/* .panel > h2 (specificity 0,1,1) would shrink the question to 13px, so the question rule matches it. */
+.panel > .quiz-q { font: 600 var(--fs-20)/var(--lh-display) var(--f-ui); color: var(--ink); }
+@media (min-width: 1280px) { .quiz-q, .panel > .quiz-q { font-size: var(--fs-26); } }
 .answer {
   display: flex; align-items: flex-start; gap: var(--s-3); min-height: var(--hit); width: 100%; padding: var(--s-3) var(--s-4);
   text-align: left; cursor: pointer; color: var(--ink); font: 500 var(--fs-15)/1.4 var(--f-ui); overflow-wrap: anywhere;
@@ -513,7 +515,7 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .wb-card {
   position: absolute; z-index: 2; box-sizing: border-box; display: grid; place-items: center; padding: 6px 10px;
   min-height: var(--hit); border: 1px solid var(--edge); border-radius: var(--r-inset);
-  background: var(--glass-hi-solid); color: var(--ink); font: 500 var(--fs-13)/1.25 var(--f-ui);
+  background: var(--glass-hi-solid); color: var(--ink); font: 500 var(--fs-13)/1.25 var(--f-ui); font-size: calc(var(--fs-13) * var(--wb-k, 1));
   text-align: center; overflow-wrap: normal; word-break: normal; hyphens: auto; cursor: pointer; touch-action: manipulation;
 }
 .wb-card:hover, .wb-card:focus-visible { border-color: var(--gold-a60); }
@@ -761,3 +763,25 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .level-desc { color: var(--ink-2); font-weight: 400; }
 .level-about { width: 100%; box-sizing: border-box; margin-bottom: var(--s-2); padding: var(--s-2); background: var(--track); border: 1px solid var(--edge); border-radius: var(--r-inset); color: var(--ink); font: var(--fs-13) var(--f-ui); }
 .level-about[hidden] { display: none; }
+
+/* Wide screens (spec 2.3): centered shell grows to min(92vw, 2200px); boards, canvases and grids widen, prose stays <= 75ch. */
+@media (min-width: 1600px) {
+  :root { --panel-w: min(1480px, 100%); }
+  html { font-size: clamp(16px, .55vw + 7px, 20px); }
+  .shell { grid-template-columns: minmax(0, 1fr) clamp(360px, 20vw, 460px); }
+  .lib { grid-template-columns: repeat(auto-fill, minmax(min(clamp(250px, 14vw, 340px), 100%), 1fr)); }
+  .recs { grid-template-columns: repeat(auto-fit, minmax(min(clamp(260px, 13vw, 340px), 100%), 1fr)); }
+  .quiz-card, .guess-card, .boss-top, .boss-card, .mm-panel, .cr-panel, .dd-panel, .pp-panel, .wi-panel, .dl-panel, .er-panel { max-width: var(--panel-w); }
+  .quiz-card, .guess-card, .boss-top, .boss-card, .mm-panel, .cr-panel, .dd-panel, .pp-panel, .wi-panel, .dl-panel, .er-panel, .wa-panel, .br-panel, .pg-panel { width: 100%; }
+  .wa-panel, .br-panel, .pg-panel { max-width: min(1100px, 100%); }
+  .quiz-q, .dd-ask, .wa-action { max-width: 75ch; }
+  .quiz-why, .wb-intro, .wb-live, .pp-live, .prose { max-width: 75ch; }
+  .answers { gap: var(--s-4); }
+  .answer { min-height: 56px; font-size: var(--fs-17); }
+  .br-part, .dd-card, .wi-opt, .dl-side { font-size: var(--fs-17); }
+  .tour-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); }
+  .mm-board { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .cr-board, .br-board, .dd-tray, .dd-who-row { grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); }
+}
+/* A game without a side panel uses the full shell width instead of reserving an empty column. */
+.shell:not(:has(> .side)) { grid-template-columns: minmax(0, 1fr); }
