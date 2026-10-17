@@ -1,48 +1,37 @@
-# Onboarding (every session, in order)
+# Startup (once per /own-it, in this order)
 
-## 1. Fork check (never skipped)
+## 1. Fork check
 
-Question: "own-it reads a lot of code and adds many messages. A forked or fresh session keeps your work context clean. Is this a fork?"
-- **Yes, this is a fork / fresh session (Recommended)** → continue.
-- **No, I'll fork first** → say how (start a new session, or use your client's fork or branch option if it has one), then stop.
-- **No, play here anyway** → continue.
+Ask once: "own-it reads a lot of code. A forked or fresh session keeps your work context clean. Is this a fork?"
+- **Yes, fork or fresh (Recommended)**: continue.
+- **No, I'll fork first**: say how (new session, or your client's fork option), stop.
+- **No, play here anyway**: continue.
 
-Asked to skip it? Ask once, one line; accept "play here".
+Never ask again this invocation (unlocks and rebuilds included). Told to skip it? Ask once, one line.
 
-## 2. Runtime check
+## 2. Storage notice
 
-Run `node --version`. Missing or below `<skill-dir>/runtime.json` `minimum`? Ask (`pinned` includes the `v`; size from `installers.<win-x64|darwin|linux-x64>`):
+Say: "Everything own-it creates is stored in the `.own-it/` folder in this project: game page, progress, screen copies, sample data, answers. Delete that folder to remove it all. own-it never edits your code."
 
-> own-it needs Node.js for its helper script, which keeps the game cheap on tokens. Node is not installed (or is too old).
-> - **Install Node.js <pinned> (Recommended)**: official installer from nodejs.org, about <sizeMB> MB. Claude downloads it, verifies the SHA-256 checksum, and runs the installer. The installer may ask for your admin approval.
-> - **Not now**: own-it stops. Install Node yourself from nodejs.org, then run /own-it again.
+## 3. Node check
 
-`winget`/`brew` present? Offer it, same version.
+`node --version`. Missing or below `<skill-dir>/runtime.json` `minimum`? Offer the pinned installer (nodejs.org, size from `installers.<win-x64|darwin|linux-x64>`, or winget/brew). Verify `sha256` before running; mismatch: delete, stop. "Not now": say "own-it needs Node. Install it from nodejs.org, then run /own-it again." and stop.
 
-- Download only the `runtime.json` URL.
-- `sha256` must match before running. Mismatch: delete, stop, tell the user.
-- Then re-run `node --version`.
-- "Not now": print "own-it needs Node. Install it from nodejs.org, then run /own-it again." and stop.
+## 4. Scan, zones, init
 
-## 3. Safety notice (once per session)
+No `.own-it/progress.json`: `scan`, group candidates into zones (ids `a-z0-9-`, max 24), confirm in one question, ask gitignore (Recommended) or commit, write `.own-it/zones.json`, `init --zones .own-it/zones.json` (add `--git-tracked` if committed, every re-init). Later runs: `fog`.
 
-"own-it is read-only. It never edits your source. Test files are only written after you approve each one."
+## 5. Customize the dashboard
 
-## 4a. First run (no `.own-it/progress.json`)
+Extract zones (`extraction.md`, `screens.md`). Write `.own-it/recs.json` with 3-5 `{game, zone, reason}` (reason ≤120 chars, playable games first), run `build-recs`. Pre-build rounds for them with `build-round` (`games.md`).
 
-1. `scan` → surface candidates with refs. Group them into zones (subsystems; ids `a-z0-9-`, max 24 chars).
-2. Ask to confirm, rename, or merge; list zones and paths in the question.
-3. Ask: **Gitignore `.own-it/`, personal stats (Recommended)** / **Commit it, team-visible coverage**.
-4. Write `.own-it/zones.json` (`examples.md`), run `init --zones .own-it/zones.json`, plus `--git-tracked` if they chose commit. Re-init without it turns tracking off: always repeat it when tracked.
+## 6. Live link
 
-## 4b. Later runs
+`serve` gives `{url}`; `open` it (or give the URL). Say one line: "Dashboard is open." Run `wait` in the background; react, then wait again:
 
-`fog` → per zone `rungs` (words map trace break boss: `c` cleared, `o` open, `-` locked), `fogged`, `stale`, `changed` (fogged only). Status: one line. `git: false` → say once fog is disabled.
+- `pick`: `build-round`, then wait.
+- `result`: `collect <round>`, grade free text, in Practice `build-feedback`, `apply`, rebuild recs, wait.
+- `ask`: grade, `build-feedback` with `grades`, wait.
+- `{idle:true}`: wait silently. After 6 idle waits in a row say "Still here. Click in the page or type here." and stop.
 
-## 5. Mode
-
-Ask: **Practice: hints, debriefs (Recommended)** / **Exam: no hints, report card at the end**.
-
-## 6. Target
-
-Ask zone and rung. Recommend: fogged zone (refresh), then weak spot, then next open rung.
+Mode comes from the result; never ask it in chat. Serve fails? Use `open` plus download and "done" (`rungs.md`).

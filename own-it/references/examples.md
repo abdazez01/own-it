@@ -72,3 +72,15 @@ Boss, with `wrong` as box-label pairs:
 
 `apply trips-words-1 --got 8 --of 10`
 `{"id":"trips-words-1","xp":130,"total":130,"ratio":0.8,"cleared":["words"],"claimed":false,"badges":["first-word"],"weak":0}`
+
+## Recs `.own-it/recs.json` → `build-recs`; quiz round → `build-round quiz .own-it/recipe-quiz.json`
+
+`{"recs":[{"game":"quests","zone":"trips","reason":"Cancel needs a manager, so walking it beats Q&A."}, ...3-5]}` → `{"count":3}`
+
+`{"zone":"trips","mode":"practice","questions":[{"q":"A driver cancels a trip. Who must agree?","options":[{"text":"A manager","why":"Cancels wait for approval."}, ...4],"answer":0}, ...5]}` → `{"id":"trips-quiz-4","est":900}`
+
+## Wait events and feedback → `build-feedback trips-boss-battle-5 .own-it/feedback.json`
+
+`wait` prints `{"type":"pick","game":"quiz","zone":"trips","mode":"practice","file":"..."}`, `{"type":"result","id":"trips-quiz-4",...}`, `{"type":"ask","round":"trips-boss-battle-5","q":"q2","text":"..."}` or `{"idle":true}`.
+
+`{"grades":{"q2":"partial"},"debrief":"Name what stops a forged role header (server/routes/trips.ts:19).","notes":{"q2":"Right direction, missing the server check."}}` → `{"id":"trips-boss-battle-5"}`

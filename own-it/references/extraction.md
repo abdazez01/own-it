@@ -1,8 +1,8 @@
 # Extraction
 
-## Words pass (rung 0, no subagent)
+## Words pass (no subagent)
 
-`scan --strings <zone>` → up to 60 terms `{t, kind, n, refs}`. Pick about 10. If code shows what a term is but not why it has that name, web search for the domain meaning; label it "outside knowledge" in questions and `lexicon.md`.
+`scan --strings <zone>` gives up to 60 terms `{t, kind, n, refs}`. Pick about 10 for the quiz. If code shows what a term is but not why it has that name, web search for the domain meaning; label it "outside knowledge" in questions and `lexicon.md`.
 
 ## Structure pass (rungs 1-4, once per zone)
 
@@ -19,6 +19,7 @@ Rules (hard numbers):
   (high|medium|low). No ref = dropped.
 - Ids unique: letters, digits, _ or -, max 24 chars.
 Kinds (k) and fields:
+- element: on (surface id), does (flow id it belongs to), goes (surface id it leads to), roles (role ids who may use it), label, optional purpose (one plain line, ≤160 chars). One per button, link or input that matters.
 - surface | component: label, actor (app or lane running it, e.g.
   "Driver app"). Outside apps: black-box component.
 - edge: from, to (surface/component ids) = "from calls to".
@@ -27,7 +28,7 @@ Kinds (k) and fields:
 - flow: label, steps = ordered groups of card ids, e.g.
   [["a"],["b"],["c","d"],["e"]]; ids in one group may run in any order.
   2-12 cards per flow, each with actor.
-- decision: label (a "why X, not Y?" worth asking).
+- decision: label (a "why X, not Y?" worth asking), reason (one real line, ≤200 chars).
 - failure: card (surface/component id), threat (short attack or fault,
   e.g. "Client forges role header"). Cover validation, auth on mutating
   endpoints, idempotency, retries/timeouts, concurrency, external deps.
