@@ -17,7 +17,7 @@ test('SKILL.md frontmatter and body budget', () => {
   assert.equal(m[1], 'Use when user runs /own-it or asks to be quizzed on, explain, or defend code they shipped');
   assert.ok(words(m[2]) <= 150, `SKILL.md body has ${words(m[2])} words`);
   for (const f of REFS) assert.ok(m[2].includes(f), `phase table mentions ${f}`);
-  for (const rule of ['hand-edit', 'never fix', 'fork check', 'one line'])
+  for (const rule of ['hand-edit', 'outside `.own-it/`', 'fork check', 'one line'])
     assert.ok(m[2].toLowerCase().includes(rule), `hard rule: ${rule}`);
 });
 

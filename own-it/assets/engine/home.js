@@ -39,11 +39,17 @@
   }
 
   // First round id for '<zone>-<game>-<n>' in OWNIT_ROUNDS, or null.
-  function roundFor(zone, game) {
+  // A round built at another level (or for another custom description) does not match. Old rounds count as medium.
+  function levelMatches(rd, pk) {
+    if (!pk) return true;
+    var lv = (rd && rd.level) || 'medium';
+    return lv === pk.level && (lv !== 'custom' || ((rd && rd.about) || '') === pk.about);
+  }
+  function roundFor(zone, game, pk) {
     var all = window.OWNIT_ROUNDS;
     if (!all || typeof all !== 'object') return null;
     var prefix = zone + '-' + game + '-';
-    var ids = Object.keys(all).filter(function (k) { return k.indexOf(prefix) === 0; }).sort();
+    var ids = Object.keys(all).filter(function (k) { return k.indexOf(prefix) === 0 && levelMatches(all[k], pk); }).sort();
     return ids.length ? ids[0] : null;
   }
 
@@ -86,8 +92,9 @@
 
   // ---------------------------------------------------------------- actions
 
-  function copyCommand(game, zone) {
+  function copyCommand(game, zone, pk) {
     var cmd = 'play ' + game + ' ' + zone;
+    if (pk) cmd += ' --level ' + pk.level + (pk.level === 'custom' ? ' --about "' + pk.about.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"' : '');
     var done = function () { OwnIt.toast('Copied. Paste it to Claude in the chat.'); };
     var fail = function () { OwnIt.toast("Couldn't copy. Type: " + cmd); };
     try {
@@ -97,28 +104,132 @@
     return cmd;
   }
 
+  // ---------------------------------------------------------------- level picker
+
+  var LEVELS = [
+    { id: 'easy', label: 'Easy', text: "I don't know the program at all" },
+    { id: 'medium', label: 'Medium', text: 'I know some parts' },
+    { id: 'hard', label: 'Hard', text: 'I know it inside out' },
+    { id: 'impossible', label: 'Impossible', text: 'All-out test of rare behaviour' },
+    { id: 'custom', label: 'Other', text: 'Describe what you know' }
+  ];
+  // The last level used comes back from Claude through progress settings; this session's pick wins until then.
+  function lastLevel() {
+    var p = progress(), st = p && p.settings ? p.settings : {};
+    var v = OwnIt.chosenLevel || st.level;
+    var ok = LEVELS.some(function (l) { return l.id === v; });
+    return { level: ok ? v : 'medium', about: OwnIt.chosenAbout !== undefined ? OwnIt.chosenAbout : (typeof st.levelAbout === 'string' ? st.levelAbout : '') };
+  }
+
+  // Custom plays at its base level (set by Claude); the rest are their own base.
+  function baseOf(level) {
+    var p = progress(), st = p && p.settings ? p.settings : {};
+    if (level !== 'custom') return level;
+    return ['easy', 'medium', 'hard', 'impossible'].indexOf(st.levelBase) >= 0 ? st.levelBase : 'medium';
+  }
+
+  // Glass dialog: pick a level (Other needs a description), then onStart({level, about?}).
+  function levelPicker(onStart) {
+    var current = lastLevel().level;
+    var note = null, area = null, rows = [];
+    return OwnIt.dialog(function (dlg, api) {
+      dlg.classList.add('level-picker');
+      dlg.appendChild(OwnIt.el('h2', null, 'How well do you know this?'));
+      var group = OwnIt.el('div', { role: 'radiogroup', 'aria-label': 'Level', 'class': 'level-options' });
+      function paint() {
+        rows.forEach(function (b) {
+          var on = b.getAttribute('data-id') === current;
+          b.setAttribute('aria-checked', on ? 'true' : 'false');
+          b.setAttribute('tabindex', on ? '0' : '-1');
+        });
+        if (area) { if (current === 'custom') area.removeAttribute('hidden'); else area.setAttribute('hidden', 'hidden'); }
+        if (note) note.textContent = '';
+      }
+      function choose(id, focus) {
+        current = id;
+        paint();
+        OwnIt.sound('press');
+        if (focus) for (var i = 0; i < rows.length; i++) if (rows[i].getAttribute('data-id') === id) rows[i].focus();
+      }
+      function start() {
+        var about = (area.value || '').trim();
+        if (current === 'custom' && (!about || about.length > 300)) {
+          note.textContent = 'Write 1 to 300 characters about what you know.';
+          if (area.focus) area.focus();
+          return;
+        }
+        OwnIt.sound('press');
+        OwnIt.chosenLevel = current;
+        if (current === 'custom') OwnIt.chosenAbout = about;
+        api.close();
+        onStart(current === 'custom' ? { level: current, about: about } : { level: current });
+      }
+      LEVELS.forEach(function (l, i) {
+        var b = OwnIt.el('button', { type: 'button', role: 'radio', 'class': 'level-opt', 'data-id': l.id });
+        b.appendChild(OwnIt.el('strong', null, l.label));
+        b.appendChild(OwnIt.el('span', { 'class': 'level-desc' }, l.text));
+        b.addEventListener('click', function () { choose(l.id, false); });
+        b.addEventListener('keydown', function (e) {
+          var d = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
+          if (d) { e.preventDefault(); choose(LEVELS[(i + d + LEVELS.length) % LEVELS.length].id, true); }
+          else if (e.key === 'Enter') { e.preventDefault(); start(); }
+        });
+        if (l.id === current) b.setAttribute('data-autofocus', '1');
+        rows.push(b);
+        group.appendChild(b);
+      });
+      dlg.appendChild(group);
+      area = OwnIt.el('textarea', { 'class': 'level-about', maxlength: '300', rows: '3', 'aria-label': 'Describe what you know', placeholder: 'e.g. I built checkout and auth, never touched billing' });
+      area.value = lastLevel().about;
+      area.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); start(); } });
+      dlg.appendChild(area);
+      note = OwnIt.el('p', { 'class': 'note', role: 'alert' }, '');
+      dlg.appendChild(note);
+      var actions = OwnIt.el('div', { 'class': 'actions' });
+      actions.appendChild(OwnIt.button('Cancel', 'quiet', function () { api.close(); }));
+      actions.appendChild(OwnIt.button('Start', 'primary', start));
+      dlg.appendChild(actions);
+      paint();
+    }, { label: 'Choose a level' });
+  }
+
   function pick(game, zone) {
-    var meta = metaOf(game);
     if (!isBuilt(game)) { OwnIt.toast('That game is coming in a later update'); return; }
     if (!zone) { OwnIt.toast('No zones yet. Ask Claude to set up your zones.'); return; }
-    var round = roundFor(zone, game);
+    levelPicker(function (pk) { start(game, zone, pk); });
+  }
+
+  function start(game, zone, pk) {
+    var meta = metaOf(game);
+    pk = { level: pk.level, about: pk.about || '' };
+    var round = roundFor(zone, game, pk);
     if (round) { OwnIt.router.go({ game: game, roundId: round }); return; }
     if (OwnIt.link && OwnIt.link.mode === 'live') {
-      var key = game + '|' + zone;
-      if (!building[key]) OwnIt.link.send('pick', { game: game, zone: zone, mode: OwnIt.mode });
+      var key = game + '|' + zone + '|' + pk.level + '|' + pk.about;
+      // Hard defaults to Exam unless the player picked a mode on the dashboard.
+      var mode = baseOf(pk.level) === 'hard' && !OwnIt.modeChosen ? 'exam' : OwnIt.mode;
+      var ev = { game: game, zone: zone, mode: mode, level: pk.level };
+      if (pk.level === 'custom') ev.about = pk.about;
+      if (!building[key]) OwnIt.link.send('pick', ev);
       building[key] = true;
       var mount = document.getElementById('stage') || document.body;
+      var began = Date.now();
       runCleanup();
       OwnIt.building(mount, {
         game: game, zone: zone, name: meta ? meta.name : game,
-        isReady: function () { return !!roundFor(zone, game); },
-        onReady: function () { OwnIt.router.go({ game: game, roundId: roundFor(zone, game) }); },
+        // If Claude built the round at another level, open it anyway after a wait instead of spinning forever.
+        isReady: function () { return !!(roundFor(zone, game, pk) || (Date.now() - began >= OwnIt.home.fallbackMs && roundFor(zone, game))); },
+        onReady: function () {
+          var exact = roundFor(zone, game, pk);
+          if (!exact) OwnIt.toast('Opened a round built at another level.');
+          OwnIt.router.go({ game: game, roundId: exact || roundFor(zone, game) });
+        },
         onBack: function () { OwnIt.router.go('home'); },
-        onCopy: function () { copyCommand(game, zone); }
+        onCopy: function () { copyCommand(game, zone, pk); }
       });
       return;
     }
-    copyCommand(game, zone);
+    copyCommand(game, zone, pk);
   }
 
   // ---------------------------------------------------------------- pieces
@@ -186,7 +297,7 @@
 
     var tools = OwnIt.el('div', { 'class': 'header-tools' });
     var mode = OwnIt.el('div', { 'aria-label': 'Mode' });
-    OwnIt.toggle(mode, [{ id: 'practice', label: 'Practice' }, { id: 'exam', label: 'Exam' }], OwnIt.mode, function (id) { OwnIt.mode = id; });
+    OwnIt.toggle(mode, [{ id: 'practice', label: 'Practice' }, { id: 'exam', label: 'Exam' }], OwnIt.mode, function (id) { OwnIt.mode = id; OwnIt.modeChosen = true; });
     tools.appendChild(mode);
     var a = OwnIt.audio;
     var st = (a && a.settings) || { sfx: true, music: true };
@@ -266,6 +377,8 @@
     var done = [];
     RUNG_CHARS.forEach(function (rc) {
       var v = z.rungs && z.rungs[rc[0]];
+      // Impossible unlocks the boss rung.
+      if (rc[0] === 'boss' && v === 'locked' && baseOf(lastLevel().level) === 'impossible') v = 'open';
       var cell = OwnIt.el('span', { 'class': 'rung-cell' + (v === 'cleared' ? ' c' : v === 'open' ? ' o' : ''), 'aria-hidden': 'true' }, rc[1]);
       row.appendChild(cell);
       if (v === 'cleared') done.push(rc[0]);
@@ -441,6 +554,7 @@
     return wrap;
   };
 
+  OwnIt.home.fallbackMs = 30000;
   OwnIt.home._pick = pick;
   OwnIt.home._reset = function () { entered = false; building = {}; selectedZone = null; };
 })();

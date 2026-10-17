@@ -10,6 +10,8 @@ const PROGRESS = { xp: 340, zones: {
   locks: { name: 'Locks', rungs: { words: 'cleared', map: 'cleared', trace: 'cleared', break: 'cleared', boss: 'cleared' }, claimed: true, fogged: false, weakSpots: [] },
 } };
 
+const go = (w) => Array.from(w.document.body.querySelectorAll('button')).find((b) => b.textContent === 'Start').click();
+
 function boot({ built = BUILT, progress = PROGRESS, recs, rounds, reduced = true } = {}) {
   const env = createEnv({ reduced });
   env.load(...FILES);
@@ -78,7 +80,8 @@ test('pick in file mode copies command', async () => {
   w.navigator.clipboard.writeText = async (t) => { copied = t; };
   home();
   Array.from(stage.querySelectorAll('.tile-game')).find((t) => t.getAttribute('data-game') === 'quiz').click();
-  assert.equal(copied, 'play quiz trips');
+  go(w);
+  assert.equal(copied, 'play quiz trips --level medium');
   await new Promise((r) => setTimeout(r, 0));
 });
 
@@ -90,7 +93,8 @@ test('pick in live mode sends the event and shows the building state', () => {
   w.OwnIt.link.send = (type, payload) => { sent.push([type, payload]); return Promise.resolve(true); };
   home();
   Array.from(stage.querySelectorAll('.tile-game')).find((t) => t.getAttribute('data-game') === 'quiz').click();
-  assert.deepEqual(JSON.parse(JSON.stringify(sent)), [['pick', { game: 'quiz', zone: 'trips', mode: 'practice' }]]);
+  go(w);
+  assert.deepEqual(JSON.parse(JSON.stringify(sent)), [['pick', { game: 'quiz', zone: 'trips', mode: 'practice', level: 'medium' }]]);
   assert.equal(stage.querySelectorAll('.building').length, 1);
   w.OwnIt.stopBuilding();
 });
@@ -101,6 +105,7 @@ test('pick with a ready round opens the game', () => {
   w.OwnIt.register({ id: 'quiz', name: 'Quiz', keys: [], play(root, round) { played = round; } });
   home();
   w.OwnIt.home._pick('quiz', 'trips');
+  go(w);
   assert.equal(played.q, 1);
 });
 
@@ -164,6 +169,7 @@ test('building state stops the idle shuffle', () => {
   w.OwnIt.link.onData = () => () => {};
   home();
   Array.from(stage.querySelectorAll('.tile-game')).find((x) => x.getAttribute('data-game') === 'quiz').click();
+  go(w);
   assert.equal(t.live.size, 0);
   w.OwnIt.stopBuilding();
   t.stop();
@@ -227,7 +233,9 @@ test('pick is not resent while that game and zone is building', () => {
   w.OwnIt.link.onData = () => () => {};
   home();
   w.OwnIt.home._pick('quiz', 'trips');
+  go(w);
   w.OwnIt.home._pick('quiz', 'trips');
+  go(w);
   assert.equal(sent.length, 1);
   w.OwnIt.stopBuilding();
 });

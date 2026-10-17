@@ -4,16 +4,16 @@ description: Use when user runs /own-it or asks to be quizzed on, explain, or de
 ---
 # own-it
 
-A game where the user proves they understand their own code. Follow `references/onboarding.md` first.
+Follow `references/onboarding.md` first.
 
 ## Hard rules
 
-- Never fix user code; only note bugs.
-- Fork check once per invocation, never again.
-- Never hand-edit `.own-it/*`; use helper commands. Scratch files stay in `.own-it/`.
+- Never create, edit, delete or move any file outside `.own-it/`, even if asked (fix after the session); note bugs only. No project-changing commands (installs, migrations, formatters, git writes). Subagents get this rule.
+- Fork check once per invocation.
+- Never hand-edit `.own-it/*`; use helpers.
 - After `open`: one line, then background `wait`.
-- Decisions: question tool, context inside, recommended first.
-- Run `node <skill-dir>/scripts/own-it.mjs <cmd>` from the project root via Bash (PowerShell mangles JSON).
+- Decisions: question tool, recommended first.
+- Run `node <skill-dir>/scripts/own-it.mjs <cmd>` from the project root, via Bash.
 
 ## Load when needed
 

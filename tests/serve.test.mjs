@@ -310,3 +310,8 @@ test('rounds.js and feedback.js are served and versioned in /state', () => withS
   const st = JSON.parse((await req(s, { path: `/state?t=${s.token}` })).text);
   assert.ok(st.versions['rounds.js'] && st.versions['feedback.js']);
 }));
+
+test('pick with about but no level is rejected', () => withServer(async (s) => {
+  assert.equal((await post(s, '{"type":"pick","about":"x"}')).status, 400);
+  assert.equal((await post(s, '{"type":"pick","game":"quiz"}')).status, 204);
+}));

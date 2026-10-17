@@ -273,13 +273,22 @@ export async function run(args, ctx) {
   if (game === 'escape-room') round.puzzles.forEach((pz) => (pz.cards || []).forEach((c) => labelIds.add(c.id)));
   const nav = game === 'quests' ? navFor(input, items) : null;
   if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
-  const data = { id, game, zone: input.zone, rung: meta.rung, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
+  // The pick's level (--level, --base, --about) wins; else the level stored by the `level` command.
+  const fl = args.flags;
+  let st = progress.settings;
+  if (fl.level !== undefined) {
+    if (!['easy', 'medium', 'hard', 'impossible', 'custom'].includes(fl.level)) throw new Error('--level must be easy, medium, hard, impossible or custom');
+    if (fl.level === 'custom' && !['easy', 'medium', 'hard', 'impossible'].includes(fl.base)) throw new Error('--base <easy|medium|hard|impossible> is required for custom');
+    st = { level: fl.level, levelBase: fl.base, levelAbout: typeof fl.about === 'string' ? fl.about.trim() : undefined };
+  }
+  const lvl = st.level ? { level: st.level, ...(st.level === 'custom' ? { about: st.levelAbout, levelBase: st.levelBase } : {}) } : {};
+  const data = { id, game, zone: input.zone, rung: meta.rung, ...lvl, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.
   const sessionPath = ownItPath(ctx.root, 'session.json');
   const session = readJson(sessionPath, { session: ctx.now().toISOString(), mode: 'practice', missions: {} });
   session.rounds = { ...(session.rounds || {}), [id]: { game, zone: input.zone, rung: meta.rung,
-    mode: input.mode || session.mode || 'practice',
+    mode: input.mode || session.mode || 'practice', ...lvl,
     cardIds: game === 'blast-radius' ? [round.target, ...round.cards.map((c) => c.id)] : shownCards(game, input, byId) } };
   const dataJs = ownItPath(ctx.root, 'data', `${id}.js`);
   writeJsRegistry(dataJs, 'OWNIT_ROUNDS', id, data);

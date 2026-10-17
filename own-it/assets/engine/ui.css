@@ -748,3 +748,16 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 @media (prefers-reduced-motion: reduce) { .er-leaf { transition: none; } }
 /* The hidden attribute must win over component display values (buttons are inline-flex), or Next and Skip show before they are due. */
 [hidden] { display: none !important; }
+
+/* Level picker dialog */
+.level-picker { max-width: min(480px, calc(100vw - 32px)); }
+.level-options { display: grid; gap: var(--s-2); margin: var(--s-3) 0; }
+.level-opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: var(--hit); padding: var(--s-2) var(--s-3);
+  background: var(--track); border: 1px solid var(--edge); border-radius: var(--r-inset); color: var(--ink); cursor: pointer; text-align: left;
+  font: 600 var(--fs-13) var(--f-ui);
+}
+.level-opt[aria-checked="true"] { box-shadow: 0 0 0 1px var(--gold); background: var(--gold-a14); }
+.level-desc { color: var(--ink-2); font-weight: 400; }
+.level-about { width: 100%; box-sizing: border-box; margin-bottom: var(--s-2); padding: var(--s-2); background: var(--track); border: 1px solid var(--edge); border-radius: var(--r-inset); color: var(--ink); font: var(--fs-13) var(--f-ui); }
+.level-about[hidden] { display: none; }
