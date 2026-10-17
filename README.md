@@ -9,7 +9,7 @@
 
 <p align="center">
   <img alt="Claude Code skill" src="https://img.shields.io/badge/Claude%20Code-skill-E8C26A?style=flat-square&labelColor=1A1B1F">
-  <img alt="18 games" src="https://img.shields.io/badge/games-18-8FD3A8?style=flat-square&labelColor=1A1B1F">
+  <img alt="20 games" src="https://img.shields.io/badge/games-20-8FD3A8?style=flat-square&labelColor=1A1B1F">
   <img alt="Node 18+" src="https://img.shields.io/badge/node-%E2%89%A518-5A7BA8?style=flat-square&labelColor=1A1B1F">
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-E8C26A?style=flat-square&labelColor=1A1B1F">
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-F5F3EE?style=flat-square&labelColor=1A1B1F">
@@ -18,7 +18,7 @@
 
 <p align="center">
   <a href="docs/media/own-it-promo.mp4">
-    <img src="docs/media/own-it-preview.gif" alt="own-it in 20 seconds: split-flap hook, a quiz, a quest on a copied app screen, and the 18-game library" width="88%">
+    <img src="docs/media/own-it-preview.gif" alt="own-it in 20 seconds: split-flap hook, a quiz, a quest on a copied app screen, and the 20-game library" width="88%">
   </a>
   <br>
   <sub>▶ <a href="docs/media/own-it-promo.mp4">Watch the 20-second video with sound</a></sub>
@@ -73,12 +73,12 @@ How:
   <tr>
     <td width="33%"><img src="docs/media/screen-quiz.jpg" alt="Quiz: who can approve a cancellation?"></td>
     <td width="33%"><img src="docs/media/screen-quest.jpg" alt="Quest on a rebuilt copy of the app's trip screen"></td>
-    <td width="33%"><img src="docs/media/screen-games.jpg" alt="The 18-game library"></td>
+    <td width="33%"><img src="docs/media/screen-games.jpg" alt="The 20-game library"></td>
   </tr>
   <tr>
     <td align="center"><sub><b>Quiz</b>: about your product, not code trivia</sub></td>
     <td align="center"><sub><b>Quests</b>: on copies of your own screens</sub></td>
-    <td align="center"><sub><b>18 games</b>, built from your code</sub></td>
+    <td align="center"><sub><b>20 games</b>, built from your code</sub></td>
   </tr>
 </table>
 
@@ -112,16 +112,24 @@ Each zone has a ladder: **Words → Map → Trace → Break → Boss**. Claim ev
 | <img src="docs/media/games/quests.svg" width="32"> | **Quests** | Trace | Walk a real flow across your screens and roles, one step at a time. |
 | <img src="docs/media/games/chain-reaction.svg" width="32"> | **Chain Reaction** | Trace | Click each step in order before the fuse burns out. |
 | <img src="docs/media/games/data-detective.svg" width="32"> | **Data Detective** | Trace | Stamp each status on a record's timeline and name who moved it. |
+| <img src="docs/media/games/next-tick.svg" width="32"> | **Next Tick** | Trace | One frozen moment of your app. Predict what happens next, tick by tick. |
 | <img src="docs/media/games/pipe-plumber.svg" width="32"> | **Pipe Plumber** | Trace | Rotate tiles until a button's request reaches the database. |
 | <img src="docs/media/games/whos-allowed.svg" width="32"> | **Who's Allowed?** | Trace | Decide fast who may do each action, and build a streak. |
 | <img src="docs/media/games/pager.svg" width="32"> | **3am Pager** | Break | An alarm goes off. Find the step that broke first, on the clock. |
 | <img src="docs/media/games/what-if.svg" width="32"> | **What-If Dial** | Break | Turn up traffic or timeouts and predict what fails first. |
 | <img src="docs/media/games/design-duel.svg" width="32"> | **Design Duel** | Break | Pick the design you'd ship and the real reason it beats the other. |
+| <img src="docs/media/games/case-file.svg" width="32"> | **Case File** | Break | A bug report lands as a case. Pick the real clues, accuse the guilty part, explain why. |
 | <img src="docs/media/games/boss-battle.svg" width="32"> | **Boss Battle** | Boss | Answer well to hit the boss. Three wrong answers and you lose. |
 | <img src="docs/media/games/escape-room.svg" width="32"> | **Escape Room** | Boss | Solve three puzzles about roles, flows and failures to open the door. |
 | <img src="docs/media/games/teach-back.svg" width="32"> | **Teach-back** | Bonus | Explain one of your screens to a product manager in two sentences. |
 
 Most games play from the keyboard, and the dashboard has sound effects, confetti and chill ambient music, which you can mute.
+
+Also in the box:
+
+- **Where this lives in your code.** After every round you get the `file:line` behind each answer, one click from your editor.
+- **Guided tutorials.** Every game has a How to play card, and the trickier ones (Blast Radius, Pipe Plumber, What-If Dial, Chain Reaction) have a short guided practice board. A first-visit tour explains the dashboard and the difference between Practice and Exam.
+- **A secret level.** If Claude notices a real bug while reading a zone, a hidden option appears in the Quests picker. Find the bug on a safe copy of your screens, then get the case report with its `file:line`. own-it still never touches your code.
 
 ## Principles
 
@@ -152,7 +160,7 @@ own-it/                 the skill (this is what you install)
   SKILL.md              entry point
   references/           instructions Claude loads only when needed
   scripts/own-it.mjs    zero-dependency helper CLI
-  assets/               dashboard, engine, 18 game templates, brand
+  assets/               dashboard, engine, 20 game templates, brand
 tests/                  node:test suite (npm test)
 fixtures/               sample app for end-to-end runs
 docs/                   design specs, plans, run reports, media
@@ -164,7 +172,7 @@ docs/                   design specs, plans, run reports, media
 npm test
 ```
 
-No dependencies to install. The suite covers every helper command, the browser engine (on a fake DOM), all 18 games, security rules, layout and the docs' word budgets.
+No dependencies to install. The suite covers every helper command, the browser engine (on a fake DOM), all 20 games, security rules, layout and the docs' word budgets.
 
 ## License
 
