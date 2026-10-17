@@ -254,6 +254,23 @@ test('pipe-plumber: a round that arrives already connected is scrambled, never s
   assert.equal(ppTiles(t)[5].classList.contains('reached'), false, 'the water does not reach the end at the start');
 });
 
+test('pipe-plumber: locked tiles stay put, a par costs XP per move over it, an unmarked start shows once turned', () => {
+  const r = ppRound();
+  r.tiles[1] = { type: 'straight', rot: 1 };
+  Object.assign(r, { locked: [1], par: 3, hideStart: true });
+  const t = boot('pipe-plumber', r);
+  assert.equal(ppTiles(t)[0].classList.contains('source'), false, 'the start is not marked');
+  assert.equal(ppTiles(t)[1].classList.contains('locked'), true);
+  ppTurn(t, 1, 3);
+  assert.equal(ppTiles(t)[1].getAttribute('data-turn'), '1', 'a locked tile does not turn');
+  assert.match(t.root.querySelector('.pp-moves').textContent, /Moves: 0 \(par 3\)/);
+  ppTurn(t, 0);
+  assert.equal(ppTiles(t)[0].classList.contains('source'), true, 'turning the start marks it');
+  ppTurn(t, 2, 2); ppTurn(t, 5, 3);
+  assert.equal(t.finished.length, 1);
+  assert.equal(t.results[0].xp, 34, '6 moves, 3 over par: 40 - 6');
+});
+
 test('data-detective: arrows move over the status grid in two dimensions', () => {
   const t = boot('data-detective', ddRound());
   assert.equal(focused(t), ddCards(t)[0]);

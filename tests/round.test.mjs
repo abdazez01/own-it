@@ -685,7 +685,7 @@ function reaches(r) {
   for (const i of seen) {
     open(r.tiles[i]).forEach((d) => {
       if ((d === 1 && i % cols === cols - 1) || (d === 3 && i % cols === 0)) return;
-      const j = i + SIDE[d];
+      const j = i + [-cols, 1, cols, -1][d];
       if (j < 0 || j >= r.tiles.length || seen.has(j) || !open(r.tiles[j]).includes((d + 2) % 4)) return;
       seen.add(j);
     });
@@ -697,7 +697,7 @@ test('pipe-plumber: a real path on the grid, solvable, never connected at the st
   const root = await pipeSetup();
   const starts = new Set(), turnSets = new Set();
   for (let k = 0; k < 60; k++) {
-    const out = await bld(root, 'pipe-plumber', { zone: 'trips', flow: 'fp' });
+    const out = await build({ _: ['pipe-plumber', put(root, { zone: 'trips', flow: 'fp' })], flags: { level: 'easy' } }, ctx(root));
     const r = loadRound(root, out.id);
     if (k === 0) assert.equal(out.id, 'trips-pipe-plumber-1');
     const ans = core.decode(r.answer);
@@ -756,6 +756,58 @@ test('pipe-plumber: a 12-step flow still lays out on the grid', async () => {
   assert.equal(core.decode(r.answer).cells.length, 12);
   assert.equal(new Set(core.decode(r.answer).cells).size, 12);
 });
+
+
+// Per level: the grid grows, decoys appear, fewer path tiles start right, and the round is solvable but never starts connected.
+const PP_LEVEL = { easy: { cols: 4, decoys: 0, wrong: 0.5 }, medium: { cols: 5, decoys: 3, wrong: 0.7 }, hard: { cols: 6, decoys: 5, wrong: 0.85 }, impossible: { cols: 7, decoys: 8, wrong: 1 } };
+const BASE_OPEN = { cap: [0], straight: [0, 2], corner: [0, 1], tee: [0, 1, 3] };
+for (const level of Object.keys(PP_LEVEL)) {
+  test(`pipe-plumber ${level}: solvable, decoys, not started solved, level extras`, async () => {
+    const root = await pipeSetup();
+    const m = loadModel(root);
+    const mid = Array.from({ length: 5 }, (_, i) => I({ id: `y${i}`, k: 'component', label: `Piece ${i}` }));
+    m.zones.trips.items.push(...mid, I({ id: 'f7', k: 'flow', label: 'Seven', steps: [['s1'], ...mid.map((x) => [x.id]), ['c2']] }));
+    saveModel(root, m);
+    for (const flow of ['fp', 'f7']) {
+      for (let k = 0; k < 25; k++) {
+        const out = await build({ _: ['pipe-plumber', put(root, { zone: 'trips', flow })], flags: { level } }, ctx(root));
+        const r = loadRound(root, out.id);
+        const want = PP_LEVEL[level];
+        const { cells } = core.decode(r.answer);
+        const n = cells.length;
+        assert.equal(r.grid.cols, want.cols);
+        assert.equal(r.tiles.length, r.grid.cols * r.grid.rows);
+        assert.equal(reaches(r), false, 'never starts connected');
+        // solvable: turning every path tile to a fitting turn connects the ends
+        const solved = r.tiles.map((t) => ({ ...t }));
+        cells.forEach((c, i) => {
+          const need = [cells[i - 1], cells[i + 1]].filter((x) => x !== undefined).map((o) => [-want.cols, 1, want.cols, -1].indexOf(o - c));
+          const rot = [0, 1, 2, 3].find((q) => need.every((d) => BASE_OPEN[solved[c].type].map((x) => (x + q) % 4).includes(d)));
+          assert.notEqual(rot, undefined, 'every path tile has a fitting turn');
+          solved[c].rot = rot;
+        });
+        assert.equal(reaches({ ...r, tiles: solved }), true, 'solvable');
+        const decoys = r.tiles.filter((t, c) => t.type === 'tee' || (!cells.includes(c) && t.type === 'cap')).length;
+        assert.equal(r.decoys, decoys);
+        assert.ok(decoys >= want.decoys, `${level} has at least ${want.decoys} decoys`);
+        const locked = r.locked || [];
+        const right = cells.filter((c, i) => {
+          const need = [cells[i - 1], cells[i + 1]].filter((x) => x !== undefined).map((o) => [-want.cols, 1, want.cols, -1].indexOf(o - c));
+          return need.every((d) => BASE_OPEN[r.tiles[c].type].map((x) => (x + r.tiles[c].rot) % 4).includes(d));
+        });
+        const lockedOnPath = locked.filter((c) => cells.includes(c)).length;
+        const wrongNeeded = Math.min(n - lockedOnPath, Math.max(1, level === 'easy' ? Math.floor(n / 2) : Math.ceil(n * want.wrong)));
+        assert.ok(n - right.length >= wrongNeeded, `${level}: at least ${wrongNeeded} path tiles start wrong`);
+        if (level === 'hard' || level === 'impossible') {
+          assert.ok(locked.length >= 1 && r.par >= 1, 'locked tiles and a par');
+          locked.forEach((c) => assert.ok(c >= 0 && c < r.tiles.length));
+        } else assert.equal(r.locked, undefined);
+        assert.equal(r.timeLimit !== undefined, level === 'impossible');
+        assert.equal(r.hideStart === true, level === 'impossible');
+      }
+    }
+  });
+}
 
 const dec = (i = 0) => ({ real: `Queue the work ${i}`, alt: `Do it inline ${i}`, reasons: [`Right reason ${i}`, `Wrong one ${i}a`, `Wrong one ${i}b`, `Wrong one ${i}c`], answer: 0 });
 const duelIn = (n = 3) => ({ zone: 'trips', decisions: Array.from({ length: n }, (_, i) => dec(i)) });

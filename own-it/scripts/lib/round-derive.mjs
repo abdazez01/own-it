@@ -92,26 +92,32 @@ export function detectiveSteps(input, byId, items) {
 
 // Pipe plumber: the grid for a flow's steps. The first step is the surface that starts the request, the last a component that stores it.
 // A random self-avoiding walk of one cell per step becomes the pipe path; every other cell is a spare pipe. Sides run clockwise from the
-// top (0 up, 1 right, 2 down, 3 left); a shape turned r quarter turns opens its base sides plus r. Tiles start at random turns, with at
-// least half of the path tiles out of place, so the round is solvable but never already solved.
-const PIPE_COLS = 4;
+// top (0 up, 1 right, 2 down, 3 left); a shape turned r quarter turns opens its base sides plus r. The level sets the size and the trouble:
+// a bigger grid, decoy tees and dead ends, fewer path tiles starting right, and (hard) locked tiles with a move par, (impossible) a timer
+// and an unmarked start. Every round is solvable and none starts connected.
 const PIPE_BASE = { cap: [0], straight: [0, 2], corner: [0, 1], tee: [0, 1, 3] };
+export const PIPE_LEVELS = {
+  easy: { cols: 4, rows: (n) => Math.max(2, Math.ceil(n / 2)), wrong: 0.5, decoys: 0, branches: 0, locked: 0, par: false, timed: false, hide: false },
+  medium: { cols: 5, rows: (n) => Math.max(3, Math.ceil(n / 3) + 1), wrong: 0.7, decoys: 3, branches: 1, locked: 0, par: false, timed: false, hide: false },
+  hard: { cols: 6, rows: (n) => Math.max(4, Math.ceil(n / 3) + 2), wrong: 0.85, decoys: 5, branches: 2, locked: 2, par: true, timed: false, hide: false },
+  impossible: { cols: 7, rows: (n) => Math.max(4, Math.ceil(n / 3) + 2), wrong: 1, decoys: 8, branches: 3, locked: 2, par: true, timed: true, hide: true },
+};
+const pipeOpen = (t) => PIPE_BASE[t.type].map((d) => (d + t.rot) % 4);
 // True when water from tile `start` reaches tile `end` across the whole grid (spare pipes included).
-function pipeReaches(tiles, cols, start, end) {
-  const open = (t) => PIPE_BASE[t.type].map((d) => (d + t.rot) % 4);
+export function pipeReaches(tiles, cols, start, end) {
   const at = [-cols, 1, cols, -1];
   const seen = new Set([start]);
   for (const i of seen) {
-    for (const d of open(tiles[i])) {
+    for (const d of pipeOpen(tiles[i])) {
       if ((d === 1 && i % cols === cols - 1) || (d === 3 && i % cols === 0)) continue;
       const j = i + at[d];
-      if (j >= 0 && j < tiles.length && !seen.has(j) && open(tiles[j]).includes((d + 2) % 4)) seen.add(j);
+      if (j >= 0 && j < tiles.length && !seen.has(j) && pipeOpen(tiles[j]).includes((d + 2) % 4)) seen.add(j);
     }
   }
   return seen.has(end);
 }
 
-export function pipeLayout(flowId, byId, items) {
+export function pipeLayout(flowId, byId, items, level = 'easy') {
   const flow = byId.get(flowId);
   if (flow.k !== 'flow') throw new Error(`"${flowId}" is not a flow`);
   const steps = flowSteps(flow, byId);
@@ -122,7 +128,8 @@ export function pipeLayout(flowId, byId, items) {
   const nameless = steps.filter((id) => !labeled(byId.get(id)));
   if (nameless.length) throw new Error(`steps without labels: ${nameless.join(', ')}`);
 
-  const n = steps.length, cols = PIPE_COLS, rows = Math.max(2, Math.ceil(n / 2));
+  const cfg = PIPE_LEVELS[level] || PIPE_LEVELS.medium;
+  const n = steps.length, cols = cfg.cols, rows = cfg.rows(n);
   const stepTo = [-cols, 1, cols, -1];
   const near = (i) => stepTo.map((d, side) => [side, i + d]).filter(([side, j]) => j >= 0 && j < cols * rows
     && !(side === 1 && i % cols === cols - 1) && !(side === 3 && i % cols === 0));
@@ -139,24 +146,48 @@ export function pipeLayout(flowId, byId, items) {
   for (const first of shuffle([...Array(cols * rows).keys()])) { cells = walk([first]); if (cells) break; }
 
   const tiles = Array.from({ length: cols * rows }, () => null);
-  const solution = new Map();
+  const need = new Map(); // path cell -> the sides it must open
   cells.forEach((cell, k) => {
     const sides = [k > 0 ? cells[k - 1] : null, k < n - 1 ? cells[k + 1] : null].filter((x) => x !== null).map((o) => stepTo.indexOf(o - cell));
-    let type, rot;
-    if (sides.length === 1) { type = 'cap'; rot = sides[0]; }
-    else if ((sides[0] + 2) % 4 === sides[1]) { type = 'straight'; rot = sides[0] % 2; }
-    else { type = 'corner'; rot = (sides[0] + 1) % 4 === sides[1] ? sides[0] : sides[1]; }
-    tiles[cell] = { type };
-    solution.set(cell, rot);
+    tiles[cell] = { type: sides.length === 1 ? 'cap' : (sides[0] + 2) % 4 === sides[1] ? 'straight' : 'corner' };
+    need.set(cell, sides);
   });
-  const fits = (cell, rot) => (tiles[cell].type === 'straight' ? rot % 2 === solution.get(cell) % 2 : rot === solution.get(cell));
+  const onPath = new Set(cells);
+  // Branches: a few middle path tiles become tees, so water can also run off the path.
+  shuffle(cells.slice(1, -1)).slice(0, cfg.branches).forEach((c) => { tiles[c].type = 'tee'; });
+  // Decoys: tees and dead ends on spare cells, those next to the path first.
+  const spare = [...tiles.keys()].filter((c) => !onPath.has(c));
+  const nextToPath = (c) => near(c).some(([, j]) => onPath.has(j));
+  const ordered = [...shuffle(spare.filter(nextToPath)), ...shuffle(spare.filter((c) => !nextToPath(c)))];
+  ordered.slice(0, cfg.decoys).forEach((c, i) => { tiles[c] = { type: i % 2 ? 'cap' : 'tee' }; });
   tiles.forEach((t, cell) => { if (!t) tiles[cell] = { type: Object.keys(PIPE_BASE)[randomInt(4)] }; });
-  // Redraw every turn until at least half of the path is out of place and no route, spare pipes included, joins the ends.
-  for (;;) {
-    tiles.forEach((t) => { t.rot = randomInt(4); });
-    if (cells.filter((c, k) => !fits(c, tiles[c].rot)).length >= Math.max(1, Math.floor(n / 2)) && !pipeReaches(tiles, cols, cells[0], cells[n - 1])) break;
+
+  const fits = (cell, rot) => { const open = pipeOpen({ type: tiles[cell].type, rot }); return need.get(cell).every((d) => open.includes(d)); };
+  const rotsOf = (cell, want) => [0, 1, 2, 3].filter((r) => fits(cell, r) === want);
+  const pick = (list) => list[randomInt(list.length)];
+  // Locked tiles (hard and up): one on the path, already right, and decoys that stay as they lie.
+  const lockedPath = cfg.locked ? shuffle(cells.slice(1, -1)).slice(0, 1) : [];
+  const lockedSpare = cfg.locked ? shuffle(spare).slice(0, Math.max(0, cfg.locked - lockedPath.length)) : [];
+  const free = cells.filter((c) => !lockedPath.includes(c));
+  const wrongMin = Math.min(free.length, Math.max(1, cfg.wrong === 0.5 ? Math.floor(n / 2) : Math.ceil(n * cfg.wrong)));
+  for (let tries = 0; ; tries++) {
+    if (tries > 5000) throw new Error('could not lay out the pipes; try again');
+    const more = cfg.wrong === 1 ? 0 : randomInt(free.length - wrongMin + 1);
+    const wrongSet = new Set(shuffle(free).slice(0, wrongMin + more));
+    cells.forEach((c) => { tiles[c].rot = pick(rotsOf(c, !wrongSet.has(c))); });
+    spare.forEach((c) => { tiles[c].rot = randomInt(4); });
+    if (!pipeReaches(tiles, cols, cells[0], cells[n - 1])) break;
   }
-  return { grid: { cols, rows }, tiles, start: cells[0], end: cells[n - 1], pathLength: n, cells, names: steps.map((id) => byId.get(id).label) };
+  const out = { grid: { cols, rows }, tiles, start: cells[0], end: cells[n - 1], pathLength: n, cells, names: steps.map((id) => byId.get(id).label) };
+  out.decoys = tiles.filter((t, c) => t.type === 'tee' || (!onPath.has(c) && t.type === 'cap')).length;
+  if (cfg.locked) out.locked = [...lockedPath, ...lockedSpare].sort((a, b) => a - b);
+  if (cfg.par) {
+    const turnsTo = (c) => [0, 1, 2, 3].find((k) => fits(c, (tiles[c].rot + k) % 4));
+    out.par = free.reduce((sum, c) => sum + turnsTo(c), 0) + 2;
+  }
+  if (cfg.timed) out.timeLimit = 20 + 12 * n;
+  if (cfg.hide) out.hideStart = true;
+  return out;
 }
 
 // Design duel: each decision's two designs land on random sides and its reasons in random order. The real side and reason live only in the answer.
@@ -197,7 +228,7 @@ export function roomPuzzles(input, byId, items) {
 }
 
 // Fills in answers the model already knows, so Claude never has to write them.
-export function derive(game, round, byId, items) {
+export function derive(game, round, byId, items, level = 'medium') {
   if (game === 'quests') {
     round.answer = round.objectives.map((o) => {
       const it = byId.get(o.element);
@@ -238,7 +269,7 @@ export function derive(game, round, byId, items) {
   } else if (game === 'pager') {
     round.cards = pagerChoices(round, byId, items).map((x) => ({ id: x.id, label: x.label }));
   } else if (game === 'pipe-plumber') {
-    const { cells, names, ...layout } = pipeLayout(round.flow, byId, items);
+    const { cells, names, ...layout } = pipeLayout(round.flow, byId, items, level);
     Object.assign(round, layout);
     round.answer = { cells, names };
   } else if (game === 'what-if') {

@@ -28,6 +28,12 @@
       throw new Error('This round cannot be played: malformed pipe plumber round.');
     }
     var start = round.start, end = round.end, pathLen = round.pathLength;
+    // Level extras, all optional: locked tiles, a move par (hard), a time limit and an unmarked start (impossible).
+    var locked = Array.isArray(round.locked) ? round.locked.filter(isCount) : [];
+    var par = isCount(round.par) && round.par > 0 ? round.par : 0;
+    var limit = isCount(round.timeLimit) && round.timeLimit > 0 ? round.timeLimit : 0;
+    var hidden = round.hideStart === true;
+    var reachedMost = 0, fuse = null;
     var labels = round && round.labels;
     var exam = (round && round.mode === 'exam') || OwnIt.mode === 'exam';
     var mode = exam ? 'exam' : 'practice';
@@ -35,6 +41,7 @@
     var done = false;
     var cur = start;
     var turns = 0;
+    var turned = !hidden; // an unmarked start shows itself once it is turned
     var turn = tiles.map(function (t) { return ((t.rot | 0) % 4 + 4) % 4; });
     var tm = kit.timers();
 
@@ -44,10 +51,12 @@
     shell.startTimer();
 
     var panel = OwnIt.el('section', { 'class': 'panel pp-panel' });
-    var goal = OwnIt.el('h2', { 'class': 'quiz-q' }, 'Turn the pipes so the request of "' + kit.label(round.flow, labels) + '" runs from the gold tile to the green tile.');
+    var goal = OwnIt.el('h2', { 'class': 'quiz-q' }, 'Turn the pipes so the request of "' + kit.label(round.flow, labels) + '" runs from ' +
+      (hidden ? 'its start (not marked: look for the dead ends) ' : 'the gold tile ') + 'to the green tile.' + (locked.length ? ' Padlocked tiles cannot turn.' : ''));
+    var moves = par ? OwnIt.el('p', { 'class': 'pp-moves quiz-why' }) : null;
     var board = OwnIt.el('div', { 'class': 'pp-board', role: 'group', 'aria-label': 'Pipes' });
     var live = OwnIt.el('p', { 'class': 'pp-live quiz-why', 'aria-live': 'polite' }, 'Tap a tile or press R to turn it. Arrow keys move.');
-    [goal, board, live].forEach(function (x) { panel.appendChild(x); });
+    [goal, moves, board, live].forEach(function (x) { if (x) panel.appendChild(x); });
     area.appendChild(panel);
     board.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
     var rows = tiles.length / cols;
@@ -59,11 +68,12 @@
 
     var pipes = [];
     var els = tiles.map(function (t, i) {
-      var b = OwnIt.el('button', { type: 'button', 'class': 'pp-tile' + (i === start ? ' source' : '') + (i === end ? ' sink' : '') });
+      var b = OwnIt.el('button', { type: 'button', 'class': 'pp-tile' + (i === start && !hidden ? ' source' : '') + (locked.indexOf(i) >= 0 ? ' locked' : '') + (i === end ? ' sink' : '') });
       var pipe = OwnIt.parseSvg('<svg viewBox="0 0 24 24"><path d="' + DRAW[t.type] + '"/></svg>');
       pipe.setAttribute('class', 'pp-pipe');
       pipes.push(pipe);
       b.appendChild(pipe);
+      if (locked.indexOf(i) >= 0) b.setAttribute('aria-disabled', 'true');
       b.addEventListener('click', function () { cur = i; rotate(i); });
       board.appendChild(b);
       return b;
@@ -76,8 +86,9 @@
     function paint(i) {
       pipes[i].style.transform = 'rotate(' + turn[i] * 90 + 'deg)';
       els[i].setAttribute('data-turn', String(turn[i]));
-      var name = i === start ? 'Start pipe' : i === end ? 'End pipe' : 'Pipe';
-      els[i].setAttribute('aria-label', name + ', open to the ' + sides(i).join(' and the ') + '. Turn with R or a tap.');
+      var name = i === start && !hidden ? 'Start pipe' : i === end ? 'End pipe' : 'Pipe';
+      var isLocked = locked.indexOf(i) >= 0;
+      els[i].setAttribute('aria-label', name + (isLocked ? ' (locked)' : '') + ', open to the ' + sides(i).join(' and the ') + (isLocked ? '. It cannot turn.' : '. Turn with R or a tap.'));
       els[i].setAttribute('tabindex', i === cur ? '0' : '-1');
     }
 
@@ -107,16 +118,19 @@
     function refresh() {
       var from = flow();
       els.forEach(function (b, i) {
-        if (Object.prototype.hasOwnProperty.call(from, i)) b.classList.add('reached'); else b.classList.remove('reached');
+        if (Object.prototype.hasOwnProperty.call(from, i) && !(hidden && i === start && !turned)) b.classList.add('reached'); else b.classList.remove('reached');
       });
       var count = Math.min(Object.keys(from).length, pathLen);
+      reachedMost = Math.max(reachedMost, count);
+      if (moves) moves.textContent = 'Moves: ' + turns + ' (par ' + par + ')';
       shell.setScore(count, pathLen);
       live.textContent = 'The water reaches ' + count + ' of ' + pathLen + ' tiles.';
       return from;
     }
 
     function rotate(i) {
-      if (done || !tiles[i]) return;
+      if (done || !tiles[i] || locked.indexOf(i) >= 0) return;
+      if (i === start) { turned = true; els[i].classList.add('source'); }
       turn[i] = (turn[i] + 1) % 4;
       turns++;
       OwnIt.sound('press');
@@ -127,6 +141,7 @@
 
     function solve(from) {
       done = true;
+      if (fuse) fuse.stop();
       var route = [];
       for (var i = end; i !== -1; i = from[i]) route.unshift(i);
       var dec = OwnItCore.decode(round.answer); // the only place the flow's order is decoded
@@ -141,10 +156,21 @@
       live.textContent = names.length ? 'The water flows: ' + names.join(', then ') + '.' : 'The water got through.';
       shell.setScore(pathLen, pathLen);
       var send = function () {
-        kit.finish(shell, ctx, { game: 'pipe-plumber', mode: mode, got: pathLen, of: pathLen, xp: pathLen * XP_TILE,
-          missed: [], review: [], extra: { turns: turns } });
+        // With a par, every move over it costs 2 XP, down to half of the full score.
+        var full = pathLen * XP_TILE, xp = par ? Math.max(Math.floor(full / 2), full - Math.max(0, turns - par) * 2) : full;
+        kit.finish(shell, ctx, { game: 'pipe-plumber', mode: mode, got: pathLen, of: pathLen, xp: xp,
+          missed: [], review: [], extra: par ? { turns: turns, par: par } : { turns: turns } });
       };
       if (reduced) send(); else tm.later(send, route.length * WATER_MS + WATER_TAIL);
+    }
+
+    function timeUp() {
+      if (done) return;
+      done = true;
+      OwnIt.sound('wrong');
+      live.textContent = 'Time is up. The water reached ' + reachedMost + ' of ' + pathLen + ' tiles.';
+      kit.finish(shell, ctx, { game: 'pipe-plumber', mode: mode, got: reachedMost, of: pathLen, xp: reachedMost * (XP_TILE / 2),
+        missed: [], review: [{ text: 'Time ran out before the water got through.' }], extra: { turns: turns, timedOut: true } });
     }
 
     function focusTile(i) {
@@ -170,9 +196,11 @@
     tiles.forEach(function (t, i) { paint(i); });
     refresh();
     focusTile(cur);
+    if (limit) fuse = kit.clock(panel, limit * 1000, { label: 'Seconds left', onEnd: timeUp });
 
     return function () {
       done = true;
+      if (fuse) fuse.stop();
       tm.clear();
       kit.release(offs);
       shell.destroy();

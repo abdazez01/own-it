@@ -25,17 +25,18 @@ Round data is JSON in `.own-it/`; `build-round <game> <file>` writes the page da
 
 Rungs: words (quiz, memory-match, spot-the-lie), map (whiteboard, screen-tour, guess-the-screen, blast-radius), trace (quests, chain-reaction, data-detective, pipe-plumber, whos-allowed), break (pager, what-if, design-duel), boss (boss-battle, escape-room).
 
-Quiz, screen-tour and guess-the-screen need `answer` on every entry. Screen-tour `chain`: `element`, 2-4 `choices` (model ids), answer one; `find`: no `choices`, answer an element id; `role`: free-text `choices`, answer one. Guess-the-screen: `choices` are surface ids, answer one. Quests and whiteboard carry none. A quest step is reachable from `start` by `goes`, or sits on a screen whose element `roles` differ from the step before (role switch, key R). Ids must exist in the zone. Player-facing text is never a bare identifier.
+Quiz, screen-tour and guess-the-screen need `answer` on every entry. Screen-tour `chain`: `element`, 2-4 `choices` (model ids), answer one; `find`: no `choices`, answer an element id; `role`: free-text `choices`, answer one. Guess-the-screen `choices` are surface ids. A quest step is reachable from `start` by `goes`, or sits on a screen whose element `roles` differ from the step before (key R). Ids must exist in the zone. Player-facing text is never a bare identifier.
 
 Errors name the bad field; fix and rerun, nothing was written.
 
 ## Levels
 
 The player picks per game on Home:
-- **Easy**: I do not know this app. Screens and words, no code, free hints. Favor `screen-tour`, `quests`, `quiz`, `guess-the-screen`.
+- **Easy**: I do not know this app. Screens and words, no code, free hints. Favor `screen-tour`, `quests`, `quiz`.
 - **Medium**: I know some parts. Data flow, light code names, hints cost 15 XP.
 - **Hard**: I know it well. Code paths, failures, permissions; hints cost 30 XP; Exam default.
 - **Impossible**: all-out. Edge cases, no hints, timers on, boss open. Favor break and boss games.
 - **Other**: describes what they know (`about`); infer the nearest base level.
 
 `build-recs` orders by the last level used (other uses its base). Rounds store their level. The page applies hint and timer policy.
+Pipe plumber scales: bigger grid, decoys, fewer tiles pre-turned; hard adds locked tiles and a par; impossible a timer and unmarked start.

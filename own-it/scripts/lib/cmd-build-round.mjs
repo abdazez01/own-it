@@ -263,16 +263,6 @@ export async function run(args, ctx) {
   const progress = loadProgress(ctx.root);
   const id = `${input.zone}-${game}-${progress.seq + 1}`;
   const round = { ...input };
-  derive(game, round, byId, items);
-  // Movers that are not model roles are shown as written, so they must read as words.
-  if (game === 'data-detective') round.who.forEach((w) => { if (!byId.has(w.id) && identifierOnly(w.label)) throw new Error(`identifier-only answer in a transition "by"; ${HINT}`); });
-  const labelIds = new Set(named);
-  for (const id of named) { const it = byId.get(id); if (it && it.k === 'element') for (const x of [it.on, it.goes]) if (typeof x === 'string') labelIds.add(x); }
-  if (['chain-reaction', 'blast-radius', 'pager', 'data-detective'].includes(game)) round.cards.forEach((c) => labelIds.add(c.id));
-  if (game === 'data-detective') round.who.forEach((c) => labelIds.add(c.id));
-  if (game === 'escape-room') round.puzzles.forEach((pz) => (pz.cards || []).forEach((c) => labelIds.add(c.id)));
-  const nav = game === 'quests' ? navFor(input, items) : null;
-  if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
   // The pick's level (--level, --base, --about) wins; else the level stored by the `level` command.
   const fl = args.flags;
   let st = progress.settings;
@@ -282,6 +272,16 @@ export async function run(args, ctx) {
     st = { level: fl.level, levelBase: fl.base, levelAbout: typeof fl.about === 'string' ? fl.about.trim() : undefined };
   }
   const lvl = st.level ? { level: st.level, ...(st.level === 'custom' ? { about: st.levelAbout, levelBase: st.levelBase } : {}) } : {};
+  derive(game, round, byId, items, st.level === 'custom' ? st.levelBase : st.level);
+  // Movers that are not model roles are shown as written, so they must read as words.
+  if (game === 'data-detective') round.who.forEach((w) => { if (!byId.has(w.id) && identifierOnly(w.label)) throw new Error(`identifier-only answer in a transition "by"; ${HINT}`); });
+  const labelIds = new Set(named);
+  for (const id of named) { const it = byId.get(id); if (it && it.k === 'element') for (const x of [it.on, it.goes]) if (typeof x === 'string') labelIds.add(x); }
+  if (['chain-reaction', 'blast-radius', 'pager', 'data-detective'].includes(game)) round.cards.forEach((c) => labelIds.add(c.id));
+  if (game === 'data-detective') round.who.forEach((c) => labelIds.add(c.id));
+  if (game === 'escape-room') round.puzzles.forEach((pz) => (pz.cards || []).forEach((c) => labelIds.add(c.id)));
+  const nav = game === 'quests' ? navFor(input, items) : null;
+  if (nav) for (const [eid, n] of Object.entries(nav)) for (const x of [eid, n.on, n.goes, ...(n.roles || [])]) if (typeof x === 'string') labelIds.add(x);
   const data = { id, game, zone: input.zone, rung: meta.rung, ...lvl, ...obfuscate(round), ...(nav ? { nav } : {}), labels: labelsFor(labelIds, byId) };
 
   // All validation done; write.

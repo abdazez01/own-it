@@ -719,6 +719,8 @@ button.board-row, a.board-row { cursor: pointer; transition: background var(--t-
 .pp-pipe path { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: butt; stroke-linejoin: miter; }
 .pp-tile.source { border-color: var(--gold); }
 .pp-tile.sink { border-color: var(--sage); }
+.pp-tile.locked { cursor: not-allowed; border-style: dashed; opacity: 0.85; }
+.pp-moves { margin: var(--s-2) 0; }
 .pp-tile.reached { color: var(--gold); background: var(--gold-a16); }
 .pp-tile.wet { color: var(--sage); background: var(--sage-a16); border-color: var(--sage); }
 @media (prefers-reduced-motion: reduce) { .pp-pipe, .pp-tile { transition: none; } }
